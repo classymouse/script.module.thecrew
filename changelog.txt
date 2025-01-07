@@ -1,0 +1,31 @@
+[COLOR orchid][B]version 2.0.7[/B][/COLOR]
+* [COLOR red]Warning[/COLOR]: As of his version The crew will only (!) supports Python 3.6 and above which means, for now, kodi v20 and 21. Unexpected results WILL happen when using on v19.
+
+
+* [COLOR green]Added[/COLOR]: total episodes/seasons and watched/unwatched episodes where available (if your skin supports it!)
+* [COLOR green]Added[/COLOR]: widgets don't show unaired episodes in progress list anymore. In normal listings they are colored based on your settings
+* [COLOR green]Added[/COLOR]: holiday/christmas movies menu item will be shown automagically in December
+* [COLOR green]Added[/COLOR]: search items can be deleted per item inside dialog (hold button or right-click)
+
+* [COLOR orange]Fixed[/COLOR]: trailers playing again
+* [COLOR orange]Fixed[/COLOR]: major core code changes py2 to 3
+* [COLOR orange]Fixed[/COLOR]: countless bugs in code due to py 3
+* [COLOR orange]Fixed[/COLOR]: fanart size quality now works in info screens and all other widgetsd etc. (you might want to clear your cache)
+* [COLOR orange]Fixed[/COLOR]: selecting an actor with the tmdb addon installed is fixed
+* [COLOR orange]Fixed[/COLOR]: all references to "next", so all nextpages are working again properly
+* [COLOR orange]Fixed[/COLOR]:
+* [COLOR orange]Fixed[/COLOR]:
+* [COLOR orange]Fixed[/COLOR]:
+* [COLOR orange]Fixed[/COLOR]:
+* [COLOR orange]Fixed[/COLOR]:
+
+* [COLOR cyan]Changed[/COLOR]: several (missing) language strings
+* [COLOR cyan]Changed[/COLOR]: trailers: 1 result plays automatically, multiple results can be selected from inm a dialog
+* [COLOR cyan]Changed[/COLOR]: changed startup dialogs -> silent boot is now really silent (will log when debug is enabled)
+* [COLOR cyan]Changed[/COLOR]: changed tvshows/seasons/episodes/movies etc. to use the new Listitems
+* [COLOR cyan]Changed[/COLOR]: artwork (e.g. clearlogo, clearart and a new thumbnail for TVShows)
+
+* [COLOR orchid]Extra[/COLOR]: Bumped version to 2.0.7/module to 2.1.1
+
+* [COLOR red]Removed[/COLOR]: a bunch of startup code
+* [COLOR red]Removed[/COLOR]:
