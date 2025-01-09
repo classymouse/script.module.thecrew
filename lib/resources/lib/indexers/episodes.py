@@ -1558,6 +1558,17 @@ class episodes:
                 tvshowtitle = i['tvshowtitle']
                 premiered = i['premiered']
 
+                unaired = ''
+                if not premiered or premiered == '0':
+                    pass
+                elif int(re.sub('[^0-9]', '', str(premiered))) > int(re.sub('[^0-9]', '', str(self.today_date))):
+                    unaired = 'true'
+                    if self.showunaired != 'true':
+                        raise Exception('unaired is False')
+
+
+
+
                 status = i['status']
                 duration = i['duration']
                 mpaa = i['mpaa']
@@ -1632,8 +1643,9 @@ class episodes:
                                     'writer': writer, 'castwiththumb': castwiththumb, 'plot': plot,
                                     'imdb': imdb, 'tvdb': tvdb, 'tmdb': tmdb, 'poster': poster,
                                     'banner': banner, 'fanart': fanart, 'thumb': thumb,
-                                    'clearlogo': clearlogo, 'clearart': clearart, 'landscape': landscape,
-                                    'paused_at': paused_at, 'watched_at': watched_at})
+                                    'clearlogo': clearlogo, 'clearart': clearart,
+                                    'landscape': landscape, 'paused_at': paused_at,
+                                    'unaired': unaired, 'watched_at': watched_at})
             except Exception as e:
                 import traceback
                 failure = traceback.format_exc()
@@ -2049,7 +2061,7 @@ class episodes:
             try:
                 #c.log(f"[CM Debug @ 2048 in episodes.py] item = {item}")
                 label = item['label'] if 'label' in item else item['title']
-                if item['unaired'] == 'true':
+                if 'unaired' in item and item['unaired'] == 'true':
                     label = unaired_color % label
 
                 imdb_id = item['imdb']

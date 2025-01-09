@@ -17,18 +17,17 @@
 #cm - 2024/11/12 - new file
 import json
 import time
+import traceback
 import requests
 
-from . import client
 from . import keys
-from .crewruntime import c
-from . import cache
 from . import control
 from .crewruntime import c
 
 import sqlite3 as database
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
+
 
 
 #######cm#
@@ -87,11 +86,11 @@ def get_fanart_tv_art(tvdb, imdb = '0', lang='en', mediatype='tv'):
 
     zero_str = {}
 
-    def extract_artwork(art, key, lang):
+    def _extract_artwork(art, key, lang):
         try:
-            items = art[key]
-            ordered_items = sorted(items, key=lambda x: (x.get('lang') != lang, x.get('lang') != 'en', x.get('lang') not in ['00', '']))
-            return ordered_items[0]['url'] if ordered_items else '0'
+            items = art.get(key, [])
+            sorted_items = sorted(items, key=lambda x: (x.get('lang') != lang, x.get('lang') != 'en', x.get('lang') not in ['00', '']))
+            return sorted_items[0].get('url', '0') if sorted_items else '0'
         except Exception:
             return '0'
 
@@ -120,21 +119,21 @@ def get_fanart_tv_art(tvdb, imdb = '0', lang='en', mediatype='tv'):
         return zero_str
 
     if mediatype == 'tv':
-        poster = extract_artwork(art, 'tvposter', lang)
-        fanart = extract_artwork(art, 'showbackground', lang)
-        banner = extract_artwork(art, 'tvbanner', lang)
-        clearlogo = extract_artwork(art, 'hdtvlogo' if 'hdtvlogo' in art else 'clearlogo', lang)
-        clearart = extract_artwork(art, 'hdclearart' if 'hdclearart' in art else 'clearart', lang)
-        landscape = extract_artwork(art, 'tvthumb' if 'tvthumb' in art else 'showbackground', lang)
+        poster = _extract_artwork(art, 'tvposter', lang)
+        fanart = _extract_artwork(art, 'showbackground', lang)
+        banner = _extract_artwork(art, 'tvbanner', lang)
+        clearlogo = _extract_artwork(art, 'hdtvlogo' if 'hdtvlogo' in art else 'clearlogo', lang)
+        clearart = _extract_artwork(art, 'hdclearart' if 'hdclearart' in art else 'clearart', lang)
+        landscape = _extract_artwork(art, 'tvthumb' if 'tvthumb' in art else 'showbackground', lang)
         discart = '0'
     elif mediatype == 'movie':
-        poster = extract_artwork(art, 'movieposter', lang)
-        fanart = extract_artwork(art, 'moviebackground' if 'moviebackground' in art else 'moviethumb', lang)
-        banner = extract_artwork(art, 'moviebanner', lang)
-        clearlogo = extract_artwork(art, 'hdmovielogo', lang)
-        clearart = extract_artwork(art, 'hdmovieclearart', lang)
-        landscape = extract_artwork(art, 'moviethumb' if 'moviethumb' in art else 'moviebackground', lang)
-        discart = extract_artwork(art, 'moviediscart', lang)
+        poster = _extract_artwork(art, 'movieposter', lang)
+        fanart = _extract_artwork(art, 'moviebackground' if 'moviebackground' in art else 'moviethumb', lang)
+        banner = _extract_artwork(art, 'moviebanner', lang)
+        clearlogo = _extract_artwork(art, 'hdmovielogo', lang)
+        clearart = _extract_artwork(art, 'hdmovieclearart', lang)
+        landscape = _extract_artwork(art, 'moviethumb' if 'moviethumb' in art else 'moviebackground', lang)
+        discart = _extract_artwork(art, 'moviediscart', lang)
     else:
         return zero_str
 
@@ -157,27 +156,30 @@ def get_cached_fanart(tvdb, imdb, url, headers, timeout, error=True):
             dbcon = database.connect(control.cacheFile)
             dbcur = dbcon.cursor()
 
-
-
             sql = f"SELECT * FROM fanart_cache WHERE url = '{url}' and added < {time.time() - TWOWEEKS}"
+            c.log(f"[CM Debug @ 160 in fanart.py] sql = {sql}")
             dbcur.execute(sql)
             result = dbcur.fetchone()
 
             if result:
-                return result[4]#data
+                #data
+                return json.dumps(result[4], indent=4, sort_keys=True)
             else:
-                #there is no data in the cache
-                response = client.request(url, headers=headers, timeout=timeout, error=error)
-                if response.code == 200:
+                #no data in cache
+                response = session.get(url, headers=headers, timeout=30)
+                response.encoding = 'utf-8'
+                txt = json.loads(response.text)
+                c.log(f"[CM Debug @ 172 in fanart.py] txt2 = {txt}")
+
+                if response.status_code == 200:
                     sql = "INSERT or REPLACE INTO fanart_cache (tvdb, imdb, url, data, added) Values (?,?,?,?,?)"
-                    dbcur.execute(sql, (tvdb, imdb, url, response, int(time.time())))
+                    c.log(f"[CM Debug @ 174 in fanart.py] sql = {sql}")
+                    dbcur.execute(sql, (tvdb, imdb, url, txt, int(time.time())))
                     dbcon.commit()
                     return response
-
             dbcon.close()
 
     except Exception as e:
-        import traceback
         failure = traceback.format_exc()
         c.log(f'[CM Debug @ 136 in fanart.py]Traceback:: {failure}')
         c.log(f'[CM Debug @ 136 in fanart.py]Exception raised. Error = {e}')

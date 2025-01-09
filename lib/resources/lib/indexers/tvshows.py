@@ -22,16 +22,12 @@ import datetime
 import json
 
 import sqlite3 as database
-# cm:
-# from dbapi2 import * is included in __init__ from the sqlite3 package so calling the dbapi2 has
-# become obsolete.
-# sqlite3.connect() for instance is the documented way, sqlite3.dbapi2.connect() can be skipped
 from urllib.parse import quote, quote_plus, parse_qsl, urlparse, urlsplit, urlencode
 
 
-import requests # type: ignore
+import requests
 #import xbmc
-import six # type: ignore
+
 
 from resources.lib.modules import trakt
 from resources.lib.modules import keys
@@ -48,13 +44,6 @@ from resources.lib.modules import fanart as fanart_tv
 from resources.lib.indexers import navigator
 from resources.lib.modules.listitem import ListItemInfoTag
 from resources.lib.modules.crewruntime import c
-
-#from sqlite3 import dbapi2 as database
-
-
-# cm (2024/10/13) - please leave both here, future implementation
-#from resources.lib.modules import artwork
-#from bs4 import BeautifulSoup
 
 
 params = dict(parse_qsl(sys.argv[2].replace('?',''))) if len(sys.argv) > 1 else {}
@@ -934,45 +923,68 @@ class tvshows:
                 title = item['name']
                 originaltitle = item.get('original_name', '') or title
 
-                try: rating = str(item['vote_average'])
-                except Exception: rating = ''
-                if not rating: rating = '0'
+                try:
+                    rating = str(item['vote_average'])
+                except Exception:
+                    rating = ''
+                if not rating:
+                    rating = '0'
 
-                try: votes = str(item['vote_count'])
-                except Exception: votes = ''
-                if not votes: votes = '0'
+                try:
+                    votes = str(item['vote_count'])
+                except Exception:
+                    votes = ''
+                if not votes:
+                    votes = '0'
 
-                try: premiered = item['first_air_date']
-                except Exception: premiered = ''
-                if not premiered : premiered = '0'
+                try:
+                    premiered = item['first_air_date']
+                except Exception:
+                    premiered = ''
+                if not premiered :
+                    premiered = '0'
 
                 unaired = ''
                 if not premiered or premiered == '0':
                     pass
                 elif int(re.sub('[^0-9]', '', str(premiered))) > int(re.sub('[^0-9]', '', str(self.today_date))):
                     unaired = 'true'
-                    if self.showunaired != 'true': raise Exception('unaired is False')
+                    if self.showunaired != 'true':
+                        raise Exception('unaired is False')
 
-                try: year = re.findall('(\d{4})', premiered)[0]
-                except Exception: year = ''
-                if not year : year = '0'
+                try:
+                    year = re.findall('(\d{4})', premiered)[0]
+                except Exception:
+                    year = ''
+                if not year :
+                    year = '0'
 
-                try: plot = item['overview']
-                except Exception: plot = ''
-                if not plot: plot = '0'
+                try:
+                    plot = item['overview']
+                except Exception:
+                    plot = ''
+                if not plot:
+                    plot = '0'
 
-                try: poster_path = item['poster_path']
-                except Exception: poster_path = ''
-                if poster_path: poster = self.tmdb_img_link % (c.tmdb_postersize, poster_path)
-                else: poster = '0'
+                try:
+                    poster_path = item['poster_path']
+                except Exception:
+                    poster_path = ''
+                if poster_path:
+                    poster = self.tmdb_img_link % (c.tmdb_postersize, poster_path)
+                else:
+                    poster = '0'
 
                 backdrop_path = item['backdrop_path'] if 'backdrop_path' in item else ''
                 if backdrop_path:
                     fanart = self.tmdb_img_link % (c.tmdb_fanartsize, 'backdrop_path')
 
-                self.list.append({'title': title, 'originaltitle': originaltitle, 'premiered': premiered,
-                                    'year': year, 'rating': rating, 'votes': votes, 'plot': plot,
-                                    'imdb': '0', 'tmdb': tmdb, 'tvdb': '0', 'poster': poster, 'fanart': fanart, 'next': _next})
+                self.list.append({'title': title, 'originaltitle': originaltitle,
+                                'premiered': premiered, 'year': year, 'rating': rating,
+                                'votes': votes, 'plot': plot, 'imdb': '0', 'tmdb': tmdb,
+                                'tvdb': '0', 'poster': poster, 'fanart': fanart, 'next': _next,
+                                'unaired': unaired
+                                })
             except Exception as e:
                 c.log(f'[CM DEBUG @ 1082 in tvshows.py] Exception raised: e = {e}')
                 pass
@@ -992,12 +1004,15 @@ class tvshows:
 
             #items = items[:50]
 
-            _next = ''; last = []; nextp = []
+            _next = ''
+            last = []
+            nextp = []
             page = int(str(url.split('&page=', 1)[1]))
             _next = '%s&page=%s' % (url.split('&page=', 1)[0], page+1)
             last = client.parseDOM(result, 'li', attrs = {'class': 'last disabled'})
             nextp = client.parseDOM(result, 'li', attrs = {'class': 'next'})
-            if last != [] or nextp == []: _next = ''
+            if last != [] or nextp == []:
+                _next = ''
         except Exception:
             return
 
@@ -1019,62 +1034,89 @@ class tvshows:
                     premiered = re.findall(r'(\d{4}-\d{2}-\d{2})', premiered)[0]
                 except Exception:
                     premiered = '0'
-                premiered = six.ensure_str(premiered)
+                premiered = c.ensure_str(premiered)
 
                 year = item['premiered']
-                try: year = re.findall('(\d{4})', year)[0]
-                except Exception: year = '0'
+                try:
+                    year = re.findall('(\d{4})', year)[0]
+                except Exception:
+                    year = '0'
                 year = str(year)
 
                 #if int(year) > int(self.datetime.strftime('%Y')): raise Exception()
 
                 imdb = item['externals']['imdb']
-                if imdb is None or imdb == '': imdb = '0'
-                else: imdb = 'tt' + re.sub('[^0-9]', '', str(imdb))
+                if imdb is None or imdb == '':
+                    imdb = '0'
+                else:
+                    imdb = 'tt' + re.sub('[^0-9]', '', str(imdb))
                 imdb = str(imdb)
 
                 tvdb = item['externals']['thetvdb']
-                if tvdb is None or tvdb == '': tvdb = '0'
-                else: tvdb = re.sub('[^0-9]', '', str(tvdb))
+                if tvdb is None or tvdb == '':
+                    tvdb = '0'
+                else:
+                    tvdb = re.sub('[^0-9]', '', str(tvdb))
                 tvdb = str(tvdb)
 
-                try: poster = item['image']['original']
-                except Exception: poster = '0'
-                if  not poster: poster = '0'
+                try:
+                    poster = item['image']['original']
+                except Exception:
+                    poster = '0'
+                if not poster:
+                    poster = '0'
                 poster = str(poster)
 
-                try: studio = item['network']['name']
-                except Exception: studio = '0'
-                if studio is None: studio = '0'
-                studio = six.ensure_str(studio)
+                try:
+                    studio = item['network']['name']
+                except Exception:
+                    studio = '0'
+                if studio is None:
+                    studio = '0'
+                studio = c.ensure_str(studio)
 
-                try: genre = item['genres']
-                except Exception: genre = '0'
+                try:
+                    genre = item['genres']
+                except Exception:
+                    genre = '0'
                 genre = [i.title() for i in genre]
-                if genre == []: genre = '0'
+                if genre == []:
+                    genre = '0'
                 genre = ' / '.join(genre)
                 genre = str(genre)
 
-                try: duration = item['runtime']
-                except Exception: duration = '0'
-                if duration is None: duration = '0'
+                try:
+                    duration = item['runtime']
+                except Exception:
+                    duration = '0'
+                if duration is None:
+                    duration = '0'
                 duration = str(duration)
 
-                try: rating = item['rating']['average']
-                except Exception: rating = '0'
-                if rating is None or rating == '0.0': rating = '0'
+                try:
+                    rating = item['rating']['average']
+                except Exception:
+                    rating = '0'
+                if rating is None or rating == '0.0':
+                    rating = '0'
                 rating = str(rating)
 
-                try: plot = item['summary']
-                except Exception: plot = '0'
-                if plot is None: plot = '0'
+                try:
+                    plot = item['summary']
+                except Exception:
+                    plot = '0'
+                if plot is None:
+                    plot = '0'
                 plot = re.sub('<.+?>|</.+?>|\n', '', plot)
                 plot = client.replaceHTMLCodes(plot)
                 plot = str(plot)
 
-                try: content = item['type'].lower()
-                except Exception: content = '0'
-                if content is None or content == '': content = '0'
+                try:
+                    content = item['type'].lower()
+                except Exception:
+                    content = '0'
+                if content is None or content == '':
+                    content = '0'
                 content = str(content)
 
                 self.list.append({
@@ -1331,12 +1373,15 @@ class tvshows:
             writers = [d['name'] for d in crew if d['job'] == 'Writer'] or ['0']
             writer = ' / '.join(writers)
 
-            duration = str(item.get('episode_run_time', ['0'])[0]) if 'episode_run_time' in item else '0'
+
+            duration = '46'
+
+            #duration = str(item.get('episode_run_time', ['0'])[0]) if 'episode_run_time' in item and item['episode_run_time'] != [] else '0'
 
             ratings = item.get('content_ratings', {}).get('results', [])
             mpaa = next((d['rating'] for d in ratings if d['iso_3166_1'] == 'US'), '0')
 
-            plot = item.get('overview', item_data.get('plot', 'The Crew - No Plot Available'))
+            plot = item.get('overview', item_data.get('plot', control.lang(32623)))
             plot = client.replaceHTMLCodes(plot)
 
             tagline = client.replaceHTMLCodes(tagline) if tagline != '0' else '0'
@@ -1678,6 +1723,7 @@ class tvshows:
 
         traktCredentials = trakt.getTraktCredentialsInfo()
         indicators = playcount.getTVShowIndicators(refresh=True) if action == 'tvshows' else playcount.getTVShowIndicators()
+        c.log(f"[CM Debug @ 1726 in tvshows.py] action = {action}")
         c.log(f"[CM Debug @ 1681 in tvshows.py] indicators = {indicators}")
         flatten = control.setting('flatten.tvshows') or 'false'
 

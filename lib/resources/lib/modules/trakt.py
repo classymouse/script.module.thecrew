@@ -28,9 +28,7 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
 import sqlite3 as database
-
 from sqlite3 import OperationalError
-
 
 from . import cache
 from . import cleandate
@@ -424,15 +422,25 @@ def getWatchedActivity():
     try:
         i = getTraktAsJson('/sync/last_activities')
 
+        c.log(f"[CM Debug @ 425 in trakt.py] i = {i}")
+
         activity = []
         activity.append(i['movies']['watched_at'])
         activity.append(i['episodes']['watched_at'])
         activity = [cleandate.iso_to_utc(i) for i in activity]
+        c.log(f"[CM Debug @ 431 in trakt.py] activity = {activity}")
         activity = sorted(activity, key=int)[-1]
 
         return activity
-    except:
+
+    except Exception as e:
+        import traceback
+        failure = traceback.format_exc()
+        c.log(f'[CM Debug @ 435 in trakt.py]Traceback:: {failure}')
+        c.log(f'[CM Debug @ 435 in trakt.py]Exception raised. Error = {e}')
         pass
+    #except:
+    #    pass
 
 
 def cachesyncMovies(timeout=0):
@@ -460,7 +468,9 @@ def syncMovies(user):
 
 
 def cachesyncTVShows(timeout=0):
-    indicators = cache.get(syncTVShows, timeout, trakt_user)
+    #indicators = cache.get(syncTVShows, timeout, trakt_user)
+    indicators = syncTVShows(0)
+    c.log(f"[CM Debug @ 463 in trakt.py] indicators = {indicators}")
     return indicators
 
 
@@ -470,14 +480,34 @@ def timeoutsyncTVShows():
         timeout = 0
     return timeout
 
-
 def syncTVShows(user):
     try:
+        if not getTraktCredentialsInfo():
+            c.log("[CM Debug @ 474 in trakt.py] getTraktCredentialsInfo is false")
+            return
+        c.log("[CM Debug @ 475 in trakt.py] getTraktCredentialsInfo is true")
+        watched_shows = getTraktAsJson('/users/me/watched/shows?extended=full')
+        c.log(f"[CM Debug @ 476 in trakt.py] watched_shows = {watched_shows}")
+        indicators = [(show['show']['ids']['tmdb'], show['show']['aired_episodes'], [(s['number'], e['number']) for s in show['seasons'] for e in s['episodes']]) for show in watched_shows]
+        c.log(f"[CM Debug @ 478 in trakt.py] indicators = {indicators}")
+        indicators = [(str(tmdb_id), aired_episodes, watched_episodes) for tmdb_id, aired_episodes, watched_episodes in indicators]
+        c.log(f"[CM Debug @ 480 in trakt.py] indicators = {indicators}")
+        return indicators
+    except:
+        pass
+
+
+def syncTVShows2(user):
+    try:
         if getTraktCredentialsInfo() is False:
+            c.log("[CM Debug @ 475 in trakt.py] getTraktCredentialsInfo is false")
             return
         indicators = getTraktAsJson('/users/me/watched/shows?extended=full')
+        c.log(f"[CM Debug @ 478 in trakt.py] indicators = {indicators}")
         indicators = [(i['show']['ids']['tmdb'], i['show']['aired_episodes'], sum([[(s['number'], e['number']) for e in s['episodes']] for s in i['seasons']], [])) for i in indicators]
+        c.log(f"[CM Debug @ 480 in trakt.py] indicators = {indicators}")
         indicators = [(str(i[0]), int(i[1]), i[2]) for i in indicators]
+        c.log(f"[CM Debug @ 482 in trakt.py] indicators = {indicators}")
         return indicators
     except:
         pass

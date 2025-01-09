@@ -57,8 +57,14 @@ def getTVShowIndicators(refresh=False):
         else:
             timeout = 0
         return trakt.cachesyncTVShows(timeout=timeout)
-    except Exception:
+    except Exception as e:
+        import traceback
+        failure = traceback.format_exc()
+        c.log(f'[CM Debug @ 60 in playcount.py]Traceback:: {failure}')
+        c.log(f'[CM Debug @ 60 in playcount.py]Exception raised. Error = {e}')
         pass
+    #except Exception:
+    #    pass
 
 
 def getSeasonIndicators(imdb):

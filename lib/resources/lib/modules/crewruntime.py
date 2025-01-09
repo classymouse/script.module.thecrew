@@ -578,7 +578,30 @@ class CrewRuntime:
 
         return lst
 
-    def search_tmdb_index_in_indicators(self, tmdb, indicators):
+    def search_tmdb_index_in_indicators(self, tmdb_id, indicator_list):
+        try:
+
+            if not indicator_list:
+                return -1
+
+            tmdb_id = str(tmdb_id)
+            indices = [index for index, value in enumerate(indicator_list) if value[0] == tmdb_id]
+            self.log(f'[CM Debug @ 587 in crewruntime.py]indices = {indices}')
+
+            return indices[0] if indices else -1
+        except Exception as e:
+            import traceback
+            failure = traceback.format_exc()
+            self.log(f'[CM Debug @ 595 in crewruntime.py]Traceback:: {failure}')
+            self.log(f'[CM Debug @ 596 in crewruntime.py]Exception raised. Error = {e}')
+
+    def search_tmdb_index_in_indicators2(self, tmdb, indicators):
+
+        if not indicators:
+            return -1
+
+        if not isinstance(tmdb, str):
+            tmdb = str(tmdb)
 
         lst = [i for i, v in enumerate(indicators) if v[0] == tmdb]
 

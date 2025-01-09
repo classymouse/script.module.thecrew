@@ -135,11 +135,11 @@ class source:
 
     def _get_items(self, url):
         try:
-            c.log(f"[CM Debug @ 138 in 1337x.py] url = {url}")
+
             r = client.request(url)
-            c.log(f"[CM Debug @ 139 in 1337x.py] r = {r}")
+
             r = c.ensure_text(r, errors='replace')
-            c.log(f"[CM Debug @ 141 in 1337x.py] r= {r}")
+            
             posts = client.parseDOM(r, 'tbody')[0]
             posts = client.parseDOM(posts, 'tr')
             for post in posts:
