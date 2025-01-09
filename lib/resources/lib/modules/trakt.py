@@ -410,7 +410,8 @@ def getActivity():
         activity.append(i['episodes']['watchlisted_at'])
         activity.append(i['lists']['updated_at'])
         activity.append(i['lists']['liked_at'])
-        activity = [int(cleandate.iso_to_utc(i)) for i in activity]
+        #activity = [int(cleandate.iso_to_utc(i)) for i in activity]
+        activity = [cleandate.new_iso_to_utc(i) for i in activity]
         activity = sorted(activity, key=int)[-1]
 
         return activity
@@ -427,7 +428,8 @@ def getWatchedActivity():
         activity = []
         activity.append(i['movies']['watched_at'])
         activity.append(i['episodes']['watched_at'])
-        activity = [cleandate.iso_to_utc(i) for i in activity]
+        #activity = [cleandate.iso_to_utc(i) for i in activity]
+        activity = [cleandate.new_iso_to_utc(i) for i in activity]
         c.log(f"[CM Debug @ 431 in trakt.py] activity = {activity}")
         activity = sorted(activity, key=int)[-1]
 
