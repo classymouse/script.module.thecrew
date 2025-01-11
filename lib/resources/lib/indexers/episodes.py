@@ -15,16 +15,12 @@
 # CM - 01/09/2023
 
 # cm - testfile VS without mocking (just useless)
-# pylint: disable=import-error
-# pylint: disable=no-name-in-module
-# pylint: disable=W0703
-# pylint: disable=W0718
-# pylint: disable=W0719
-# pylint: disable=broad-except
 
 import os
 import sys
 import re
+# cm - added temporarily
+import time
 import datetime
 import json
 import requests
@@ -33,32 +29,29 @@ import requests
 #import zipfile
 #import base64
 
-# cm - added temporarily
-import time
 
 # cm - we need to remove the six lib
-import six
+#import six
 
-#import urllib
 from urllib.parse import quote, quote_plus, unquote_plus, parse_qsl, urlsplit, urlencode, urlparse
 
-from resources.lib.modules import trakt
-from resources.lib.modules import keys
-from resources.lib.modules import bookmarks
-from resources.lib.modules import cleantitle
-from resources.lib.modules import cleangenre
-from resources.lib.modules import control
-from resources.lib.modules import client
-from resources.lib.modules import cache
-from resources.lib.modules import playcount
-from resources.lib.modules import workers
-from resources.lib.modules import views
-from resources.lib.modules import utils
-from resources.lib.modules import fanart as fanart_tv
+from ..modules import trakt
+from ..modules import keys
+from ..modules import bookmarks
+from ..modules import cleantitle
+from ..modules import cleangenre
+from ..modules import control
+from ..modules import client
+from ..modules import cache
+from ..modules import playcount
+from ..modules import workers
+from ..modules import views
+from ..modules import utils
+from ..modules import fanart as fanart_tv
 
-from resources.lib.modules.listitem import ListItemInfoTag
-#from resources.lib.modules import log_utils
-from resources.lib.modules.crewruntime import c
+from ..modules.listitem import ListItemInfoTag
+#from ..modules import log_utils
+from ..modules.crewruntime import c
 
 params = dict(parse_qsl(sys.argv[2].replace('?', ''))) if len(sys.argv) > 1 else {}
 action = params.get('action')
@@ -73,15 +66,12 @@ class seasons:
         self.session = requests.Session()
 
         self.tmdb_user = control.setting( 'tm.personal_user') or control.setting('tm.user') or keys.tmdb_key
-
         self.user = self.tmdb_user
-
         self.lang = control.apiLanguage()['tmdb']
         self.showunaired = control.setting('showunaired') or 'true'
         self.specials = control.setting('tv.specials') or 'true'
 
         self.today_date = datetime.date.today().strftime("%Y-%m-%d")
-
         self.tmdb_link = 'https://api.themoviedb.org/3/'
         self.tmdb_img_link = 'https://image.tmdb.org/t/p/{}{}'
 
@@ -115,7 +105,7 @@ class seasons:
             pass
 
 
-    def tmdb_list_backup(self, tvshowtitle, year, imdb_id, tmdb_id, meta=None, lite=False):
+    def tmdb_list(self, tvshowtitle, year, imdb_id, tmdb_id, meta=None, lite=False):
         """Get a list of TV show seasons from TMDB."""
         try:
             if tmdb_id is None:
@@ -153,8 +143,7 @@ class seasons:
                 raise Exception()
 
             if self.lang == 'en':
-                item = self.session.get(
-                    self.tmdb_show_link % (tmdb_id, 'en'), timeout=16).json()
+                item = self.session.get(self.tmdb_show_link % (tmdb_id, 'en'), timeout=16).json()
             elif lite is True:
                 item = self.session.get(
                     self.tmdb_show_lite_link % tmdb_id, timeout=16).json()
@@ -165,10 +154,10 @@ class seasons:
             if item is None:
                 raise Exception()
 
-            seasons = item.get('seasons', [])
+            seasons_list = item.get('seasons', [])
 
             if self.specials == 'false':
-                seasons = [s for s in seasons if not s['season_number'] == 0]
+                seasons_list = [s for s in seasons_list if not s['season_number'] == 0]
 
             studio = item.get('networks', [])[0].get('name', '0')
 
@@ -182,7 +171,6 @@ class seasons:
             mpaa = [d['rating'] for d in m if d['iso_3166_1'] == 'US'][0] if m else '0'
 
             status = item.get('status', '0')
-
 
             castwiththumb = []
             try:
@@ -200,8 +188,7 @@ class seasons:
             if not castwiththumb:
                 castwiththumb = '0'
 
-            show_plot = 'The Crew - No Plot Available' if 'overview' not in item or\
-                not item['overview'] else item['overview']
+            show_plot = c.lang(32623) if 'overview' not in item or not item['overview'] else item['overview']
             show_plot = client.replaceHTMLCodes(c.ensure_str(show_plot, errors='replace'))
 
             if not self.lang == 'en' and show_plot == '0':
@@ -214,7 +201,6 @@ class seasons:
                     pass
 
             unaired = ''
-
             banner = clearlogo = clearart = landscape = '0'
 
             if meta:
@@ -242,9 +228,9 @@ class seasons:
 
         except Exception as e:
             c.log(f"Exception raised in tmdb_list part 2: {e}")
-            pass
 
-        for item in seasons:
+
+        for item in seasons_list:
             try:
                 season = str(int(item['season_number']))
                 unaired = 'false'
@@ -259,15 +245,12 @@ class seasons:
                     if self.showunaired != 'true':
                         raise Exception()
 
-                plot = 'The Crew - No Plot Available' if 'overview' not in item or\
-                    not item['overview'] else item['overview']
+                plot = c.lang(32623) if 'overview' not in item or not item['overview'] else item['overview']
                 plot = client.replaceHTMLCodes(c.ensure_str(plot, errors='replace'))
-
 
                 poster_path = item.get('poster_path', '')
                 if poster_path:
-                    poster = self.tmdb_img_link.format(
-                        c.tmdb_postersize, poster_path)
+                    poster = self.tmdb_img_link.format(c.tmdb_postersize, poster_path)
                 else:
                     poster = show_poster
 
@@ -478,12 +461,6 @@ class seasons:
                 pass
 
         return self.list
-
-
-
-
-
-
 
 
     def seasonDirectory(self, items):
@@ -1582,7 +1559,7 @@ class episodes:
 
 
                 plot = item['overview'] if item['overview'] else i['plot'] or 'The Crew - No plot Available'
-                plot = client.replaceHTMLCodes(six.ensure_str(plot, errors='replace'))
+                plot = client.replaceHTMLCodes(c.ensure_str(plot, errors='replace'))
 
 
                 if 'crew' in item:
@@ -1814,7 +1791,7 @@ class episodes:
                 if rating is None or rating == '0.0':
                     rating = '0'
                 rating = str(rating)
-                rating = six.ensure_str(rating)
+                rating = c.ensure_str(rating)
 
                 votes = '0'
 
@@ -1964,7 +1941,7 @@ class episodes:
                        # try:
                         # en_item = en_result.get('episodes', [])
                         # episodeplot = en_item['overview']
-                        # episodeplot = six.ensure_str(episodeplot)
+                        # episodeplot = c.ensure_str(episodeplot)
                        # except Exception:
                         # episodeplot = ''
                        # if not episodeplot: episodeplot = '0'
@@ -2019,7 +1996,6 @@ class episodes:
             return self.list
         except Exception:
             return
-
 
     def episodeDirectory(self, items):
         if not items:
@@ -2218,8 +2194,6 @@ class episodes:
 
         control.content(sys_handle, 'episodes')
         control.directory(sys_handle, cacheToDisc=True)
-
-
 
     def addDirectory(self, items, queue=False):
         if items is None or len(items) == 0:

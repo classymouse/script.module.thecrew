@@ -22,6 +22,11 @@ def new_iso_to_utc(iso_ts):
         return 0
     return int(time.mktime(time.strptime(iso_ts, "%Y-%m-%dT%H:%M:%S.000Z")))
 
+
+
+# cm modified
+# !deprecated
+# TODO: remove this function
 def iso_to_utc(iso_ts):
     if not iso_ts or iso_ts is None:
         return 0

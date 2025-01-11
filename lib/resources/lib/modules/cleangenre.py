@@ -16,6 +16,7 @@
  ********************************************************cm*
 '''
 
+
 def lang(i, lang):
 
     if lang == 'bg':
@@ -383,7 +384,7 @@ def lang(i, lang):
         i = i.replace('Adventure', '\u0041\u0076\u006f\u006e\u0074\u0075\u0075\u0072')
         i = i.replace('Animation', '\u0041\u006e\u0069\u006d\u0061\u0074\u0069\u0065')
         i = i.replace('Anime', 'Anime')
-        i = i.replace('Biography', 'Biography')
+        i = i.replace('Biography', 'Biografie')
         i = i.replace('Comedy', '\u004b\u006f\u006d\u0065\u0064\u0069\u0065')
         i = i.replace('Crime', '\u004d\u0069\u0073\u0064\u0061\u0061\u0064')
         i = i.replace('Documentary', '\u0044\u006f\u0063\u0075\u006d\u0065\u006e\u0074\u0061\u0069\u0072\u0065')
@@ -396,7 +397,7 @@ def lang(i, lang):
         i = i.replace('Music ', '\u004d\u0075\u007a\u0069\u0065\u006b')
         i = i.replace('Musical', 'Musical')
         i = i.replace('Mystery', '\u004d\u0079\u0073\u0074\u0065\u0072\u0069\u0065')
-        i = i.replace('News', 'News')
+        i = i.replace('News', 'Nieuws')
         i = i.replace('Reality-TV', 'Reality-TV')
         i = i.replace('Romance', '\u0052\u006f\u006d\u0061\u006e\u0074\u0069\u0065\u006b')
         i = i.replace('Science Fiction', '\u0053\u0063\u0069\u0065\u006e\u0063\u0065\u0066\u0069\u0063\u0074\u0069\u006f\u006e')

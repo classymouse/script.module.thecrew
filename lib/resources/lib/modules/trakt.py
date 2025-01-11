@@ -85,7 +85,7 @@ REDIRECT_URI = 'urn:ietf:wg:oauth:2.0:oob'
 
 trakt_user = control.setting('trakt.user').strip()
 session = requests.Session()
-retries = Retry(total=3, backoff_factor=1)
+retries = Retry(total=3, backoff_factor=0.5)
 session.mount(BASE_URL, HTTPAdapter(max_retries=retries))
 
 
@@ -111,11 +111,15 @@ def get_trakt(url, post=None):
         response = session.get(url, headers=headers, timeout=30) if not post else\
                     session.post(url, data=post, headers=headers, timeout=30)
 
+        #if not response:
+        #    c.log(f"[CM Debug @ 115 in trakt.py] url = {url}")
+        #    msg_handler(url, response, '0', post, headers)
+
         response.encoding = 'utf-8'
         status_code = str(response.status_code)
         c.log(f"[CM Debug @ 118 in trakt.py] trakt status = {status_code}")
-        c.log(f"[CM Debug @ 119 in trakt.py] trakt headers = {response.headers}")
-        if not response or not status_code or not status_code.startswith('2'):
+        #c.log(f"[CM Debug @ 119 in trakt.py] trakt headers = {response.headers}")
+        if not status_code or not status_code.startswith('2'):
             msg_handler(url, response, status_code, post, headers)
 
         return response.text, response.headers
@@ -127,8 +131,10 @@ def get_trakt(url, post=None):
         pass
 
 def msg_handler(url, response, status_code, post, headers):
-    if not response or status_code.startswith('5') and not status_code.startswith('4') or\
-        (response and isinstance(response, str) and '<html' in response):
+    if not response:# or status_code.startswith('5') and not status_code.startswith('4')
+        control.infoDialog(f'Trakt Server didn\'t respond, {trakt_response_codes[status_code]}', sound=True)
+        return
+    elif (response and isinstance(response, str) and '<html' in response):
         control.infoDialog(f'A Trakt Server Problem occurred, code: {status_code}', sound=True)
         return
     elif status_code == '423':
@@ -592,8 +598,8 @@ def scrobbleEpisode(imdb, season, episode, watched_percent, action):
     return get_trakt(f'/scrobble/{action}', {"show": {"ids": {"imdb": imdb}}, "episode": {"season": season, "number": episode}, "progress": watched_percent})[0]
 
 
-def getMovieTranslation(id, lang, full=False):
-    url = f'/movies/{id}/translations/{lang}'
+def getMovieTranslation(_id, lang, full=False):
+    url = f'/movies/{_id}/translations/{lang}'
     try:
         item = getTraktAsJson(url)[0]
         return item if full else item.get('title')
@@ -605,7 +611,7 @@ def getTVShowTranslation(_id, lang, season=None, episode=None, full=False):
     if season and episode:
         url = f'/shows/{_id}/seasons/{season}/episodes/{episode}/translations/{lang}'
     else:
-        url = f'/shows/{id}/translations/{lang}'
+        url = f'/shows/{_id}/translations/{lang}'
 
     try:
         item = getTraktAsJson(url)[0]

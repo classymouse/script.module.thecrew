@@ -169,7 +169,7 @@ def get_cached_fanart(tvdb, imdb, url, headers, timeout, error=True):
                 response = session.get(url, headers=headers, timeout=30)
                 response.encoding = 'utf-8'
                 txt = json.loads(response.text)
-                c.log(f"[CM Debug @ 172 in fanart.py] txt2 = {txt}")
+                c.log(f"[CM Debug @ 172 in fanart.py] txt = {txt}")
 
                 if response.status_code == 200:
                     sql = "INSERT or REPLACE INTO fanart_cache (tvdb, imdb, url, data, added) Values (?,?,?,?,?)"
