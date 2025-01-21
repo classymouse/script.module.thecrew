@@ -109,13 +109,22 @@ def get_fanart_tv_art(tvdb, imdb = '0', lang='en', mediatype='tv'):
                 raise ValueError('Invalid IMDB ID')
             url = f'http://webservice.fanart.tv/v3/movies/{imdb}'
 
-        ##response = client.request(url, headers=headers, timeout='15', error=True)
-        response = get_cached_fanart(tvdb, imdb, url, headers, '15', error=True)
-        art = json.loads(response)
+        response = get_cached_fanart(tvdb, imdb, url, headers, 15)
+        if response:
+            art = json.loads(response)
+
+        if response is None:
+            return zero_str
+
+        if 'status' in art and art.get('status') == 'error':
+            return zero_str
+
     except ValueError as e:
         c.log(f'[CM Debug @ 82 in fanart.py] ValueError raised: {e}')
         return zero_str
-    except Exception:
+
+    except Exception as e:
+        c.log(f'[CM Debug @ 119 in fanart.py] Exception raised, returning zero_str. Error = {e}')
         return zero_str
 
     if mediatype == 'tv':
@@ -133,8 +142,10 @@ def get_fanart_tv_art(tvdb, imdb = '0', lang='en', mediatype='tv'):
         clearlogo = _extract_artwork(art, 'hdmovielogo', lang)
         clearart = _extract_artwork(art, 'hdmovieclearart', lang)
         landscape = _extract_artwork(art, 'moviethumb' if 'moviethumb' in art else 'moviebackground', lang)
-        discart = _extract_artwork(art, 'moviediscart', lang)
+        #discart = _extract_artwork(art, 'moviediscart', lang)
+        discart = _extract_artwork(art, 'moviedisc', lang)
     else:
+        c.log(f'[CM Debug @ 104 in fanart.py] Invalid mediatype: {mediatype}, returning zero_str')
         return zero_str
 
 
@@ -149,7 +160,7 @@ def get_fanart_tv_art(tvdb, imdb = '0', lang='en', mediatype='tv'):
             'clearlogo': clearlogo, 'clearart': clearart, 'discart': discart
             } #poster, fanart, banner, landscape, clearlogo, clearart, discart
 
-def get_cached_fanart(tvdb, imdb, url, headers, timeout, error=True):
+def get_cached_fanart(tvdb, imdb, url, headers, timeout=30):
     try:
         if has_table('fanart_cache'):
             control.makeFile(control.dataPath)
@@ -157,34 +168,42 @@ def get_cached_fanart(tvdb, imdb, url, headers, timeout, error=True):
             dbcur = dbcon.cursor()
 
             sql = f"SELECT * FROM fanart_cache WHERE url = '{url}' and added < {time.time() - TWOWEEKS}"
-            c.log(f"[CM Debug @ 160 in fanart.py] sql = {sql}")
             dbcur.execute(sql)
             result = dbcur.fetchone()
 
             if result:
                 #data
-                return json.dumps(result[4], indent=4, sort_keys=True)
+                return json.loads(result[4], indent=4, sort_keys=True)
             else:
                 #no data in cache
-                response = session.get(url, headers=headers, timeout=30)
+                response = session.get(url, headers=headers, timeout=timeout)
                 response.encoding = 'utf-8'
                 txt = json.loads(response.text)
-                c.log(f"[CM Debug @ 172 in fanart.py] txt = {txt}")
 
                 if response.status_code == 200:
                     sql = "INSERT or REPLACE INTO fanart_cache (tvdb, imdb, url, data, added) Values (?,?,?,?,?)"
-                    c.log(f"[CM Debug @ 174 in fanart.py] sql = {sql}")
+
+                    if isinstance(txt, dict):
+                        txt = json.dumps(txt, indent=4, sort_keys=True)
                     dbcur.execute(sql, (tvdb, imdb, url, txt, int(time.time())))
                     dbcon.commit()
-                    return response
-            dbcon.close()
-
+                    dbcon.close()
+                    #return response
+                    return txt
+                else:
+                    c.log(f"[CM Debug @ 181 in fanart.py] response.status_code = {response.status_code}, close db, return None")
+                    dbcon.close()
+                    return None
     except Exception as e:
+        import traceback
         failure = traceback.format_exc()
-        c.log(f'[CM Debug @ 136 in fanart.py]Traceback:: {failure}')
-        c.log(f'[CM Debug @ 136 in fanart.py]Exception raised. Error = {e}')
-        pass
-
+        c.log(f'[CM Debug @ 197 in fanart.py]Traceback:: {failure}')
+        c.log(f'[CM Debug @ 197 in fanart.py]Exception raised. Error = {e}')
+        #pass
+    #except Exception as e:
+    #    c.log(f'[CM Debug @ 200 in fanart.py]Exception raised. Error = {e}')
+        dbcon.close()
+        return None
 
 
 def has_table(table):

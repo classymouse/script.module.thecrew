@@ -94,7 +94,7 @@ class source:
                     sources.append({'source': host, 'quality': quality, 'language': 'en', 'url': url, 'direct': False, 'debridonly': False})
             return sources
         except:
-            c.log('CMOVIES - Exception', 1)
+            #c.log('CMOVIES - Exception', 1)
             return sources
 
 

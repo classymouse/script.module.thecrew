@@ -23,12 +23,10 @@ from resources.lib.modules import client
 from resources.lib.modules import workers
 from resources.lib.modules import source_utils
 
-from urllib.parse import urlencode, quote_plus, quote, urljoin, parse_qs
-
-#try: from urlparse import parse_qs, urljoin
-#except ImportError: from urllib.parse import parse_qs, urljoin
-#try: from urllib import urlencode, quote_plus, quote
-#except ImportError:
+try: from urlparse import parse_qs, urljoin
+except ImportError: from urllib.parse import parse_qs, urljoin
+try: from urllib import urlencode, quote_plus, quote
+except ImportError: from urllib.parse import urlencode, quote_plus, quote
 
 
 class source:
@@ -37,7 +35,7 @@ class source:
         self.language = ['en']
         self.domains = ['torrentdownloads.me']
         self.base_link = 'https://www.torrentdownloads.me'
-        self.search = '/rss.xml?new=1&type=search&cid={0}&search={1}'
+        self.search = 'https://www.torrentdownloads.me/rss.xml?new=1&type=search&cid={0}&search={1}'
 
     def movie(self, imdb, title, localtitle, aliases, year):
         try:
@@ -91,8 +89,6 @@ class source:
             else:
                 url = self.search.format('4', quote(query))
 
-            url = urljoin(self.base_link, url)
-
             self.hostDict = hostDict + hostprDict
             headers = {'User-Agent': client.agent()}
             _html = client.request(url, headers=headers)
@@ -134,10 +130,7 @@ class source:
             if not seeders == '0':
                 if cleantitle.get(re.sub('(|)', '', t)) == cleantitle.get(self.title):
                     if y == self.hdlr:
-                        self._sources.append({
-                            'source': 'torrent', 'quality': quality, 'language': 'en', 'url': url,
-                            'info': info, 'direct': False, 'debridonly': True
-                            })
+                        self._sources.append({'source': 'torrent', 'quality': quality, 'language': 'en', 'url': url, 'info': info, 'direct': False, 'debridonly': True})
 
         except BaseException:
             pass

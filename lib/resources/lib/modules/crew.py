@@ -510,8 +510,8 @@ def router(params):
 
     elif action == 'download':
         import json
-        from resources.lib.modules import sources
-        from resources.lib.modules import downloader
+        from . import sources
+        from . import downloader
         try:
             downloader.download(name, image, sources.sources().sourcesResolve(json.loads(source)[0], True))
         except:

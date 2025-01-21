@@ -117,8 +117,6 @@ def get_trakt(url, post=None):
 
         response.encoding = 'utf-8'
         status_code = str(response.status_code)
-        c.log(f"[CM Debug @ 118 in trakt.py] trakt status = {status_code}")
-        #c.log(f"[CM Debug @ 119 in trakt.py] trakt headers = {response.headers}")
         if not status_code or not status_code.startswith('2'):
             msg_handler(url, response, status_code, post, headers)
 
@@ -436,7 +434,7 @@ def getWatchedActivity():
         activity.append(i['episodes']['watched_at'])
         #activity = [cleandate.iso_to_utc(i) for i in activity]
         activity = [cleandate.new_iso_to_utc(i) for i in activity]
-        c.log(f"[CM Debug @ 431 in trakt.py] activity = {activity}")
+        #c.log(f"[CM Debug @ 431 in trakt.py] activity = {activity}")
         activity = sorted(activity, key=int)[-1]
 
         return activity
@@ -467,7 +465,7 @@ def syncMovies(user):
             c.log(f"[CM Debug @ 449 in trakt.py] getTraktCredentialsInfo is false")
             return
         indicators = getTraktAsJson('/users/me/watched/movies')
-        c.log(f"[CM Debug @ 452 in trakt.py] indicators = {indicators}")
+        #c.log(f"[CM Debug @ 452 in trakt.py] indicators = {indicators}")
         indicators = [i['movie']['ids'] for i in indicators]
         indicators = [str(i['imdb']) for i in indicators if 'imdb' in i]
         return indicators
@@ -478,7 +476,7 @@ def syncMovies(user):
 def cachesyncTVShows(timeout=0):
     #indicators = cache.get(syncTVShows, timeout, trakt_user)
     indicators = syncTVShows(0)
-    c.log(f"[CM Debug @ 463 in trakt.py] indicators = {indicators}")
+    #c.log(f"[CM Debug @ 463 in trakt.py] indicators = {indicators}")
     return indicators
 
 
@@ -491,15 +489,15 @@ def timeoutsyncTVShows():
 def syncTVShows(user):
     try:
         if not getTraktCredentialsInfo():
-            c.log("[CM Debug @ 474 in trakt.py] getTraktCredentialsInfo is false")
+            #c.log("[CM Debug @ 474 in trakt.py] getTraktCredentialsInfo is false")
             return
-        c.log("[CM Debug @ 475 in trakt.py] getTraktCredentialsInfo is true")
+        #c.log("[CM Debug @ 475 in trakt.py] getTraktCredentialsInfo is true")
         watched_shows = getTraktAsJson('/users/me/watched/shows?extended=full')
-        c.log(f"[CM Debug @ 476 in trakt.py] watched_shows = {watched_shows}")
+        #c.log(f"[CM Debug @ 476 in trakt.py] watched_shows = {watched_shows}")
         indicators = [(show['show']['ids']['tmdb'], show['show']['aired_episodes'], [(s['number'], e['number']) for s in show['seasons'] for e in s['episodes']]) for show in watched_shows]
-        c.log(f"[CM Debug @ 478 in trakt.py] indicators = {indicators}")
+        #c.log(f"[CM Debug @ 478 in trakt.py] indicators = {indicators}")
         indicators = [(str(tmdb_id), aired_episodes, watched_episodes) for tmdb_id, aired_episodes, watched_episodes in indicators]
-        c.log(f"[CM Debug @ 480 in trakt.py] indicators = {indicators}")
+        #c.log(f"[CM Debug @ 480 in trakt.py] indicators = {indicators}")
         return indicators
     except:
         pass
@@ -511,11 +509,11 @@ def syncTVShows2(user):
             c.log("[CM Debug @ 475 in trakt.py] getTraktCredentialsInfo is false")
             return
         indicators = getTraktAsJson('/users/me/watched/shows?extended=full')
-        c.log(f"[CM Debug @ 478 in trakt.py] indicators = {indicators}")
+        #3c.log(f"[CM Debug @ 478 in trakt.py] indicators = {indicators}")
         indicators = [(i['show']['ids']['tmdb'], i['show']['aired_episodes'], sum([[(s['number'], e['number']) for e in s['episodes']] for s in i['seasons']], [])) for i in indicators]
-        c.log(f"[CM Debug @ 480 in trakt.py] indicators = {indicators}")
+        #c.log(f"[CM Debug @ 480 in trakt.py] indicators = {indicators}")
         indicators = [(str(i[0]), int(i[1]), i[2]) for i in indicators]
-        c.log(f"[CM Debug @ 482 in trakt.py] indicators = {indicators}")
+        #c.log(f"[CM Debug @ 482 in trakt.py] indicators = {indicators}")
         return indicators
     except:
         pass
@@ -578,9 +576,9 @@ def scrobbleMovie(imdb, watched_percent, action):
     try:
         if not imdb.startswith('tt'):
             imdb = 'tt' + imdb
-        c.log(f"[CM Debug @ 496 in trakt.py]inside trakt.scrobbleMovie | imdb = {imdb} | watched_percent = {watched_percent} | action = {action}")
+        #c.log(f"[CM Debug @ 496 in trakt.py]inside trakt.scrobbleMovie | imdb = {imdb} | watched_percent = {watched_percent} | action = {action}")
         r = get_trakt(f'/scrobble/{action}', {"movie": {"ids": {"imdb": imdb}}, "progress": watched_percent})
-        c.log(f"[CM Debug @ 498 in trakt.py] r = {r}")
+        #c.log(f"[CM Debug @ 498 in trakt.py] r = {r}")
         #return get_trakt(f'/scrobble/{action}', {"movie": {"ids": {"imdb": imdb}}, "progress": watched_percent})[0]
         return
     except Exception as e:
@@ -782,7 +780,7 @@ def syncTrakt():
                 last_played = item.get('paused_at')
                 resume_id = item.get('id')
 
-                c.log(f"[CM Debug @ 731 in trakt.py] mediatype = {media_type} with trakt = {trakt} and resume_point = {resume_point}, season = {season} and episode = {episode}")
+                #c.log(f"[CM Debug @ 731 in trakt.py] mediatype = {media_type} with trakt = {trakt} and resume_point = {resume_point}, season = {season} and episode = {episode}")
                 insert_trakt_progress(media_type, trakt, imdb, tmdb, tvdb, media_id, title, year, season, episode, resume_point, curr_time, last_played, resume_id)
         return c.infoDialog('Syncing with Trakt Finished', 'Please wait', icon='main_classy.png', sound=True)
     except OperationalError as e:
@@ -900,13 +898,11 @@ def _commit(db_connection):
 
 def _dict_factory(cursor, row):
     """
-
-
     A factory function that constructs a dictionary from a SQLite query result.
     :param cursor: a SQLite cursor object
     :param row: a row from the SQLite query result
     :return: a dictionary where the keys are the column names and the values are the corresponding
-                values from the row
+    :values from the row
     """
     if cursor is None or row is None:
         raise ValueError("cursor and row must not be None")

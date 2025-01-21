@@ -93,6 +93,7 @@ class movies:
         self.fanart_tv_level_link = 'https://webservice.fanart.tv/v3/level'
         self.tmdb_img_link = 'https://image.tmdb.org/t/p/%s%s'
         self.tm_art_link = (f'{self.tmdb_link}movie/%s/images?api_key={self.tmdb_user}&language=en-US&include_image_language=en{self.lang},null')
+        self.tmdb_external_ids_by_tmdb = (f'{self.tmdb_link}movie/%s/external_ids?api_key={self.tmdb_user}&language=en-US')
 
         ######
         # imdb
@@ -105,7 +106,6 @@ class movies:
         self.person_link = (f'{self.tmdb_link}search/person?api_key={self.tmdb_user}&query=%s&include_adult=false&language=en-US&page=1')
         self.persons_link = (f'{self.tmdb_link}person/%s?api_key={self.tmdb_user}&?language=en-US')
         self.personlist_link = (f'{self.tmdb_link}trending/person/day?api_key={self.tmdb_user}&language=en-US')
-        #self.personmovies_link = (f'{self.tmdb_link}person/%s/movie_credits?api_key={self.tmdb_user}&language=en-US')
         self.personmovies_link = (f'{self.tmdb_link}person/%s/movie_credits?api_key={self.tmdb_user}&language=en-US')
 
         self.oscars_link = (f'{self.tmdb_link}list/28?api_key={self.tmdb_user}&language=en-US&page=1' )
@@ -113,7 +113,7 @@ class movies:
         self.theaters_link = (f'{self.tmdb_link}discover/movie?api_key={self.tmdb_user}&now_playing?language=en-US&page=1&region=US|UK&sort_by=popularity.desc')
         self.year_link = (f'{self.tmdb_link}discover/movie?api_key={self.tmdb_user}&include_adult=false&include_video=false&language=en-US&region=US&sort_by=release_date.desc&year=%s&page=1')
         self.language_link = (f'{self.tmdb_link}discover/movie?api_key={self.tmdb_user}&include_adult=false&include_video=false&sort_by=popularity.desc&with_original_language=%s&page=1')
-        self.year_link = (f'{self.tmdb_link}discover/movie?api_key={self.tmdb_user}&include_adult=false&include_video=false&language=en-US&region=US&sort_by=release_date.desc&year=%s&page=1')
+        self.year_link = (f'{self.tmdb_link}discover/movie?api_key={self.tmdb_user}&include_adult=false&include_video=false&language=en-US&release_date.lte={self.today_date}&region=US&sort_by=release_date.desc&year=%s&page=1')
         self.featured_link = (f'{self.tmdb_link}discover/movie?api_key={self.tmdb_user}&include_adult=false&include_video=false&language=en-US&page=1&sort_by=popularity.desc&with_release_type=1|2|3&release_date.gte=date[60]&release_date.lte=date[0]')
         self.popular_link = (f'{self.tmdb_link}discover/movie?api_key={self.tmdb_user}&include_adult=false&include_video=false&language=en-US&page=1&sort_by=popularity.desc&with_release_type=1|2|3&release_date.gte=date[60]&release_date.lte=date[0]')
         self.views_link = (f'{self.tmdb_link}discover/movie?api_key={self.tmdb_user}&include_adult=false&include_video=false&language=en-US&page=1&sort_by=popularity.desc&vote_average.gte=8&vote_average.lte=10&with_original_language=en')
@@ -140,8 +140,8 @@ class movies:
         self.tmdb_movie_trending_week_link = (f'{self.tmdb_link}trending/movie/week?api_key={self.tmdb_user}')
         self.tmdb_movie_discover_year_link = (f'{self.tmdb_link}discover/movie?api_key={self.tmdb_user}&language=%s&sort_by=popularity.desc&first_air_date_year={self.year}&include_null_first_air_dates=false&with_original_language=en&page=1')
 
-            ###cm#
-            # Trakt
+        ###cm#
+        # Trakt
         self.trending_link = f'{self.trakt_link}/movies/trending?limit={self.count}&page=1'
         self.traktlists_link = f'{self.trakt_link}/users/me/lists'
         self.traktlikedlists_link = f'{self.trakt_link}/users/likes/lists?limit=1000000'
@@ -176,7 +176,6 @@ class movies:
             parsed_url_netloc = urlparse(url).netloc.lower()
             c.log(f"[CM Debug @ 173 in movies.py] parsed_url_netloc = {parsed_url_netloc}")
 
-
             if self.trakt_link in url and url == self.onDeck_link:
                 self.on_deck_list = cache.get(self.trakt_list, 720, url, self.trakt_user)
                 self.list = []
@@ -203,10 +202,8 @@ class movies:
                     self.list = cache.get(self.trakt_list, 6, url, self.trakt_user)
                 self.list = sorted(self.list, key=lambda k: int(k['year']), reverse=True)
 
-
                 #if '/users/me/' in url and '/collection/' in url:
                     #self.list = sorted(self.list, key=lambda k: utils.title_key(k['title']))
-
 
             elif parsed_url_netloc in self.search_link and '/search/movie' in url:
                 self.list = cache.get(self.tmdb_list, 1, url)
@@ -296,12 +293,15 @@ class movies:
                 c.log(f"[CM Debug @ 325 in movies.py] id = {_id}, term = {term}")
 
                 cm.append((32070, f'movieDeleteTerm&id={_id})'))
-                navigator.navigator().addDirectoryItem(term, f'movieSearchterm&name={term}', 'search.png', 'DefaultTVShows.png', context=(cm))
+                navigator.navigator().addDirectoryItem(term,
+                                    f'movieSearchterm&name={term}', 'search.png',
+                                    'DefaultTVShows.png', context=cm)
                 lst += [(term)]
         dbcur.close()
 
         if len(lst) > 0:
-            navigator.navigator().addDirectoryItem(32605, 'clearCacheSearch', 'tools.png', 'DefaultAddonProgram.png')
+            navigator.navigator().addDirectoryItem(32605,
+                                        'clearCacheSearch', 'tools.png', 'DefaultAddonProgram.png')
 
         navigator.navigator().endDirectory()
 
@@ -606,14 +606,16 @@ class movies:
 
         for item in items:
             try:
+                c.log(f"[CM Debug @ 608 in movies.py] item = {item}")
                 title = item.get('title')
                 title = client.replaceHTMLCodes(title)
 
                 year = item.get('year', '0')
                 year = re.sub(r'[^0-9]', '', str(year))
 
-                # if int(year) > int((self.datetime).strftime('%Y')):
+                if int(year) > int((self.datetime).strftime('%Y')):
                 #   raise Exception()
+                    break
 
                 imdb = item.get('ids', {}).get('imdb')
                 if not imdb:
@@ -966,12 +968,11 @@ class movies:
                     unaired = 'true'
                     if self.showunaired != 'true':
                         continue
-
                 plot = item.get('overview', c.lang(32084))
                 poster_path = item.get('poster_path', '')
-                poster = self.tmdb_img_link.format(c.tmdb_postersize, poster_path) if poster_path else '0'
+                poster = self.tmdb_img_link % (c.tmdb_postersize, poster_path) if poster_path else '0'
                 backdrop_path = item.get('backdrop_path', '')
-                fanart = self.tmdb_img_link.format(c.tmdb_fanartsize, backdrop_path) if backdrop_path else ''
+                fanart = self.tmdb_img_link % (c.tmdb_fanartsize, backdrop_path) if backdrop_path else ''
                 self.list.append({
                     'title': title,
                     'originaltitle': original_title,
@@ -1024,6 +1025,8 @@ class movies:
 
     def worker(self, level=0):
 
+        c.log(f"[CM Debug @ 1028 in movies.py] \n==========================\nInside Worker\nlevel = {level}\n=================================\n\n")
+
         self.meta = []
         total = len(self.list)
 
@@ -1035,7 +1038,6 @@ class movies:
             self.list[i].update({'metacache': False})
 
         self.list = metacache.fetch(self.list, self.lang, self.user)
-        c.log(f"[CM Debug @ 1328 in movies.py]self.list = {self.list}")
 
         # cm changed worker - 2024-05-14
         for r in range(0, total, 40): #cm increment 40 but why?
@@ -1046,9 +1048,6 @@ class movies:
                         threads.append(workers.Thread(self.no_info(i)))
                     else:
                         threads.append(workers.Thread(self.super_info(i)))
-
-            #[i.start() for i in threads]
-            #[i.join() for i in threads]
 
             for thread in threads:
                 thread.start()
@@ -1067,6 +1066,7 @@ class movies:
         '''
         try:
             if self.list[i]['metacache'] is True:
+                c.log(f"[CM Debug @ 1241 in movies.py] inside super_info, metacache is True so I will skip this\n\ncomplete list = \n\n{repr(self.list[i])}")
                 return
 
 
@@ -1077,6 +1077,16 @@ class movies:
             imdb = lst['imdb'] if 'imdb' in lst else '0'
             tmdb = lst['tmdb'] if 'tmdb' in lst else '0'
             list_title = lst['title']
+
+            if imdb == '0' and tmdb != '0':
+                #cm - get external id's from tmdb
+                try:
+                    url = self.tmdb_external_ids_by_tmdb % tmdb
+                    result = self.session.get(url, timeout=15).json()
+                    imdb = result['imdb_id'] if 'imdb_id' in result and result['imdb_id'].startswith('tt') else '0'
+                except Exception:
+                    imdb = '0'
+
 
             if tmdb == '0' and imdb != '0':
                 try:
@@ -1095,12 +1105,13 @@ class movies:
             if _id in ['0', None]:
                 raise Exception()
 
+
             en_url = self.tmdb_api_link % _id
             trans_url = en_url + ',translations'
             url = en_url if self.lang == 'en' else trans_url
 
             item = self.session.get(url, timeout=15).json()
-            c.log(f"[CM Debug @ 1392 in movies.py] item = {item}")
+            #c.log(f"[CM Debug @ 1392 in movies.py] item = {item}")
 
             if imdb == '0':
                 try:
@@ -1248,6 +1259,9 @@ class movies:
             poster3 = fanart2 = ''
             banner = clearlogo = clearart = landscape = discart = '0'
 
+            #art = fanart_tv.get_fanart_tv_art(tvdb = '0', imdb = imdb, lang='en', mediatype='movie')
+            #if art:
+                #c.log(f"[CM Debug @ 1107 in movies.py] art = {art}")
             if imdb not in ['0', None]:
                 tempart = fanart_tv.get_fanart_tv_art(imdb=imdb, tvdb='0', mediatype='movie')
                 poster3 = tempart.get('poster', '0')
@@ -1257,6 +1271,9 @@ class movies:
                 clearart = tempart.get('clearart', '0')
                 landscape = tempart.get('landscape', '0')
                 discart = tempart.get('discart', '0')
+                c.log(f"[CM Debug @ 1274 in movies.py] type tempart = {type(tempart)}, tempart = {repr(tempart)}")
+                c.log(f"[CM Debug @ 1275 in movies.py] \n\n====================\n\n")
+                c.log(f"[CM Debug @ 1276 in movies.py] poster3 = {poster3}, fanart2 = {fanart2}, banner = {banner}, clearlogo = {clearlogo}, clearart = {clearart}, landscape = {landscape}, discart = {discart}\n\n====================\n\n")
 
             poster = poster3 or poster2 or poster1
             fanart = fanart2 or fanart1

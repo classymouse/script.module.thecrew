@@ -15,32 +15,25 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 '''
 
-
 import re
-import traceback
-from urllib.parse import parse_qs, urljoin, urlencode, quote_plus
 
-from resources.lib.modules import cache, cleantitle, client, control, debrid, log_utils, source_utils
-from resources.lib.modules.crewruntime import c
+
+from resources.lib.modules import cleantitle, client, control, debrid, source_utils
+
+try: from urlparse import parse_qs, urljoin
+except ImportError: from urllib.parse import parse_qs, urljoin
+try: from urllib import urlencode, quote_plus, quote
+except ImportError: from urllib.parse import urlencode, quote_plus, quote
 
 
 class source:
     def __init__(self):
         self.priority = 1
         self.language = ['en']
-        self.domains = ['prbay.top','pirateproxy.live', 'thepiratebay.org', 'thepiratebay.fun', 'thepiratebay.asia', 'tpb.party', 'thepiratebay3.org', 'thepiratebayz.org', 'thehiddenbay.com', 'piratebay.live', 'thepiratebay.zone']
-        #self._base_link = None
-        #self.search_link = '/s/?q=%s&page=0&&video=on&orderby=99'
-        self._base_link = "https://apibay.org"
-        self.search_link = '/q.php?q=%s&cat=0'
+        self.domains = ['torrentquest.com']
+        self.base_link = 'https://torrentquest.com'
+        self.search_link = '/%s/%s'
         self.min_seeders = int(control.setting('torrent.min.seeders'))
-
-    @property
-    def base_link(self):
-        if self._base_link is None:
-            default_url = f'https://{self.domains[0]}'
-            self._base_link = cache.get(self.__get_base_url, 120, default_url)
-        return self._base_link
 
     def movie(self, imdb, title, localtitle, aliases, year):
         if debrid.status(True) is False:
@@ -51,8 +44,6 @@ class source:
             url = urlencode(url)
             return url
         except Exception:
-            failure = traceback.format_exc()
-            c.log('TPB - Exception: \n' + str(failure))
             return
 
     def tvshow(self, imdb, tvdb, tvshowtitle, localtvshowtitle, aliases, year):
@@ -64,8 +55,6 @@ class source:
             url = urlencode(url)
             return url
         except Exception:
-            failure = traceback.format_exc()
-            c.log('TPB - Exception: \n' + str(failure))
             return
 
     def episode(self, url, imdb, tvdb, title, premiered, season, episode):
@@ -82,13 +71,13 @@ class source:
             url = urlencode(url)
             return url
         except Exception:
-            failure = traceback.format_exc()
-            c.log('TPB - Exception: \n' + str(failure))
             return
 
     def sources(self, url, hostDict, hostprDict):
+        sources = []
         try:
-            sources = []
+            if debrid.status() is False:
+                raise Exception()
 
             if url is None:
                 return sources
@@ -97,7 +86,7 @@ class source:
             data = dict([(i, data[i][0]) if data[i] else (i, '') for i in data])
 
             title = data['tvshowtitle'] if 'tvshowtitle' in data else data['title']
-
+            stype = 'TV' if 'tvshowtitle' in data else 'Movie'
             hdlr = 'S%02dE%02d' % (int(data['season']), int(data['episode'])) if 'tvshowtitle' in data else data['year']
 
             query = '%s S%02dE%02d' % (
@@ -106,43 +95,51 @@ class source:
                 int(data['episode'])) if 'tvshowtitle' in data else '%s %s' % (
                 data['title'],
                 data['year'])
-            query = re.sub(r'(\\\|/| -|:|;|\*|\?|"|<|>|\|)', ' ', query)
-            url = self.search_link % quote_plus(query)
-            url = urljoin(self.base_link, url)
+            query = re.sub('(\\\|/| -|:|;|\*|\?|"|<|>|\|)', ' ', query)
+
+            url = urljoin(self.base_link, self.search_link % (query[0].lower(), cleantitle.geturl(query)))
+
             html = client.request(url)
             html = html.replace('&nbsp;', ' ')
             try:
-                results = client.parseDOM(html, 'table', attrs={'id': 'searchResult'})[0]
-            except Exception as e:
-                c.log(f'TPB1 - Failed to parse search results:{e}')
+                results = client.parseDOM(html, 'tbody')[0]
+            except Exception:
                 return sources
-            rows = re.findall('<tr(.+?)</tr>', results, re.DOTALL)
+
+            rows = re.findall('<tr>(.+?)</tr>', results, re.DOTALL)
             if rows is None:
                 return sources
 
             for entry in rows:
                 try:
                     try:
-                        name = re.findall('class="detLink" title=".+?">(.+?)</a>', entry, re.DOTALL)[0]
+                        if stype == 'TV':
+                            verify = re.findall('<td class="t5">(.+?)</td>', entry, re.DOTALL)[0]
+                        else:
+                            verify = re.findall('<td class="t2">(.+?)</td>', entry, re.DOTALL)[0]
+                    except Exception:
+                        continue
+                    try:
+                        name = re.findall('<td class="n">(.+?)</td>', entry, re.DOTALL)[0]
+                        name = re.findall('title="(.+?)"', name, re.DOTALL)[0]
                         name = client.replaceHTMLCodes(name)
-                        # t = re.sub('(\.|\(|\[|\s)(\d{4}|S\d*E\d*|S\d*|3D)(\.|\)|\]|\s|)(.+|)', '', name, flags=re.I)
-                        if cleantitle.get(title) not in cleantitle.get(name):
+                        if not cleantitle.get(title) in cleantitle.get(name):
                             continue
                     except Exception:
                         continue
-                    y = re.findall(r'[\.|\(|\[|\s](\d{4}|S\d*E\d*|S\d*)[\.|\)|\]|\s]', name)[-1].upper()
-                    if y != hdlr:
+                    y = re.findall('[\.|\(|\[|\s](\d{4}|S\d*E\d*|S\d*)[\.|\)|\]|\s]', name)[-1].upper()
+                    if not y == hdlr:
                         continue
 
                     try:
-                        seeders = int(re.findall('<td align="right">(.+?)</td>', entry, re.DOTALL)[0])
+                        seeders = int(re.findall('<td class="s">(.+?)</td>', entry, re.DOTALL)[0])
                     except Exception:
                         continue
                     if self.min_seeders > seeders:
                         continue
 
                     try:
-                        link = 'magnet:%s' % (re.findall('a href="magnet:(.+?)"', entry, re.DOTALL)[0])
+                        link = 'magnet:%s' % (re.findall('href="magnet:(.+?)"', entry, re.DOTALL)[0])
                         link = str(client.replaceHTMLCodes(link).split('&tr')[0])
                     except Exception:
                         continue
@@ -162,35 +159,15 @@ class source:
                     sources.append({'source': 'Torrent', 'quality': quality, 'language': 'en',
                                     'url': link, 'info': info, 'direct': False, 'debridonly': True})
                 except Exception:
-                    failure = traceback.format_exc()
-                    c.log('TPB - Cycle Broken: \n' + str(failure))
                     continue
 
-            check = [i for i in sources if i['quality'] != 'CAM']
+            check = [i for i in sources if not i['quality'] == 'CAM']
             if check:
                 sources = check
 
             return sources
         except Exception:
-            failure = traceback.format_exc()
-            #c.log('TPB - Exception: \n' + str(failure))
             return sources
-
-    def __get_base_url(self, fallback):
-        try:
-            for domain in self.domains:
-                try:
-                    url = 'https://%s' % domain
-                    result = client.request(url, limit=1, timeout='10')
-                    result = re.findall('<input type="submit" title="(.+?)"', result, re.DOTALL)[0]
-                    if result and 'Pirate Search' in result:
-                        return url
-                except Exception:
-                    pass
-        except Exception:
-            pass
-
-        return fallback
 
     def resolve(self, url):
         return url

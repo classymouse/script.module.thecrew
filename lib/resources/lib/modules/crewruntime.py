@@ -201,10 +201,6 @@ class CrewRuntime:
         '''
         #logdebug = xbmc.LOGDEBUG
         begincolor = begininfocolor = endcolor = ''
-
-
-        begincolor = begininfocolor = endcolor = ''
-
         debug_prefix = f'{begincolor}[ {self.name} {self.pluginversion} | {self.moduleversion} | {self.kodiversion} | {self.platform} | DEBUG ]{endcolor}'
         info_prefix = f'{begininfocolor}[ {self.name} {self.pluginversion}/{self.moduleversion} | INFO ]{endcolor}'
 
@@ -249,6 +245,18 @@ class CrewRuntime:
 
         except Exception as exc:
             xbmc.log(f'[ {self.name} ] Logging Failure: {exc}', 1)
+
+    def scraper_error(self, msg, scraper, trace=0):
+        """
+        Logs an error message associated with a specific scraper.
+
+        Args:
+            msg (str): The error message to log.
+            scraper (str): The name of the scraper where the error occurred.
+            trace (int, optional): If set to 1, includes traceback information. Defaults to 0.
+        """
+        msg = f'Scraper: {scraper} | {msg}'
+        self.log(msg, trace)
 
     def in_addon(self) -> bool:
         '''

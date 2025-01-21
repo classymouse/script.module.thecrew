@@ -1,28 +1,28 @@
 # -*- coding: utf-8 -*-
 
 '''
- ***********************************************************
- * The Crew Add-on - Scraper Module
- *
- *
- * @file torrentgalaxy.py
- * @package script.module.thecrew
- *
- * @copyright (c) 2025, The Crew
- * @license GNU General Public License, version 3 (GPL-3.0)
- *
-  ***********************************************************cm*
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 '''
 
 import re
-from urllib.parse import urlencode, quote_plus, parse_qs, urljoin
-
-from resources.lib.modules import cleantitle
-from resources.lib.modules import debrid
-from resources.lib.modules import source_utils
-from resources.lib.modules.crewruntime import c
+from resources.lib.modules import cleantitle, debrid, source_utils
 from resources.lib.modules import client
 
+try: from urlparse import parse_qs, urljoin
+except ImportError: from urllib.parse import parse_qs, urljoin
+try: from urllib import urlencode, quote_plus, quote
+except ImportError: from urllib.parse import urlencode, quote_plus, quote
 
 
 class source:
@@ -30,9 +30,7 @@ class source:
         self.priority = 1
         self.language = ['en']
         self.domains = ['torrentgalaxy.to']
-        #self.base_link = 'https://torrentgalaxy.to' # cm - eu blocked
-        self.base_link = "https://tgx.rs"
-        #self.search_link = '/torrents.php?search=%s&sort=seeders&order=desc'
+        self.base_link = 'https://torrentgalaxy.to' # cm - blocked
         self.search_link = '/torrents.php?search=%s'
 
     def movie(self, imdb, title, localtitle, aliases, year):
@@ -75,9 +73,11 @@ class source:
 
             title = data['tvshowtitle'] if 'tvshowtitle' in data else data['title']
 
-            hdlr = f"S{int(data['season']):02d}E{int(data['episode']):02d}" if 'tvshowtitle' in data else data['year']
+            hdlr = 'S%02dE%02d' % (int(data['season']), int(data['episode'])) if 'tvshowtitle' in data else data['year']
 
-            query = f"{data['tvshowtitle']} s{int(data['season']):02d}e{int(data['episode']):02d}" if 'tvshowtitle' in data else f"{data['title']} {data['year']}"
+            query = '%s s%02de%02d' % (
+            data['tvshowtitle'], int(data['season']), int(data['episode'])) if 'tvshowtitle' in data else '%s %s' % (
+            data['title'], data['year'])
             query = re.sub(r'(\\\|/| -|:|;|\*|\?|"|\'|<|>|\|)', ' ', query)
 
             url = self.search_link % quote_plus(query)
@@ -92,27 +92,21 @@ class source:
                         size = re.findall(r'((?:\d+\,\d+\.\d+|\d+\.\d+|\d+\,\d+|\d+)\s*(?:GiB|MiB|GB|MB))', post)[0]
                         div = 1 if size.endswith('GB') else 1024
                         size = float(re.sub('[^0-9|/.|/,]', '', size.replace(',', '.'))) / div
-                        size = f"{size:.2f} GB"
-                    except Exception:
+                        size = '%.2f GB' % size
+                    except BaseException:
                         size = '0'
                     for url in link:
                         if hdlr not in url:
                             continue
+                        url = url.split('&tr')[0]
                         quality, info = source_utils.get_release_quality(url)
-
-                        url = url.split('&dn=', 1)[0]
-
-                        #cm - this will never happen, only btih magnet link left
                         if any(x in url for x in ['FRENCH', 'Ita', 'italian', 'TRUEFRENCH', '-lat-', 'Dublado']):
                             continue
-
                         info.append(size)
                         info = ' | '.join(info)
-
-                        sources.append({
-                            'source': 'Torrent', 'quality': quality, 'language': 'en', 'url': url,
-                            'info': info, 'direct': False, 'debridonly': True
-                            })
+                        sources.append(
+                            {'source': 'Torrent', 'quality': quality, 'language': 'en', 'url': url, 'info': info,
+                                'direct': False, 'debridonly': True})
             except:
                 return
             return sources

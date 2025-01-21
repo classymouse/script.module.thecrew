@@ -70,6 +70,7 @@ class sources:
             url = None
 
             items = self.getSources(title, year, imdb, tmdb, season, episode, tvshowtitle, premiered)
+            c.log(f"[CM Debug @ 73 in sources.py] items = {repr(items)}")
             select = control.setting('hosts.mode') if not select else select # cm - this is ALWAYS select, always 1
 
             metadata = json.loads(meta) if meta is not None else {}
@@ -373,7 +374,7 @@ class sources:
             pass
 
 
-    def getSources(self, title, year, imdb, tmdb, season, episode, tvshowtitle, premiered, quality='HD', timeout=30):
+    def getSources2(self, title, year, imdb, tmdb, season, episode, tvshowtitle, premiered, quality='HD', timeout=30):
 
         start_time = time.time()
         progressDialog = control.progressDialog if control.setting('progress.dialog') == '0' else control.progressDialogBG
@@ -442,6 +443,8 @@ class sources:
         #[i.start() for i in threads]
         for thread in threads:
             thread.start()
+        for thread in threads:
+            thread.join()
         #[i.join() for i in threads]
 
         string1 = control.lang(32404)
@@ -478,7 +481,8 @@ class sources:
 
         #for i in range(0, 4 * timeout): #max 120
         #for i in range(0, 2 * timeout): #max 120
-        for i in range(0, timeout): #max 120
+        for i in range(timeout): #max 120
+            c.log(f"[CM Debug @ 484 in sources.py] i = {i}")
             if str(pre_emp) == 'true':
                 if quality in [0, 1]:
                     if (source_4k + d_source_4k) >= int(pre_emp_limit):
@@ -506,7 +510,8 @@ class sources:
                     pass
 
                 #c.log(f"[CM Debug @ 545 in sources.py] debrid_status = {debrid_status}")
-                d_4k_label = d_1080_label = d_720_label = d_sd_label = total_format = d_total_label = ''
+                #d_4k_label = d_1080_label = d_720_label = d_sd_label = total_format = d_total_label = ''
+                #source_4k_label = source_1080_label = source_720_label = source_sd_label = source_total_label = ''
 
                 if len(self.sources) > 0:
                     source_counts = {
@@ -540,10 +545,18 @@ class sources:
                     source_720_label = total_format % ('red', pdiag_list[2]) if pdiag_list[2] == 0 else total_format % ('lime', pdiag_list[2])
                     source_sd_label = total_format % ('red', pdiag_list[3]) if pdiag_list[3] == 0 else total_format % ('lime', pdiag_list[3])
                     source_total_label = total_format % ('red', pdiag_list[4]) if pdiag_list[4] == 0 else total_format % ('lime', pdiag_list[4])
+                else:
+                    #no sources
+                    c.log(f"[CM Debug @ 549 in sources.py] len(self.sources) = {len(self.sources)}")
+                    raise StopIteration
+
+
+
+
 
                 mainleft = info = []
                 for x in threads:
-                    #c.log(f"[CM Debug @ 587 in sources.py] x = repr(x) = {repr(x)} with name = {x.getName()} and is_alive is {x.is_alive()}")
+                    c.log(f"[CM Debug @ 550 in sources.py] x = repr(x) = {repr(x)} with name = {x.getName()} and is_alive is {x.is_alive()}")
                     if x.is_alive() is True:
                         if x.getName() in mainsourceDict:
                             mainleft.append(sourcelabelDict[x.getName()])
@@ -551,7 +564,7 @@ class sources:
                             info.append(sourcelabelDict[x.getName()])
 
                 #if (i / 2) < timeout: # --> for i in range(0, timeout) - cm - huh?
-                if ((time.time() - start_time) < (timeout / 2)):
+                if (time.time() - start_time) < (timeout / 2):
                     try:
                         if i >= timeout and len(mainleft) == 0 and len(self.sources) >= 100 * len(info):
                             break # improve responsiveness
@@ -791,6 +804,8 @@ class sources:
         #[i.start() for i in threads]
         for thread in threads:
             thread.start()
+        for thread in threads:
+            thread.join()
         #[i.join() for i in threads]
 
         string1 = control.lang(32404)
@@ -1012,13 +1027,22 @@ class sources:
                         break
 
                 time.sleep(0.5)
-            except Exception:
+            except Exception as e:
+                import traceback
+                failure = traceback.format_exc()
+                c.log(f'[CM Debug @ 1018 in sources.py]Traceback:: {failure}')
+                c.log(f'[CM Debug @ 1018 in sources.py]Exception raised. Error = {e}')
                 pass
         try:
             progressDialog.close()
-        except Exception:
+
+        except Exception as e:
+            import traceback
+            failure = traceback.format_exc()
+            c.log(f'[CM Debug @ 1027 in sources.py]Traceback:: {failure}')
+            c.log(f'[CM Debug @ 1027 in sources.py]Exception raised. Error = {e}')
             pass
-    
+
 
         self.sourcesFilter()
         end_time = time.time()
@@ -1027,7 +1051,7 @@ class sources:
 
 
 
-    def getSources_backup(self, title, year, imdb, tmdb, season, episode, tvshowtitle, premiered, quality='HD', timeout=30):
+    def getSources(self, title, year, imdb, tmdb, season, episode, tvshowtitle, premiered, quality='HD', timeout=30):
 
         progressDialog = control.progressDialog if control.setting('progress.dialog') == '0' else control.progressDialogBG
         progressDialog.create(control.addonInfo('name'), '')
@@ -1100,7 +1124,7 @@ class sources:
 
         try:
             timeout = int(control.setting('scrapers.timeout.1'))
-            c.log(f"[CM Debug @ 799 in sources.py] timeout = {timeout}")
+            c.log(f"[CM Debug @ 1127 in sources.py] timeout = {timeout}")
         except Exception:
             pass
 
@@ -1152,6 +1176,9 @@ class sources:
                 except Exception:
                     pass
 
+                #for e in self.sources:
+                    #c.log(f"[CM Debug @ 1180 in sources.py] e = {repr(e)}")
+
                 if len(self.sources) > 0:
                     if quality == 0:
                         source_4k = len([e for e in self.sources if e['quality'] == '4K' and e['debridonly'] is False])
@@ -1201,22 +1228,24 @@ class sources:
 
                         d_total = d_source_4k + d_source_1080 + d_source_720 + d_source_sd
 
-                if debrid_status:
-                    d_4k_label = total_format % ('red', d_source_4k) if d_source_4k == 0 else total_format % ('lime', d_source_4k)
-                    d_1080_label = total_format % ('red', d_source_1080) if d_source_1080 == 0 else total_format % ('lime', d_source_1080)
-                    d_720_label = total_format % ('red', d_source_720) if d_source_720 == 0 else total_format % ('lime', d_source_720)
-                    d_sd_label = total_format % ('red', d_source_sd) if d_source_sd == 0 else total_format % ('lime', d_source_sd)
-                    d_total_label = total_format % ('red', d_total) if d_total == 0 else total_format % ('lime', d_total)
-                source_4k_label = total_format % ('red', source_4k) if source_4k == 0 else total_format % ('lime', source_4k)
-                source_1080_label = total_format % ('red', source_1080) if source_1080 == 0 else total_format % ('lime', source_1080)
-                source_720_label = total_format % ('red', source_720) if source_720 == 0 else total_format % ('lime', source_720)
-                source_sd_label = total_format % ('red', source_sd) if source_sd == 0 else total_format % ('lime', source_sd)
-                source_total_label = total_format % ('red', total) if total == 0 else total_format % ('lime', total)
+                    if debrid_status:
+                        d_4k_label = total_format % ('red', d_source_4k) if d_source_4k == 0 else total_format % ('lime', d_source_4k)
+                        d_1080_label = total_format % ('red', d_source_1080) if d_source_1080 == 0 else total_format % ('lime', d_source_1080)
+                        d_720_label = total_format % ('red', d_source_720) if d_source_720 == 0 else total_format % ('lime', d_source_720)
+                        d_sd_label = total_format % ('red', d_source_sd) if d_source_sd == 0 else total_format % ('lime', d_source_sd)
+                        d_total_label = total_format % ('red', d_total) if d_total == 0 else total_format % ('lime', d_total)
+                    source_4k_label = total_format % ('red', source_4k) if source_4k == 0 else total_format % ('lime', source_4k)
+                    source_1080_label = total_format % ('red', source_1080) if source_1080 == 0 else total_format % ('lime', source_1080)
+                    source_720_label = total_format % ('red', source_720) if source_720 == 0 else total_format % ('lime', source_720)
+                    source_sd_label = total_format % ('red', source_sd) if source_sd == 0 else total_format % ('lime', source_sd)
+                    source_total_label = total_format % ('red', total) if total == 0 else total_format % ('lime', total)
+
+
                 if (i / 2) < timeout:
                     try:
-                        #@todo oh fix for double duty mainleft and info in threads
                         mainleft = [sourcelabelDict[x.getName()] for x in threads if x.is_alive() is True and x.getName() in mainsourceDict]
                         info = [sourcelabelDict[x.getName()] for x in threads if x.is_alive() is True]
+                        #if i >= timeout and len(mainleft) == 0 and len(self.sources) >= 100 * len(info):
                         if i >= timeout and len(mainleft) == 0 and len(self.sources) >= 100 * len(info):
                             break # improve responsiveness
                         if debrid_status:
@@ -1290,7 +1319,7 @@ class sources:
                             percent = int(100 * float(i) / (2 * timeout) + 0.5)
                             progressDialog.update(max(1, percent), line1 + '\n' + line2)
                     except Exception as e:
-                        log_utils.log('Exception Raised: %s' % str(e), log_utils.LOGERROR)
+                        c.log(f'Exception Raised: {e}', 1)
                 else:
                     try:
                         #@todo fix for double duty mainleft and info
@@ -1321,13 +1350,17 @@ class sources:
                         break
 
                 time.sleep(0.5)
-            except Exception:
-                pass
+            except Exception as e:
+                import traceback
+                failure = traceback.format_exc()
+                c.log(f'[CM Debug @ 1349 in sources.py]Traceback:: {failure}')
+                c.log(f'[CM Debug @ 1349 in sources.py]Exception raised. Error = {e}')
+
         try:
             progressDialog.close()
         except Exception as e:
-            c.log(f"[CM Debug @ 1016 in sources.py] exception raised. Error = {e}")
-            pass
+            c.log(f"[CM Debug @ 1355 in sources.py] exception raised. Error = {e}")
+
 
         self.sourcesFilter()
 
@@ -1561,7 +1594,7 @@ class sources:
             else:
                 yield source # Always yield non-string url sources.
 
-    def sourcesProcessTorrents(self, torrent_sources):
+    def sourcesProcessTorrents2(self, torrent_sources):
         """Process torrent sources by checking for cached hashes.
 
         This function takes a list of torrent sources and checks if the torrent
@@ -1620,7 +1653,7 @@ class sources:
             return torrent_sources
 
 
-    def sourcesProcessTorrents_backup(self, torrent_sources):#adjusted Fen code
+    def sourcesProcessTorrents(self, torrent_sources):#adjusted Fen code
         if len(torrent_sources) == 0:
             return
         for i in torrent_sources:
@@ -1642,8 +1675,10 @@ class sources:
                         infoHash = r.lower()
                         i['info_hash'] = infoHash
                         hashList.append(infoHash)
-                except Exception: torrent_sources.remove(i)
-            if len(torrent_sources) == 0: return torrent_sources
+                except Exception:
+                    torrent_sources.remove(i)
+            if len(torrent_sources) == 0:
+                return torrent_sources
             torrent_sources = [i for i in torrent_sources if 'info_hash' in i]
             hashList = list(set(hashList))
             control.sleep(500)
@@ -1706,7 +1741,7 @@ class sources:
             initial_count = len(self.sources)
             self.sources = list(self.uniqueSourcesGen(self.sources))
             duplicates_removed = initial_count - len(self.sources)
-            control.infoDialog(control.lang(32089).format(duplicates_removed), icon='INFO')
+            control.infoDialog(control.lang(32089).format(duplicates_removed), icon='main_classy.png', time=4000)
 
         torrent_sources = self.sourcesProcessTorrents([src for src in self.sources if 'magnet:' in src['url']])
         filtered_sources = []
@@ -1841,7 +1876,8 @@ class sources:
             self.sources = [i for i in self.sources if not any(value in (i['url']).lower() for value in hevc_list)]# and not any(s in i.get('name').lower for s in hevc_list)
 
         local = [i for i in self.sources if 'local' in i and i['local'] is True]
-        for i in local: i.update({'language': self._getPrimaryLang() or 'en'})
+        for i in local:
+            i.update({'language': self._getPrimaryLang() or 'en'})
         self.sources = [i for i in self.sources if i not in local]
 
         #Filter-out duplicate links
@@ -1851,12 +1887,12 @@ class sources:
                 self.sources = list(self.uniqueSourcesGen(self.sources))
                 dupes = str(stotal - len(self.sources))
                 control.infoDialog(control.lang(32089).format(dupes), icon='INFO')
-            #else:
-                #self.sources
+            else:
+                self.sources
         except Exception:
             import traceback
             failure = traceback.format_exc()
-            log_utils.log('DUP - Exception: ' + str(failure))
+            c.log('DUP - Exception: ' + str(failure))
             control.infoDialog('Dupes filter failed', icon='INFO')
             self.sources
         #END
@@ -1991,7 +2027,7 @@ class sources:
                 d = 'MD'
             if d.lower() == 'premiumize.me':
                 d = 'PM'
-            if d.lower() == 'Torbox':
+            if d.lower() == 'torbox':
                 d = 'TB'
             if d.lower() == 'real-debrid':
                 d = 'RD'
@@ -1999,10 +2035,10 @@ class sources:
                 d = 'ZVR'
             if not d == '':
                 #label = '%02d | %s | %s | %s | ' % (int(i+1), d, q, p)
-                label = f'{i+1:02d} | {d} | {q} | {p} | '
+                label = f'{int(i)+1:02d} | {d} | {q} | {p} | '
             else:
                 #label = '%02d | %s | %s | ' % (int(i+1), q, p)
-                label = f'{i+1:02d} | {q} | {p} | '
+                label = f'{int(i)+1:02d} | {q} | {p} | '
 
             if multi is True and not l != 'en':
                 label += f'{l} | '
@@ -2051,8 +2087,12 @@ class sources:
             if not HEVC == 'true':
                 self.sources = [i for i in self.sources if not 'HEVC' or 'multiline_label' in i]
 
-        except Exception:
-            pass
+        except Exception as e:
+            import traceback
+            failure = traceback.format_exc()
+            c.log(f'[CM Debug @ 2080 in sources.py]Traceback:: {failure}')
+            c.log(f'[CM Debug @ 2080 in sources.py]Exception raised. Error = {e}')
+
 
         self.sources = [i for i in self.sources if 'label' or 'multiline_label' in i['label']]
 

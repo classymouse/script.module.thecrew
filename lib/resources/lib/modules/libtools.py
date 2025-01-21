@@ -2,10 +2,7 @@
 
 '''
  ***********************************************************
- * Genesis Add-on
- * Copyright (C) 2015 lambda
- *
- * - Mofidied by The Crew
+ * The Crew Add-on
  *
  * @file bookmarks.py
  * @package script.module.thecrew
@@ -19,7 +16,6 @@
 
 import sqlite3 as database
 
-
 import datetime
 import json
 import os
@@ -27,17 +23,15 @@ import re
 import sys
 
 from urllib.parse import parse_qsl, quote_plus
-
-import six
+from ftplib import FTP
 
 from . import control
 from . import cleantitle
-#from . import log_utils
 from . import sources
 from .crewruntime import c
 
-from resources.lib.indexers import movies
-from resources.lib.indexers import tvshows
+from ..indexers import movies
+from ..indexers import tvshows
 
 
 class lib_tools:
@@ -51,7 +45,7 @@ class lib_tools:
                 if 'ftp://' not in folder:
                     raise Exception()
 
-                from ftplib import FTP
+
                 ftparg = re.compile(r'ftp://(.+?):(.+?)@(.+?):?(\d+)?/(.+/?)').findall(folder)
                 ftp = FTP(ftparg[0][2], ftparg[0][0], ftparg[0][1])
                 try:
@@ -81,16 +75,12 @@ class lib_tools:
 
     @staticmethod
     def nfo_url(media_string, ids):
-        tmdb_url = 'https://www.themoviedb.org/%s/%s'
-        imdb_url = 'https://www.imdb.com/title/%s/'
-        tvdb_url = 'https://thetvdb.com/?tab=series&id=%s'
-
         if 'imdb' in ids:
-            return imdb_url % (str(ids['imdb']))
+            return f'https://www.imdb.com/title/{str(ids["imdb"])}'
         elif 'tmdb' in ids:
-            return tmdb_url % (media_string, str(ids['tmdb']))
+            return f'https://www.themoviedb.org/{media_string}/{str(ids["tmdb"])}' % (media_string, str(ids['tmdb']))
         elif 'tvdb' in ids:
-            return tvdb_url % (str(ids['tvdb']))
+            return f'https://thetvdb.com/?tab=series&id={str(ids["tvdb"])}'
         else:
             return ''
 
@@ -98,7 +88,6 @@ class lib_tools:
     def check_sources(title, year, imdb, tmdb=None, season=None, episode=None, tvshowtitle=None, premiered=None):
         try:
             src = sources.sources().getSources(title, year, imdb, tmdb, season, episode, tvshowtitle, premiered)
-            #getSources(self, title, year, imdb, tmdb, season, episode, tvshowtitle, premiered, quality='HD', timeout=30)
             return src and len(src) > 5
         except Exception:
             return False
@@ -117,6 +106,20 @@ class lib_tools:
 
     @staticmethod
     def make_path(base_path, title, year='', season=''):
+        """
+        This function generates a file path for a TV show. It takes a base path, title, year,
+        and season as input, and returns a path in the format base_path/title (year)/Season season.
+        The title is sanitized to replace special characters with underscores.
+
+        Args:
+            base_path (_type_): _description_
+            title (_type_): _description_
+            year (str, optional): _description_. Defaults to ''.
+            season (str, optional): _description_. Defaults to ''.
+
+        Returns:
+            _type_: _description_
+        """
         show_folder = re.sub(r'[^\w\-_\. ]', '_', title)
         show_folder = f'{show_folder} ({year})' if year else show_folder
         path = os.path.join(base_path, show_folder)
@@ -177,7 +180,9 @@ class libmovies:
         if self.infoDialog is True:
             control.infoDialog(control.lang(32554), time=1)
 
-        if self.library_setting == 'true' and not control.condVisibility('Library.IsScanningVideo') and files_added > 0:
+        if self.library_setting == 'true' and not\
+            control.condVisibility('Library.IsScanningVideo') and\
+            files_added > 0:
             control.execute('UpdateLibrary(video)')
     def add_movie(self, name: str, title: str, year: int, imdb_id: str, add_range: bool = False) -> None:
         """
@@ -705,9 +710,9 @@ class libepisodes:
                 seasons = episodes.seasons().get(item['tvshowtitle'], item['year'], item['imdb'], item['tmdb'], meta=None, idx=False)
                 season = [i['season'] for i in seasons]
                 for s in season:
-                    #log_utils.log('lib_seasons: ' + str(s))
+                    #c.log('lib_seasons: ' + str(s))
                     it = episodes.episodes().get(item['tvshowtitle'], item['year'], item['imdb'], item['tmdb'], meta=None, season=s, idx=False)
-                    #log_utils.log('lib_it: ' + str(it))
+                    #c.log('lib_it: ' + str(it))
 
                     status = seasons[0]['status'].lower()
 
