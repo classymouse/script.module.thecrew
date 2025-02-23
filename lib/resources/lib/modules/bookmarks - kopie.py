@@ -152,6 +152,11 @@ def get(media_type, imdb, tmdb=0, traktid=0, tvdb=0, season=0, episode=0, local=
             return 0
 
 
+
+
+
+
+
 def reset(current_time, total_time, media_type, imdb, season='', episode=''):
     """
     Reset a bookmark, marking the media as watched or unwatched.

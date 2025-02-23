@@ -1535,7 +1535,7 @@ class player(xbmc.Player):
                 meta[i] = control.infoLabel(f'listitem.{i}')
             except Exception:
                 pass
-        #meta = dict((k,v) for k, v in six.iteritems(meta) if not v == '')
+
         meta = dict((k,v) for k, v in meta.items() if not v == '')
         if 'title' not in meta:
             meta['title'] = control.infoLabel('listitem.label')
@@ -1602,8 +1602,10 @@ class bookmarks_old:
 
             #if not control.setting('bookmarks') == 'true': raise Exception()
             idFile = hashlib.md5()
-            for i in name: idFile.update(str(i))
-            for i in year: idFile.update(str(i))
+            for i in name:
+                idFile.update(str(i))
+            for i in year:
+                idFile.update(str(i))
             idFile = str(idFile.hexdigest())
 
             dbcon = database.connect(control.bookmarksFile)
@@ -1619,10 +1621,13 @@ class bookmarks_old:
             label = '%02d:%02d:%02d' % (hours, minutes, seconds)
             label = (control.lang(32502) % label).encode('utf-8')
 
-            try: yes = control.dialog.contextmenu([label, control.lang(32501), ])
-            except Exception: yes = control.yesnoDialog(label, '', '', str(name), control.lang(32503), control.lang(32501))
+            try:
+                yes = control.dialog.contextmenu([label, control.lang(32501), ])
+            except Exception:
+                yes = control.yesnoDialog(label, '', '', str(name), control.lang(32503), control.lang(32501))
 
-            if yes: self.offset = '0'
+            if yes:
+                self.offset = '0'
 
             return self.offset
         except Exception:

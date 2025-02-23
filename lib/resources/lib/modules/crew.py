@@ -134,26 +134,6 @@ def router(params):
             else:
                 docu.documentary().root()
 
-    elif action == "furkNavigator":
-        from resources.lib.indexers import navigator
-        navigator.navigator().furk()
-
-    elif action == "furkMetaSearch":
-        from resources.lib.indexers import furk
-        furk.furk().furk_meta_search(url)
-
-    elif action == "furkSearch":
-        from resources.lib.indexers import furk
-        furk.furk().search()
-
-    elif action == "furkUserFiles":
-        from resources.lib.indexers import furk
-        furk.furk().user_files()
-
-    elif action == "furkSearchNew":
-        from resources.lib.indexers import furk
-        furk.furk().search_new()
-
     elif action == 'bluehat':
         from resources.lib.indexers import navigator
         navigator.navigator().bluehat()
@@ -265,7 +245,7 @@ def router(params):
 
     elif action == 'movies':
         from resources.lib.indexers import movies
-        if url  == 'tmdb_networks':
+        if url in ['tmdb_networks', 'tmdb_networks_no_unaired']:
             movies.movies().get(url, tid)
         else:
             movies.movies().get(url)
@@ -521,9 +501,11 @@ def router(params):
         from resources.lib.indexers import lists
         try:
             if content is not None:
+                c.log(f"[CM Debug @ 524 in crew.py] content = {content}")
                 lists.player().play(url, content)
             else:
                 from resources.lib.modules import sources
+                c.log(f"[CM Debug @ 528 in crew.py] playing from sources, title = {title} | year = {year} | imdb = {imdb} | tmdb = {tmdb} | season = {season} | episode = {episode} | tvshowtitle = {tvshowtitle} | premiered = {premiered} | meta = {meta} | select = {select}")
                 sources.sources().play(
                     title, year, imdb, tmdb, season, episode, tvshowtitle, premiered, meta, select)
         except Exception as e:

@@ -79,8 +79,6 @@ class navigator:
             self.addDirectoryItem(90008, 'porn', 'main_pinkhat.png', 'DefaultMovies.png')
         if not control.setting('navi.personal.list') == 'false':
             self.addDirectoryItem(90167, 'plist', 'userlists.png', 'userlists.png')
-        if not control.setting('furk.ai') == '':
-            self.addDirectoryItem('Furk.net', 'furkNavigator', 'movies.png', 'movies.png')
         self.addDirectoryItem(32008, 'toolNavigator','main_tools.png', 'DefaultAddonProgram.png')
         downloads = True if control.setting('downloads') == 'true' and (len(control.listDir(control.setting('movie.download.path'))[0]) > 0 or len(control.listDir(control.setting('tv.download.path'))[0]) > 0) else False
         if downloads is True:
@@ -89,10 +87,6 @@ class navigator:
 
         self.endDirectory()
 
-    def furk(self):
-        self.addDirectoryItem(90001, 'furkUserFiles','mytvnavigator.png', 'mytvnavigator.png')
-        self.addDirectoryItem(90002, 'furkSearch', 'search.png', 'search.png')
-        self.endDirectory()
 
     def movies(self, lite=False):
         self.addDirectoryItem(32003, 'mymovieliteNavigator','mymovies.png', 'DefaultVideoPlaylists.png')
@@ -107,7 +101,8 @@ class navigator:
         if not control.setting('navi.moviepopular') == 'false':
             self.addDirectoryItem(32018, 'movies&url=popular', 'most-popular.png', 'DefaultMovies.png')
         if not control.setting('navi.disneym') == 'false':
-            self.addDirectoryItem(90166, 'movies&url=https://api.trakt.tv/users/drew-casteo/lists/disney-movies/items?', 'disney.png', 'disney.png')
+            #self.addDirectoryItem(90166, 'movies&url=https://api.trakt.tv/users/drew-casteo/lists/disney-movies/items?', 'disney.png', 'disney.png')
+            self.addDirectoryItem(90166, 'movies&url=tmdb_networks_no_unaired&tid=337', 'disney.png', 'disney.png')
         if not control.setting('navi.traktlist') == 'false':
             self.addDirectoryItem(90051, 'traktlist','trakt.png', 'DefaultMovies.png')
         #if not control.setting('navi.imdblist') == 'false':

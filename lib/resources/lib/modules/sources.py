@@ -74,6 +74,7 @@ class sources:
             select = control.setting('hosts.mode') if not select else select # cm - this is ALWAYS select, always 1
 
             metadata = json.loads(meta) if meta is not None else {}
+            c.log(f"[CM Debug @ 77 in sources.py] meta = {metadata}")
             mediatype = metadata['mediatype'] if 'mediatype' in metadata else ''
 
             if mediatype != 'movie':

@@ -201,8 +201,8 @@ class CrewRuntime:
         '''
         #logdebug = xbmc.LOGDEBUG
         begincolor = begininfocolor = endcolor = ''
-        debug_prefix = f'{begincolor}[ {self.name} {self.pluginversion} | {self.moduleversion} | {self.kodiversion} | {self.platform} | DEBUG ]{endcolor}'
-        info_prefix = f'{begininfocolor}[ {self.name} {self.pluginversion}/{self.moduleversion} | INFO ]{endcolor}'
+        debug_prefix = f' DEBUG {begincolor}[{self.name} {self.pluginversion} | {self.moduleversion} | {self.kodiversion} | {self.platform}]{endcolor}'
+        info_prefix = f' INFO {begininfocolor}[{self.name} {self.pluginversion}/{self.moduleversion}]{endcolor}'
 
         log_path = xbmcvfs.translatePath('special://logpath')
         filename = 'the_crew.log'
@@ -233,15 +233,19 @@ class CrewRuntime:
                 xbmc.log(f"\n\n--> addon name @ 147 = {self.name} | {self.pluginversion} | {self.moduleversion}  \n\n")
 
                 if not os.path.exists(log_file):
-                    _file = open(log_file, 'w', encoding="utf8")
+                    _file = open(log_file, 'a', encoding="utf8")
+                    line = 'Classy started this file\n'
+                    _file.write(line.rstrip('\r\n') + '\n')
+
                     _file.close()
                 with open(log_file, 'a', encoding="utf8") as _file:
                     now = datetime.now()
                     _dt = now.strftime("%Y-%m-%d %H:%M:%S")
 
                     #line = f'[{_date} {_time}] {head}: {msg}'
-                    line = f'[{_dt}] {head}: {msg}'
-                    _file.write(line.rstrip('\r\n') + '\n\n')
+                    line = f'{_dt} {head}: {msg}'
+                    #_file.write(line.rstrip('\r\n') + '\n\n')
+                    _file.write(line.rstrip('\r\n') + '\n')
 
         except Exception as exc:
             xbmc.log(f'[ {self.name} ] Logging Failure: {exc}', 1)
@@ -380,18 +384,29 @@ class CrewRuntime:
         UnicodeDecodeError
             If the decoding fails.
         """
+
+        if not isinstance(data, (str, bytes)):
+            data = data.encode(encoding).strip()
+
         if isinstance(data, str):
             return data
 
         # Check if the input data is of type bytes
         if not isinstance(data, bytes):
-            raise ValueError("Input data must be a byte string.")
+            raise Exception("Input data must be a byte string.")
 
         try:
             # Try to decode the byte string
             return data.decode(encoding)
         except UnicodeDecodeError as e:
+            import traceback
+            failure = traceback.format_exc()
+            self.log(f'[CM Debug @ 404 in crewruntime.py]Traceback:: {failure}')
+            self.log(f'[CM Debug @ 405 in crewruntime.py]Exception raised. Error = {e}')
+
             raise UnicodeDecodeError(f"Decoding failed: {e}") from e
+
+
 
 
     def set_imagesizes(self) -> None:

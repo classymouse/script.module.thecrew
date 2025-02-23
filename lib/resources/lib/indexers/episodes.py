@@ -157,6 +157,9 @@ class seasons:
             else:
                 item = self.session.get(self.tmdb_show_link % (tmdb_id, self.lang) + ',translations', timeout=16).json()
 
+            tvdb_id = item.get('external_ids', {}).get('tvdb', '0')
+
+
             if item is None:
                 raise Exception()
 
@@ -183,7 +186,8 @@ class seasons:
                 credits_list = item.get('aggregate_credits', {}).get('cast', [])[:30]
                 for person in credits_list:
                     icon = self.tmdb_img_link.format(
-                        c.tmdb_profilesize, person['profile_path']) if person['profile_path'] else ''
+                        c.tmdb_profilesize, person['profile_path']
+                        ) if person['profile_path'] else ''
                     cast.append({
                         'name': person['name'],
                         'role': person['roles'][0]['character'],
@@ -230,7 +234,12 @@ class seasons:
                 else:
                     fanart = '0'
 
-                tv_fanart = fanart_tv.get_cached_fanart(tvdb, imdb, url, headers, timeout, error=True)
+                tv_fanart = fanart_tv.get_fanart_tv_art(tvdb=tvdb_id)
+                if tv_fanart:
+                    banner = tv_fanart.get('banner', '0')
+                    clearlogo = tv_fanart.get('clearlogo', '0')
+                    clearart = tv_fanart.get('clearart', '0')
+                    landscape = tv_fanart.get('landscape', '0')
 
 
 
@@ -513,7 +522,7 @@ class seasons:
                 c.log(f"[CM Debug @ 342 in episodes.py] poster = i['poster'] = {i['poster']} and background = i['fanart'] = {i['fanart']}")
 
 
-                label = ('{} {}').format(labelMenu, i['season'])
+                label = (f"{labelMenu} {i['season']}")
 
                 try:
                     if i['unaired'] == 'true':
@@ -523,16 +532,11 @@ class seasons:
 
                 systitle = sysname = quote_plus(i['tvshowtitle'])
 
-
-
                 poster = str(i['poster']) if 'poster' in i and not i['poster'] == '0' else c.addon_poster()
                 fanart = str(i['fanart']) if 'fanart' in i and not i['fanart'] == '0' else c.addon_fanart()
                 c.log(f"[CM Debug @ 359 in episodes.py] i want to know the type of fanart. It is = {type(fanart)}")
                 fanart_converted = c.string_to_tuple(fanart)
                 c.log(f"[CM Debug @ 359 in episodes.py] fanart_converted = {fanart_converted}")
-
-
-
 
                 c.log(f"[CM Debug @ 359 in episodes.py] fanart = {fanart[0]}")
                 banner = str(i['banner']) if 'banner' in i and not i['banner'] == '0' else c.addon_banner()
@@ -607,10 +611,6 @@ class seasons:
                     item = control.item(label=label, offscreen=True)
                 except Exception:
                     item = control.item(label=label)
-
-
-
-
 
 
                 art = {}
@@ -2152,7 +2152,11 @@ class episodes:
                 if is_folder:
                     liz.setProperty('IsPlayable', 'true')
 
-                offset = bookmarks.get('episode', imdb_id, season, episode, True)
+
+                #not all episodes have an imdb id, all do have a tmdb id
+
+                offset = bookmarks.get('episode', imdb=imdb_id, tmdb=tmdb_id, season=season, episode=episode, local=False)
+                c.log(f"[CM Debug @ 2159 in episodes.py] offset = {offset}")
                 meta.update({'offset': offset})
 
                 meta['studio'] = c.string_split_to_list(meta['studio']) if 'studio' in meta else []

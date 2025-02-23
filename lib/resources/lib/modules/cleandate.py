@@ -22,7 +22,8 @@ def new_iso_to_utc(iso_ts):
         return 0
     return int(time.mktime(time.strptime(iso_ts, "%Y-%m-%dT%H:%M:%S.000Z")))
 
-
+def now_to_iso():
+    return datetime.datetime.now().isoformat('T', 'milliseconds') + 'Z'
 
 # cm modified
 # !deprecated

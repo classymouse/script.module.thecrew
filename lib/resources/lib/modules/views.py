@@ -16,26 +16,51 @@
 
 import sqlite3 as database
 
+
+
 from . import control
 from .crewruntime import c
 
+sql_add = 'CREATE TABLE IF NOT EXISTS views (skin TEXT, view_type TEXT, view_id TEXT, UNIQUE(skin, view_type));'
 
-def add_view(content):
+
+def table_exists() -> bool:
+    '''
+    Check if the views table exists in the views database
+
+    Returns:
+        bool: Whether the views table exists
+    '''
+    with database.connect(control.viewsFile) as dbconn:
+        dbcur = dbconn.cursor()
+        dbcur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='views'")
+        return bool(dbcur.fetchone())
+
+def add_view(content) -> None:
+    """
+    Add or update the view configuration for the given content type.
+
+    This function retrieves the current skin and view ID, constructs a record,
+    and ensures the 'views' table exists. It then deletes any existing record
+    for the skin and content type and inserts the new record. Finally, it
+    displays an info dialog with the view name, skin name, and skin icon.
+
+    Args:
+        content (str): The type of content to set the view for.
+    """
+
     try:
         skin = control.skin
         view_id = str(control.getCurrentViewId())
         record = (skin, content, view_id)
         control.makeFile(control.dataPath)
+        if not table_exists():
+            with database.connect(control.viewsFile) as dbcon:
+                dbcur = dbcon.cursor()
+                dbcur.execute(sql_add)
         with database.connect(control.viewsFile) as dbcon:
             dbcur = dbcon.cursor()
-            dbcur.execute("""
-                CREATE TABLE IF NOT EXISTS views (
-                    skin TEXT,
-                    view_type TEXT,
-                    view_id TEXT,
-                    UNIQUE(skin, view_type)
-                );
-            """)
+            dbcur.execute(sql_add)
             dbcur.execute("DELETE FROM views WHERE skin = ? AND view_type = ?", (skin, content))
             dbcur.execute("INSERT INTO views VALUES (?, ?, ?)", record)
 
@@ -44,13 +69,14 @@ def add_view(content):
         skin_icon = control.addon(skin).getAddonInfo('icon')
 
         control.infoDialog(view_name, heading=skin_name, sound=True, icon=skin_icon)
+    except database.Error as e:
+        c.log(f"Database error: {e}")
     except Exception as e:
-        c.log(str(e))
+        c.log(f"Error: {e}")
 
 
 
-
-def set_view(content, view_dict=None):
+def set_view(content, view_dict=None) -> bool:
     """Set the view type for the given content type.
 
     Args:
@@ -65,6 +91,10 @@ def set_view(content, view_dict=None):
         try:
             skin = control.skin
             record = (skin, content)
+            if not table_exists():
+                with database.connect(control.viewsFile) as dbconn:
+                    dbcur = dbconn.cursor()
+                    dbcur.execute(sql_add)
             with database.connect(control.viewsFile) as dbconn:
                 dbcur = dbconn.cursor()
                 dbcur.execute('SELECT * FROM views WHERE skin = ? AND view_type = ?', record)

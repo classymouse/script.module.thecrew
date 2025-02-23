@@ -1,31 +1,40 @@
-[COLOR orchid][B]version 2.0.7[/B][/COLOR]
-* [COLOR red]Warning[/COLOR]: As of his version The crew will only (!) supports Python 3.6 and above which means, for now, kodi v20 and 21. Unexpected results WILL happen when using on v19.
+[COLOR orchid][B]version 2.1.0[/B][/COLOR]
 
+* [COLOR teal]Info[/COLOR]: This is a major release where a lot of things have been changed and it is almost a complete rewrite of the addon. While it has been tested on a lot of different systems, bugs on some devices/systems may occur. Please let us know.
+
+* [COLOR red]Warning[/COLOR]: As of his version The crew will only (!) supports Python 3.8 and above which means, for now, kodi v20 and 21. Unexpected results WILL happen when using on v19.
 
 * [COLOR green]Added[/COLOR]: total episodes/seasons and watched/unwatched episodes where available (if your skin supports it!)
 * [COLOR green]Added[/COLOR]: widgets don't show unaired episodes in progress list anymore. In normal listings they are colored based on your settings
 * [COLOR green]Added[/COLOR]: holiday/christmas movies menu item will be shown automagically in December
 * [COLOR green]Added[/COLOR]: search items can be deleted per item inside dialog (hold button or right-click)
+* [COLOR green]Added[/COLOR]: progress percentage in title when movie or episode is paused
+* [COLOR green]Added[/COLOR]: progress synced with trakt
+
 
 * [COLOR orange]Fixed[/COLOR]: trailers playing again
-* [COLOR orange]Fixed[/COLOR]: major core code changes py2 to 3
+* [COLOR orange]Fixed[/COLOR]: major core code changes py2 to 3. Will [B]not[/B] work on a python 2 version
 * [COLOR orange]Fixed[/COLOR]: countless bugs in code due to py 3
 * [COLOR orange]Fixed[/COLOR]: fanart size quality now works in info screens and all other widgetsd etc. (you might want to clear your cache)
 * [COLOR orange]Fixed[/COLOR]: selecting an actor with the tmdb addon installed is fixed
 * [COLOR orange]Fixed[/COLOR]: all references to "next", so all nextpages are working again properly
-* [COLOR orange]Fixed[/COLOR]:
-* [COLOR orange]Fixed[/COLOR]:
-* [COLOR orange]Fixed[/COLOR]:
+* [COLOR orange]Fixed[/COLOR]: several indicators (e.g. progress indicators movies)
+* [COLOR orange]Fixed[/COLOR]: countless errors and created numerous new defs to fix old code
+* [COLOR orange]Fixed[/COLOR]: reading of the trakt/local bookmarks setting in Settings
 * [COLOR orange]Fixed[/COLOR]:
 * [COLOR orange]Fixed[/COLOR]:
 
 * [COLOR cyan]Changed[/COLOR]: several (missing) language strings
-* [COLOR cyan]Changed[/COLOR]: trailers: 1 result plays automatically, multiple results can be selected from inm a dialog
+* [COLOR cyan]Changed[/COLOR]: trailers: 1 result plays automatically, multiple results can be selected from a dialog
 * [COLOR cyan]Changed[/COLOR]: changed startup dialogs -> silent boot is now really silent (will log when debug is enabled)
 * [COLOR cyan]Changed[/COLOR]: changed tvshows/seasons/episodes/movies etc. to use the new Listitems
 * [COLOR cyan]Changed[/COLOR]: artwork (e.g. clearlogo, clearart and a new thumbnail for TVShows)
+* [COLOR cyan]Changed[/COLOR]: local bookmarks significally, it is possible you will lose some progress if you are not using trakt
+* [COLOR cyan]Changed[/COLOR]: workings of local and trakt bookmarks. If you choose "local" bookmarks your progress stays local to the device, if you choose "[COLOR red][B]Trakt[/B][/COLOR]" your progress will be updated with Trakt and you can continue watching on another device
 
-* [COLOR orchid]Extra[/COLOR]: Bumped version to 2.0.7/module to 2.1.1
+* [COLOR orchid]Extra[/COLOR]: Bumped version to 2.1.0/module to 2.2.0
 
-* [COLOR red]Removed[/COLOR]: a bunch of startup code
-* [COLOR red]Removed[/COLOR]:
+* [COLOR red]Removed[/COLOR]: a lot of startup code
+* [COLOR red]Removed[/COLOR]: a lot of obsolete
+* [COLOR red]Removed[/COLOR]: removed Kodi-six
+* [COLOR red]Removed[/COLOR]: removed support for Furk.net

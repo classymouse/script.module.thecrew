@@ -156,7 +156,7 @@ class trailers:
             url = result['video']
             title = result['title']
             plot = result['plot']
-            icon = result['video']
+            #icon = result['video']
             poster = self.poster
             fanart = self.fanart
 
@@ -170,7 +170,7 @@ class trailers:
                 control.sleep(1000)
                 while control.player.isPlayingVideo():
                     control.sleep(1000)
-                control.execute('Dialog.Close(%s, true)' % control.getCurrentDialogId)
+                control.execute(f'Dialog.Close({control.getCurrentDialogId}, true)')
 
 
         except Exception as e:

@@ -27,12 +27,19 @@ import os
 import sys
 import traceback
 import base64
-from kodi_six import xbmc, xbmcaddon, xbmcvfs
+import xbmc
+import xbmcaddon
+import xbmcvfs
+#from kodi_six import xbmc, xbmcaddon, xbmcvfs
 from resources.lib.modules import client
 from resources.lib.modules import control
 
+from .crewruntime import c
+
 import six
-from six.moves import urllib_parse, urllib_request, http_cookiejar, html_parser
+from six.moves import urllib_request, http_cookiejar, html_parser
+
+from urllib.parse import quote_plus, unquote_plus, urlencode, unquote
 
 profile = functions_dir = control.transPath(xbmcaddon.Addon().getAddonInfo('profile'))
 
@@ -86,21 +93,21 @@ def clear():
 def resolve(regex):
     try:
         vanilla = re.compile('(<regex>.+)', re.MULTILINE | re.DOTALL).findall(regex)[0]
-        cddata = re.compile('<\!\[CDATA\[(.+?)\]\]>', re.MULTILINE | re.DOTALL).findall(regex)
+        cddata = re.compile(r'<\!\[CDATA\[(.+?)\]\]>', re.MULTILINE | re.DOTALL).findall(regex)
         for i in cddata:
-            regex = regex.replace('<![CDATA['+i+']]>', urllib_parse.quote_plus(i))
+            regex = regex.replace('<![CDATA['+i+']]>', quote_plus(i))
 
         regexs = re.compile('(<regex>.+)', re.MULTILINE | re.DOTALL).findall(regex)[0]
         regexs = re.compile('<regex>(.+?)</regex>', re.MULTILINE | re.DOTALL).findall(regexs)
         regexs = [re.compile('<(.+?)>(.*?)</.+?>', re.MULTILINE | re.DOTALL).findall(i) for i in regexs]
 
-        regexs = [dict([(client.replaceHTMLCodes(x[0]), client.replaceHTMLCodes(urllib_parse.unquote_plus(x[1]))) for x in i]) for i in regexs]
+        regexs = [dict([(client.replaceHTMLCodes(x[0]), client.replaceHTMLCodes(unquote_plus(x[1]))) for x in i]) for i in regexs]
         regexs = [(i['name'], i) for i in regexs]
         regexs = dict(regexs)
 
         url = regex.split('<regex>', 1)[0].strip()
         url = client.replaceHTMLCodes(url)
-        url = six.ensure_str(url)
+        url = c.ensure_str(url)
 
         r = getRegexParsed(regexs, url)
 
@@ -121,10 +128,10 @@ def resolve(regex):
                         item2 = item2.replace('[%s.param%s]' % (regexname, str(i)), obj[i-1])
 
                     item2 = re.compile('(<regex>.+?</regex>)', re.MULTILINE | re.DOTALL).findall(item2)
-                    item2 = [x for x in item2 if not '<name>%s</name>' % regexname in x]
+                    item2 = [x for x in item2 if f'<name>{regexname}</name>' not in x]
                     item2 = ''.join(item2)
 
-                    ln += '\n<item>%s\n%s</item>\n' % (item, item2)
+                    ln += f'\n<item>{item}\n{item2}</item>\n'
                 except Exception:
                     pass
 
@@ -147,17 +154,21 @@ class NoRedirection(urllib_request.HTTPErrorProcessor):
 def getRegexParsed(regexs, url,cookieJar=None,forCookieJarOnly=False,recursiveCall=False,cachedPages={}, rawPost=False, cookie_jar_file=None):#0,1,2 = URL, regexOnly, CookieJarOnly
         #cachedPages = {}
     #print 'url',url
-    doRegexs = re.compile('\$doregex\[([^\]]*)\]').findall(url)
+    doRegexs = re.compile(r'\$doregex\[([^\]]*)\]').findall(url)
 #        print 'doRegexs',doRegexs,regexs
+    c.log(f"[CM Debug @ 401 in regex.py] doRegexs = {doRegexs} and regexs = {regexs}")
     setresolved=True
     for k in doRegexs:
         if k in regexs:
             #print 'processing ' ,k
+            c.log(f"[CM Debug @ 164 in regex.py] processing {k}")
             m = regexs[k]
             #print m
+            c.log(f"[CM Debug @ 167 in regex.py] m = {m}")
             cookieJarParam=False
             if  'cookiejar' in m: # so either create or reuse existing jar
                 #print 'cookiejar exists',m['cookiejar']
+                c.log(f"[CM Debug @ 171 in regex.py] cookiejar exists {m['cookiejar']}")
                 cookieJarParam=m['cookiejar']
                 if  '$doregex' in cookieJarParam:
                     cookieJar=getRegexParsed(regexs, m['cookiejar'],cookieJar,True, True,cachedPages)
@@ -165,20 +176,26 @@ def getRegexParsed(regexs, url,cookieJar=None,forCookieJarOnly=False,recursiveCa
                 else:
                     cookieJarParam=True
             #print 'm[cookiejar]',m['cookiejar'],cookieJar
+            c.log(f"[CM Debug @ 179 in regex.py] cookieJarParam = {cookieJarParam}")
             if cookieJarParam:
                 if cookieJar is None:
                     #print 'create cookie jar'
+                    c.log("[CM Debug @ 183 in regex.py] create cookie jar")
                     cookie_jar_file=None
                     if 'open[' in m['cookiejar']:
                         cookie_jar_file=m['cookiejar'].split('open[')[1].split(']')[0]
 #                            print 'cookieJar from file name',cookie_jar_file
+                        c.log(f"[CM Debug @ 188 in regex.py] cookieJar from file name {cookie_jar_file}")
 
                     cookieJar=getCookieJar(cookie_jar_file)
 #                        print 'cookieJar from file',cookieJar
+                    c.log(f"[CM Debug @ 192 in regex.py] cookieJar from file {cookieJar}")
                     if cookie_jar_file:
                         saveCookieJar(cookieJar,cookie_jar_file)
                     #cookieJar = http_cookiejar.LWPCookieJar()
                     #print 'cookieJar new',cookieJar
+                    c.log(f"[CM Debug @ 197 in regex.py] url = {url}")
+                    c.log(f"[CM Debug @ 198 in regex.py] cookieJar new  = {cookie_jar_file}")
                 elif 'save[' in m['cookiejar']:
                     cookie_jar_file=m['cookiejar'].split('save[')[1].split(']')[0]
                     complete_path=os.path.join(profile,cookie_jar_file)
@@ -217,11 +234,11 @@ def getRegexParsed(regexs, url,cookieJar=None,forCookieJarOnly=False,recursiveCa
                 #print 'using cache page',m['page']
                 link = cachedPages[m['page']]
             else:
-                if m['page'] and not m['page']=='' and  m['page'].startswith('http'):
+                if m['page'] and not m['page']=='' and m['page'].startswith('http'):
                     if '$epoctime$' in m['page']:
-                        m['page']=m['page'].replace('$epoctime$',getEpocTime())
+                        m['page'] = m['page'].replace('$epoctime$',getEpocTime())
                     if '$epoctime2$' in m['page']:
-                        m['page']=m['page'].replace('$epoctime2$',getEpocTime2())
+                        m['page'] = m['page'].replace('$epoctime2$',getEpocTime2())
 
                     #print 'Ingoring Cache',m['page']
                     page_split=m['page'].split('|')
@@ -238,11 +255,14 @@ def getRegexParsed(regexs, url,cookieJar=None,forCookieJarOnly=False,recursiveCa
 
 
 #                        print 'urllib_request.getproxies',urllib_request.getproxies()
+                        c.log(f"[CM Debug @ 258 in regex.py] urllib_request.getproxies {urllib_request.getproxies()}")
                     current_proxies=urllib_request.ProxyHandler(urllib_request.getproxies())
                     #print 'getting pageUrl',pageUrl
+                    c.log(f"[CM Debug @ 261 in regex.py] getting pageUrl {pageUrl}")
                     req = urllib_request.Request(pageUrl)
                     if 'proxy' in m:
                         proxytouse= m['proxy']
+                        c.log(f"[CM Debug @ 265 in regex.py] proxytouse {proxytouse}")
 #                            print 'proxytouse',proxytouse
 #                            urllib_request.getproxies= lambda: {}
                         if pageUrl[:5]=="https":
@@ -271,8 +291,10 @@ def getRegexParsed(regexs, url,cookieJar=None,forCookieJarOnly=False,recursiveCa
                         req.add_header('X-Forwarded-For', m['x-forward'])
                     if 'setcookie' in m:
 #                            print 'adding cookie',m['setcookie']
+                        c.log(f"[CM Debug @ 299 in regex.py] adding cookie {m['setcookie']}")
                         req.add_header('Cookie', m['setcookie'])
                     if 'appendcookie' in m:
+                        c.log(f"[CM Debug @ 302 in regex.py] appending cookie {m['appendcookie']}")
 #                            print 'appending cookie to cookiejar',m['appendcookie']
                         cookiestoApend=m['appendcookie']
                         cookiestoApend=cookiestoApend.split(';')
@@ -321,13 +343,13 @@ def getRegexParsed(regexs, url,cookieJar=None,forCookieJarOnly=False,recursiveCa
                         #    (captcha_challenge,catpcha_word,idfield)=processRecaptcha(m['page'],cookieJar)
                         #    if captcha_challenge:
                         #        postData=postData.replace('$LiveStreamRecaptcha','manual_recaptcha_challenge_field:'+captcha_challenge+',recaptcha_response_field:'+catpcha_word+',id:'+idfield)
-                        splitpost=postData.split(',');
+                        splitpost=postData.split(',')
                         post={}
                         for p in splitpost:
-                            n=p.split(':')[0];
-                            v=p.split(':')[1];
+                            n=p.split(':')[0]
+                            v=p.split(':')[1]
                             post[n]=v
-                        post = urllib_parse.urlencode(post)
+                        post = urlencode(post)
 
                     if 'rawpost' in m:
                         post=m['rawpost']
@@ -390,6 +412,7 @@ def getRegexParsed(regexs, url,cookieJar=None,forCookieJarOnly=False,recursiveCa
 
             if not m['expres']=='':
                 #print 'doing it ',m['expres']
+                c.log(f"[CM Debug @ 415 in regex.py] doing it {m['expres']}")
                 if '$LiveStreamCaptcha' in m['expres']:
                     val=askCaptcha(m,link,cookieJar) #cm askCaptcha isundefined
                     #print 'url and val',url,val
@@ -397,50 +420,65 @@ def getRegexParsed(regexs, url,cookieJar=None,forCookieJarOnly=False,recursiveCa
 
                 elif m['expres'].startswith('$pyFunction:') or '#$pyFunction' in m['expres']:
                     #print 'expeeeeeeeeeeeeeeeeeee',m['expres']
+                    c.log(f"[CM Debug @ 422 in regex.py] expression $pyfunction :: {m['expres']}")
                     val=''
                     if m['expres'].startswith('$pyFunction:'):
                         val=doEval(m['expres'].split('$pyFunction:')[1],link,cookieJar,m)
                     else:
                         val=doEvalFunction(m['expres'],link,cookieJar,m)
-                    if 'ActivateWindow' in m['expres']: return
+                        c.log(f"[CM Debug @ 427 in regex.py] val = {val}")
+                    if 'ActivateWindow' in m['expres']:
+                        return
                     if forCookieJarOnly:
                         return cookieJar# do nothing
                     if 'listrepeat' in m:
                         listrepeat=m['listrepeat']
-                        return listrepeat,eval(val), m,regexs,cookieJar
+                        return listrepeat, eval(val), m,regexs,cookieJar
 
                     try:
                         url = url.replace(u"$doregex[" + k + "]", val)
-                    except: url = url.replace("$doregex[" + k + "]", control.six_decode(val))
+                        c.log(f"[CM Debug @ 439 in regex.py] url = {url}")
+                    except:
+                        url = url.replace("$doregex[" + k + "]", control.six_decode(val))
+                        c.log(f"[CM Debug @ 443 in regex.py] (exception) url = {url}")
                 else:
                     if 'listrepeat' in m:
                         listrepeat=m['listrepeat']
                         ret=re.findall(m['expres'],link)
+                        c.log(f"[CM Debug @ 449 in regex.py] listrepeat = {listrepeat} and ret = {ret}, m = {m} with regex {regexs}")
                         return listrepeat,ret, m,regexs
 
                     val=''
                     if not link=='':
                         #print 'link',link
+                        c.log(f"[CM Debug @ 456 in regex.py] link = {link}")
                         reg = re.compile(m['expres']).search(link)
                         try:
                             val=reg.group(1).strip()
-                        except: traceback.print_exc()
+                        except:
+                            traceback.print_exc()
                     elif m['page']=='' or m['page'] is None:
                         val=m['expres']
 
                     if rawPost:
 #                            print 'rawpost'
-                        val=urllib_parse.quote_plus(val)
+                        val=quote_plus(val)
+                        c.log(f"[CM Debug @ 466 in regex.py] rawpost val = {val}")
                     if 'htmlunescape' in m:
-                        #val=urllib_parse.unquote_plus(val)
+                        #val=unquote_plus(val)
                         val=html_parser.HTMLParser().unescape(val)
+                        c.log(f"[CM Debug @ 470 in regex.py] htmlunescape val = {val}")
                     try:
                         url = url.replace("$doregex[" + k + "]", val)
-                    except: url = url.replace("$doregex[" + k + "]", control.six_decode(val))
+                        c.log(f"[CM Debug @ 474 in regex.py] url = {url}")
+                    except:
+                        url = url.replace("$doregex[" + k + "]", control.six_decode(val))
+                        c.log(f"[CM Debug @ 478 in regex.py] (exception) url = {url}")
                     #print 'ur',url
                     #return val
             else:
                 url = url.replace("$doregex[" + k + "]",'')
+                c.log(f"[CM Debug @ 484 in regex.py] url = {url}")
         if '$epoctime$' in url:
             url=url.replace('$epoctime$',getEpocTime())
         if '$epoctime2$' in url:
@@ -452,7 +490,8 @@ def getRegexParsed(regexs, url,cookieJar=None,forCookieJarOnly=False,recursiveCa
         if '$get_cookies$' in url:
             url=url.replace('$get_cookies$',getCookiesString(cookieJar))
 
-        if recursiveCall: return url
+        if recursiveCall:
+            return url
         #print 'final url',repr(url)
         if url=="":
             return
@@ -466,7 +505,8 @@ def get_unwise( str_eval):
         ss="w,i,s,e=("+str_eval+')'
         exec(ss)
         page_value=unwise_func(w,i,s,e)
-    except: traceback.print_exc(file=sys.stdout)
+    except:
+        traceback.print_exc(file=sys.stdout)
     #print 'unpacked',page_value
     return page_value
 
@@ -481,7 +521,7 @@ def unwise_func( w, i, s, e):
         if (lIll < 5):
             l1lI.append(w[lIll])
         elif (lIll < len(w)):
-            ll1l.append(w[lIll]);
+            ll1l.append(w[lIll])
         lIll+=1
         if (ll1I < 5):
             l1lI.append(i[ll1I])
@@ -491,29 +531,29 @@ def unwise_func( w, i, s, e):
         if (Il1l < 5):
             l1lI.append(s[Il1l])
         elif (Il1l < len(s)):
-            ll1l.append(s[Il1l]);
+            ll1l.append(s[Il1l])
         Il1l+=1
         if (len(w) + len(i) + len(s) + len(e) == len(ll1l) + len(l1lI) + len(e)):
-            break;
+            break
 
     lI1l = ''.join(ll1l)#.join('');
     I1lI = ''.join(l1lI)#.join('');
-    ll1I = 0;
-    l1ll = [];
+    ll1I = 0
+    l1ll = []
     for lIll in list(range(0,len(ll1l),2)):
         #print 'array i',lIll,len(ll1l)
-        ll11 = -1;
+        ll11 = -1
         if ( ord(I1lI[ll1I]) % 2):
-            ll11 = 1;
+            ll11 = 1
         #print 'val is ', lI1l[lIll: lIll+2]
-        l1ll.append(chr(    int(lI1l[lIll: lIll+2], 36) - ll11));
-        ll1I+=1;
+        l1ll.append(chr(int(lI1l[lIll: lIll+2], 36) - ll11))
+        ll1I+=1
         if (ll1I >= len(l1lI)):
-            ll1I = 0;
+            ll1I = 0
     ret=''.join(l1ll)
     if 'eval(function(w,i,s,e)' in ret:
 #        print 'STILL GOing'
-        ret=re.compile('eval\(function\(w,i,s,e\).*}\((.*?)\)').findall(ret)[0]
+        ret=re.compile(r'eval\(function\(w,i,s,e\).*}\((.*?)\)').findall(ret)[0]
         return get_unwise(ret)
     else:
 #        print 'FINISHED'
@@ -529,7 +569,8 @@ def get_unpacked( page_value, regex_for_text='', iterations=1, total_iteration=1
         if regex_for_text and len(regex_for_text)>0:
             try:
                 page_value=re.compile(regex_for_text).findall(page_value)[0] #get the js variable
-            except: return 'NOTPACKED'
+            except:
+                return 'NOTPACKED'
 
         page_value=unpack(page_value,iterations,total_iteration)
     except:
@@ -616,7 +657,8 @@ def __unpack(p, a, c, k, e, d, iteration,v=1):
 def __itoa(num, radix):
 #    print 'num red',num, radix
     result = ""
-    if num==0: return '0'
+    if num==0:
+        return '0'
     while num > 0:
         result = "0123456789abcdefghijklmnopqrstuvwxyz"[num % radix] + result
         num /= radix
@@ -646,7 +688,7 @@ def findAndReplaceWord(source_str, word_to_find,replace_with):
                 val='' # last one nothing to append normally
             else:
                 if len(current_split)==0: #if blank check next one with current split value
-                    if ( len(splits[current_index+1])==0 and word_to_find[0].lower() not in 'abcdefghijklmnopqrstuvwxyz1234567890_') or (len(splits[current_index+1])>0  and splits[current_index+1][0].lower() not in 'abcdefghijklmnopqrstuvwxyz1234567890_'):# first just just check next
+                    if (len(splits[current_index+1])==0 and word_to_find[0].lower() not in 'abcdefghijklmnopqrstuvwxyz1234567890_') or (len(splits[current_index+1])>0  and splits[current_index+1][0].lower() not in 'abcdefghijklmnopqrstuvwxyz1234567890_'):# first just just check next
                         val=replace_with
                 #not blank, then check current endvalue and next first value
                 else:
@@ -767,11 +809,11 @@ def getUrl(url, cookieJar=None,post=None, timeout=20, headers=None, noredir=Fals
 def get_decode(str,reg=None):
     if reg:
         str=re.findall(reg, str)[0]
-    s1 = urllib_parse.unquote(str[0: len(str)-1]);
+    s1 = unquote(str[0: len(str)-1]);
     t = ''
     for i in list(range(len(s1))):
         t += chr(ord(s1[i]) - s1[len(s1)-1]);
-    t=urllib_parse.unquote(t)
+    t=unquote(t)
 #    print t
     return t
 
@@ -781,8 +823,8 @@ def javascriptUnEscape(str):
 #    print 'js',js
     if (not js is None) and len(js)>0:
         for j in js:
-            #print urllib_parse.unquote(j)
-            str=str.replace(j ,urllib_parse.unquote(j))
+            #print unquote(j)
+            str=str.replace(j ,unquote(j))
     return str
 
 

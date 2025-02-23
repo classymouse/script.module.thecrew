@@ -59,7 +59,6 @@ class player(xbmc.Player):
         self.tmdb = None
         self.ids = {}
         self.offset = 0
-        self.getbookmark = False
 
 
 
@@ -73,7 +72,6 @@ class player(xbmc.Player):
             self.currentTime = 0
 
             self.content = 'movie' if season is None or episode is None else 'episode'
-            self.getbookmark = True if self.content in ['movie','episode'] else False
 
             self.title = title
             self.year = year
@@ -88,15 +86,11 @@ class player(xbmc.Player):
             self.DBID = None
             self.imdb = imdb if imdb is not None else '0'
             self.tmdb = tmdb if tmdb is not None else '0'
-            #self.ids = {'imdb': self.imdb, 'tmdb': self.tmdb}
+            self.ids = {'imdb': self.imdb, 'tmdb': self.tmdb}
             #self.ids = dict((k,v) for k, v in six.iteritems(self.ids) if not v == '0')
             self.ids = dict((k,v) for k, v in self.ids.items() if not v == '0')
 
-            c.log(f"[CM Debug @ 93 in player.py] self.content = {self.content}")
-
             self.offset = bookmarks.get(self.content, imdb, season, episode)
-            c.log(f"[CM Debug @ 94 in player.py] offset = {self.offset} with title = {self.title}")
-
 
             poster, thumb, fanart, clearlogo, clearart, discart, meta = self.getMeta(meta)
 
@@ -221,88 +215,6 @@ class player(xbmc.Player):
 
 
 #TC 2/01/19 started
-    def keepPlaybackAlive_old(self):
-        pname = f"{control.addonInfo('id')}.player.overlay"
-        control.window.clearProperty(pname)
-
-        if self.content == 'movie':
-            #overlay = playcount.getMovieOverlay(playcount.getMovieIndicators(), self.imdb)
-            overlay = playcount.get_movie_overlay(playcount.getMovieIndicators(), self.imdb)
-
-        elif self.content == 'episode':
-            #overlay = playcount.getEpisodeOverlay(playcount.getTVShowIndicators(), self.imdb, self.tmdb, self.season, self.episode)
-            overlay = playcount.get_episode_overlay(playcount.getTVShowIndicators(), self.imdb, self.tmdb, self.season, self.episode)
-
-        else:
-            overlay = '6'
-
-        for __ in range(240):
-            if self.isPlayingVideo():
-                break
-            xbmc.sleep(1000)
-
-        if overlay == '7':
-            while self.isPlayingVideo():
-                try:
-                    self.totalTime = self.getTotalTime()
-                    self.currentTime = self.getTime()
-                except:
-                    pass
-                xbmc.sleep(2000)
-
-        elif self.content == 'movie':
-            while self.isPlayingVideo():
-                try:
-                    self.totalTime = self.getTotalTime()
-                    self.currentTime = self.getTime()
-
-                    watcher = self.currentTime / self.totalTime >= .92
-                    _property = control.window.getProperty(pname)
-
-                    if watcher is True and not _property == '7':
-                        control.window.setProperty(pname, '7')
-                        playcount.markMovieDuringPlayback(self.imdb, '7')
-
-                    elif watcher is False and not _property == '6':
-                        control.window.setProperty(pname, '6')
-                        playcount.markMovieDuringPlayback(self.imdb, '6')
-                except:
-                    pass
-                xbmc.sleep(2000)
-
-        elif self.content == 'episode':
-            while self.isPlayingVideo():
-                try:
-                    self.totalTime = self.getTotalTime()
-                    self.currentTime = self.getTime()
-
-                    watcher = self.currentTime / self.totalTime >= .92
-                    _property = control.window.getProperty(pname)
-
-                    if watcher is True and not _property == '7':
-                        control.window.setProperty(pname, '7')
-                        playcount.markEpisodeDuringPlayback(self.imdb, self.tmdb, self.season, self.episode, '7')
-
-                    elif watcher is False and not _property == '6':
-                        control.window.setProperty(pname, '6')
-                        playcount.markEpisodeDuringPlayback(self.imdb, self.tmdb, self.season, self.episode, '6')
-                except:
-                    pass
-                xbmc.sleep(2000)
-
-        control.window.clearProperty(pname)
-
-
-#cm 19-02-2025
-#overlay isn't used anymore and is calculated by kodi based on percentage of video watched
-#so i need to completely rewrite the keepPlaybackAlive function
-#i will keep the same logic as before but without the overlay
-#i will also remove the playcount.py file and move the functions to the player.py file
-#i will also remove the playcount module from the imports
-#i will also remove the playcount.markMovieDuringPlayback and playcount.markEpisodeDuringPlayback functions
-#i will also remove the playcount.getMovieOverlay and playcount.getEpisodeOverlay functions
-#i will also remove the playcount.getMovieIndicators and playcount.getTVShowIndicators functions
-#i will also remove the playcount.getMovieOverlay and playcount.getEpisodeOverlay functions
     def keepPlaybackAlive(self):
         pname = f"{control.addonInfo('id')}.player.overlay"
         control.window.clearProperty(pname)
@@ -363,24 +275,21 @@ class player(xbmc.Player):
 
                     if watcher is True and not _property == '7':
                         control.window.setProperty(pname, '7')
-                        playcount.markEpisodeDuringPlayback(self.imdb, self.tmdb, self.season, self.episode, '7')
+                        playcount.markEpisodeDuringPlayback(
+                            self.imdb, self.tmdb, self.season, self.episode, '7'
+                            )
 
                     elif watcher is False and not _property == '6':
                         control.window.setProperty(pname, '6')
-                        playcount.markEpisodeDuringPlayback(self.imdb, self.tmdb, self.season, self.episode, '6')
+                        playcount.markEpisodeDuringPlayback(
+                            self.imdb, self.tmdb, self.season, self.episode, '6'
+                            )
                 except:
                     pass
                 xbmc.sleep(2000)
 
         control.window.clearProperty(pname)
 
-
-
-
-
-
-
-    #! f-string on rpc impossible for now on py < 3.11 because of nesting-level
     def libForPlayback(self):
         try:
             if self.DBID is None:
@@ -390,50 +299,49 @@ class player(xbmc.Player):
                 rpc = '{"jsonrpc": "2.0", "method": "VideoLibrary.SetMovieDetails", "params": {"movieid" : %s, "playcount" : 1 }, "id": 1 }' % str(self.DBID)
             elif self.content == 'episode':
                 rpc = '{"jsonrpc": "2.0", "method": "VideoLibrary.SetEpisodeDetails", "params": {"episodeid" : %s, "playcount" : 1 }, "id": 1 }' % str(self.DBID)
-            else:
-                rpc = ''
 
-            if rpc:
-                control.jsonrpc(rpc)
-                control.refresh()
+            control.jsonrpc(rpc)
+            control.refresh()
         except:
             pass
 
     def idleForPlayback(self):
         for _ in range(400):
-            if control.condVisibility('Window.IsActive(busydialog)') == 1 or\
-                control.condVisibility('Window.IsActive(busydialognocancel)') == 1:
+            if control.condVisibility('Window.IsActive(busydialog)') == 1 or control.condVisibility('Window.IsActive(busydialognocancel)') == 1:
                 control.idle()
             else:
                 break
             control.sleep(100)
 
-    def onPlayBackStarted(self):
+
+    def onAVStarted(self):
         control.execute('Dialog.Close(all,true)')
-        if self.getbookmark is True and self.offset != '0':
-            self.seekTime(float(self.offset))
-        c.log(f"[CM Debug @ 330 in player.py] onPlayBackStarted for title = {self.title} with seektime = {self.offset}")
 
-    def onPlayBackPaused(self):
-        if self.getbookmark is True:
-            bookmarks.reset(self.currentTime, self.totalTime, self.name, self.year)
-
-
-    def onPlayBackStopped(self):
-        if self.getbookmark is True:
-            bookmarks.reset(self.currentTime, self.totalTime, self.name, self.year)
-
-    def onPlayBackEnded(self):
-        self.onPlayBackStopped()
-
-
-
-
-    def onPlayBackStarted2(self):
-
-        if control.setting('bookmarks') == 'true'and self.isPlayingVideo():# and int(self.offset) > 120
+        if control.setting('bookmarks') == 'true' and int(self.offset) > 120 and self.isPlayingVideo():
             if control.setting('bookmarks.auto') == 'true':
-                c.log(f"[CM Debug @ 354 in player.py] seeking time {float(self.offset)}")
+                self.seekTime(float(self.offset))
+            else:
+                self.pause()
+                minutes, seconds = divmod(float(self.offset), 60)
+                hours, minutes = divmod(minutes, 60)
+                label = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+                label = control.lang2(12022).format(label)
+                if control.setting('bookmarks.auto') == 'true' and trakt.getTraktCredentialsInfo() is True:
+                    yes = control.yesnoDialog(label + '[CR]  (Trakt scrobble)', heading=control.lang2(13404))
+                else:
+                    yes = control.yesnoDialog(label, heading=control.lang2(13404))
+                if yes:
+                    self.seekTime(float(self.offset))
+                control.sleep(1000)
+                self.pause()
+
+        subtitles().get(self.name, self.imdb, self.season, self.episode)
+        self.idleForPlayback()
+
+    def onPlayBackStarted(self):
+
+        if control.setting('bookmarks') == 'true' and int(self.offset) > 120 and self.isPlayingVideo():
+            if control.setting('bookmarks.auto') == 'true':
                 self.seekTime(float(self.offset))
             else:
                 self.pause()
@@ -457,7 +365,7 @@ class player(xbmc.Player):
             #self.onAVStarted()
             pass
 
-    def onPlayBackStopped2(self):
+    def onPlayBackStopped(self):
         if self.totalTime == 0 or self.currentTime == 0:
             control.sleep(2000)
             return
@@ -473,7 +381,7 @@ class player(xbmc.Player):
             control.refresh()
 
 
-    def onPlayBackEnded2(self):
+    def onPlayBackEnded(self):
         self.onPlayBackStopped()
 
 

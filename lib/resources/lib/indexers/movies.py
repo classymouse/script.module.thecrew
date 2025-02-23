@@ -21,7 +21,7 @@ import datetime
 import json
 
 from urllib.parse import quote_plus, parse_qsl, urlparse, urlsplit, urlencode
-from sqlite3 import dbapi2 as database
+import sqlite3 as database
 #from bs4 import BeautifulSoup
 
 import requests
@@ -119,20 +119,20 @@ class movies:
         self.views_link = (f'{self.tmdb_link}discover/movie?api_key={self.tmdb_user}&include_adult=false&include_video=false&language=en-US&page=1&sort_by=popularity.desc&vote_average.gte=8&vote_average.lte=10&with_original_language=en')
         self.genre_link = (f'{self.tmdb_link}discover/movie?api_key={self.tmdb_user}&include_adult=false&include_video=false&language=en-US&sort_by=release_date.desc&release_date.lte=date[0]&with_genres=%s&page=1')
 
-        self.tmdb_by_imdb = (f'{self.tmdb_link}find/%s?api_key={self.tmdb_user}&external_source=imdb_id')
-        self.tm_search_link = (f'{self.tmdb_link}search/movie?api_key={self.tmdb_user}&language=en-US&query=%s&page=1')
-        self.related_link = (f'{self.tmdb_link}movie/%s/similar?api_key={self.tmdb_user}&page=1')
-        self.tmdb_providers_link = (f'{self.tmdb_link}discover/movie?api_key={self.tmdb_user}&sort_by=popularity.desc&with_watch_providers=%s&watch_region=%s&page=1')
-        self.tmdb_art_link = (f'{self.tmdb_link}movie/%s/images?api_key={self.tmdb_user}&language=en-US&include_image_language=en,%s,null')
+        self.tmdb_by_imdb = f'{self.tmdb_link}find/%s?api_key={self.tmdb_user}&external_source=imdb_id'
+        self.tm_search_link = f'{self.tmdb_link}search/movie?api_key={self.tmdb_user}&language=en-US&query=%s&page=1'
+        self.related_link = f'{self.tmdb_link}movie/%s/similar?api_key={self.tmdb_user}&page=1'
+        self.tmdb_providers_link = f'{self.tmdb_link}discover/movie?api_key={self.tmdb_user}&sort_by=popularity.desc&with_watch_providers=%s&watch_region=%s&page=1'
+        self.tmdb_art_link = f'{self.tmdb_link}movie/%s/images?api_key={self.tmdb_user}&language=en-US&include_image_language=en,%s,null'
 
-        self.tmdb_api_link = (f'{self.tmdb_link}movie/%s?api_key={self.tmdb_user}&language={self.lang}&append_to_response=aggregate_credits,content_ratings,external_ids')
-        self.tmdb_networks_link_no_unaired = (f'{self.tmdb_link}discover/movie?api_key={self.tmdb_user}&first_air_date.lte={self.today_date}&sort_by=first_air_date.desc&with_networks=%s&page=1')
-        self.tmdb_networks_link = (f'{self.tmdb_link}discover/movie?api_key={self.tmdb_user}&with_networks=%s&language=en-US&release_date.lte={self.today_date}&sort_by=primary_release_date.desc&page=1')
-        self.tmdb_search_movie_link = (f'{self.tmdb_link}search/movie?api_key={self.tmdb_user}&language=en-US&query=%s&page=1')
-        self.search_link = (f'{self.tmdb_link}search/movie?api_key={self.tmdb_user}&language=en-US&query=%s&page=1')
-        self.related_link = (f'{self.tmdb_link}movie/%s/similar?api_key={self.tmdb_user}&language=en-US&page=1')
-        self.tmdb_info_tvshow_link = (f'{self.tmdb_link}movie/%s?api_key={self.tmdb_user}&language={self.lang}&append_to_response=images')
-        self.tmdb_by_imdb = (f'{self.tmdb_link}find/%s?api_key={self.tmdb_user}&external_source=imdb_id')
+        self.tmdb_api_link = f'{self.tmdb_link}movie/%s?api_key={self.tmdb_user}&language={self.lang}&append_to_response=aggregate_credits,content_ratings,external_ids'
+        self.tmdb_networks_link = f'{self.tmdb_link}discover/movie?api_key={self.tmdb_user}&with_networks=%s&language=en-US&release_date.lte={self.today_date}&sort_by=primary_release_date.desc&page=1'
+        self.tmdb_networks_no_unaired_link = f'{self.tmdb_link}discover/movie?api_key={self.tmdb_user}&first_air_date.lte={self.today_date}&sort_by=first_air_date.desc&with_networks=%s&page=1'
+        self.tmdb_search_movie_link = f'{self.tmdb_link}search/movie?api_key={self.tmdb_user}&language=en-US&query=%s&page=1'
+        self.search_link = f'{self.tmdb_link}search/movie?api_key={self.tmdb_user}&language=en-US&query=%s&page=1'
+        self.related_link = f'{self.tmdb_link}movie/%s/similar?api_key={self.tmdb_user}&language=en-US&page=1'
+        self.tmdb_info_tvshow_link = f'{self.tmdb_link}movie/%s?api_key={self.tmdb_user}&language={self.lang}&append_to_response=images'
+        self.tmdb_by_imdb = f'{self.tmdb_link}find/%s?api_key={self.tmdb_user}&external_source=imdb_id'
 
         self.tmdb_movie_top_rated_link = (f'{self.tmdb_link}movie/top_rated?api_key={self.tmdb_user}&language={self.lang}&sort_by=popularity.desc&page=1')
         self.tmdb_movie_popular_link = (f'{self.tmdb_link}movie/popular?api_key={self.tmdb_user}&language={self.lang}&page=1')
@@ -166,7 +166,7 @@ class movies:
             else:
                 c.log(f"[CM Debug @ 167 in movies.py] url = {url}")
                 url = getattr(self, f"{url}_link", None)
-                c.log(f"[CM Debug @ 169 in movies.py] url = {url}")
+                c.log(f"[CM Debug @ 169 in movies.py] url = {url} and tid = {tid}")
 
 
             for days_offset in re.findall(r'date\[(\d+)\]', url):
@@ -223,9 +223,10 @@ class movies:
             #elif parsed_url_netloc in self.imdb_link:
                 #self.list = cache.get(self.imdb_list, 24, url)
 
-            elif parsed_url_netloc in self.tmdb_networks_link and tid > 0:
+            elif parsed_url_netloc in self.tmdb_networks_link and int(tid) > 0:
                 #c.log(f"[cm debug in movies.py @ 344] u={u} and url={url}")
-                self.list = cache.get(self.tmdb_list, 24, url, tid)
+                #self.list = cache.get(self.tmdb_list, 24, url, tid)
+                self.list = self.tmdb_list(url, tid)
 
             elif parsed_url_netloc in self.tmdb_link and ('/user/' in url or '/list/' in url):
                 self.list = cache.get(self.list_tmdb_list, 0, url)
@@ -247,10 +248,10 @@ class movies:
                 self.movieDirectory(self.list)
             return self.list
         except Exception as e: # pylint: disable=W0703
-            #import traceback
-            #failure = traceback.format_exc()
-            #c.log('[CM Debug @ 322 in movies.py]Traceback:: ' + str(failure))
-            #c.log('[CM Debug @ 323 in movies.py]Exception raised. Error = ' + str(e))
+            import traceback
+            failure = traceback.format_exc()
+            c.log('[CM Debug @ 322 in movies.py]Traceback:: ' + str(failure))
+            c.log('[CM Debug @ 323 in movies.py]Exception raised. Error = ' + str(e))
             c.log(f'Exception raised in movies.get(), error = {e}', 1)
 
 
@@ -279,7 +280,9 @@ class movies:
         dbcur = dbcon.cursor()
 
         try:
-            dbcur.executescript("CREATE TABLE IF NOT EXISTS movies (ID Integer PRIMARY KEY AUTOINCREMENT, term TEXT);")
+            dbcur.executescript(
+                "CREATE TABLE IF NOT EXISTS movies (ID Integer PRIMARY KEY AUTOINCREMENT, term TEXT);"
+                )
         except Exception:
             pass
 
@@ -287,7 +290,7 @@ class movies:
         lst = []
         cm = []
 
-        for (_id, term) in dbcur.fetchall():
+        for _id, term in dbcur.fetchall():
             if term not in str(lst):
 
                 c.log(f"[CM Debug @ 325 in movies.py] id = {_id}, term = {term}")
@@ -348,10 +351,8 @@ class movies:
             dbcon = database.connect(control.searchFile)
             dbcur = dbcon.cursor()
             dbcur.execute("DELETE FROM movies WHERE ID = ?", (search_term_id,))
-            dbcur.execute("""
-                          SELECT * FROM movies ORDER BY ID DESC
-                        """)
-            for (_id, term) in dbcur.fetchall():
+            dbcur.execute("SELECT * FROM movies ORDER BY ID DESC")
+            for _id, term in dbcur.fetchall():
                 c.log(f"[CM Debug @ 389 in movies.py] id = {_id}, term = {term}")
 
             c.log(f"[CM Debug @ 391 in tvshows.py]running here with search_term_id = {search_term_id}")
@@ -934,17 +935,20 @@ class movies:
 
     def tmdb_list(self, url, tid=0):
         try:
-            if tid:
+            if int(tid) > 0:
                 url = url % tid
+                c.log(f"[CM Debug @ 940 in movies.py] url = {url}")
 
             response = self.session.get(url, timeout=15).json()
             items = response.get('results', [])
-        except Exception:
+        except Exception as e:
+            c.log(f"[CM Debug @ 944 in movies.py] error = {e}")
             return
 
         try:
             page = int(response.get('page', 0))
             total_pages = int(response.get('total_pages', 0))
+            c.log(f"[CM Debug @ 949 in movies.py] page = {page} with total_pages = {total_pages}")
 
             if page >= total_pages or 'page=' not in url:
                 raise ValueError("Invalid page or URL format")
@@ -1066,7 +1070,7 @@ class movies:
         '''
         try:
             if self.list[i]['metacache'] is True:
-                c.log(f"[CM Debug @ 1241 in movies.py] inside super_info, metacache is True so I will skip this\n\ncomplete list = \n\n{repr(self.list[i])}")
+                #c.log(f"[CM Debug @ 1241 in movies.py] inside super_info, metacache is True so I will skip this\n\ncomplete list = \n\n{repr(self.list[i])}")
                 return
 
 
@@ -1316,15 +1320,6 @@ class movies:
         addon_clearlogo, addon_clearart = c.addon_clearlogo(), c.addon_clearart()
         addonDiscart = c.addon_discart()
 
-        c.log(f"[CM Debug @ 1302 in movies.py] addon_poster = {addon_poster}")
-        c.log(f"[CM Debug @ 1303 in movies.py] addon_banner = {addon_banner}")
-        c.log(f"[CM Debug @ 1304 in movies.py] addon_fanart = {addon_fanart}")
-        c.log(f"[CM Debug @ 1305 in movies.py] setting_fanart = {setting_fanart}")
-        c.log(f"[CM Debug @ 1306 in movies.py] addon_clearlogo = {addon_clearlogo}")
-        c.log(f"[CM Debug @ 1307 in movies.py] addon_clearart = {addon_clearart}")
-        c.log(f"[CM Debug @ 1308 in movies.py] addonDiscart = {addonDiscart}")
-
-
         traktCredentials = trakt.getTraktCredentialsInfo()
 
         isPlayable = 'true' if 'plugin' not in control.infoLabel( 'Container.PluginName') else 'false'
@@ -1352,10 +1347,32 @@ class movies:
                 label = i['label'] if 'label' in i and i['label'] != '0' else title
                 label = f"{label} ({year})"
                 status = i['status'] if 'status' in i else '0'
+
+                meta = dict((k, v) for k, v in i.items() if not v == '0')
+
                 # cm - resume_point -warning: percentage, float!
                 resume_point = int(i['resume_point']) if 'resume_point' in i else 0
+                c.log(f"[CM Debug @ 1469 in movies.py]duration of title {title} = {meta['duration']}")
+                offset = 0.0
+
+                if not resume_point:
+                    #offset = float(bookmarks.get('movie', imdb, '', '', True))
+                    resume_point= float(bookmarks.get('movie', imdb, '', '', False))
+
+                    c.log(f"[CM Debug @ 1471 in movies.py] offset 1: {resume_point} with type {type(resume_point)} for {title}")
+                    offset = float(int(meta['duration']) * (resume_point / 100)) #= float(int(7200) * (4.39013/100)) = 315.0 with playing time = 7200 secs om 4.3 % of the movie
+                else:
+                    offset =float(int(meta['duration']) * (resume_point / 100))
+
+                c.log(f"[CM Debug @ 1366 in movies.py] offset = {offset}")
+
+                meta.update({'offset': offset})
+                meta.update({'resume_point': resume_point})
+
+
+
                 if resume_point:
-                    label += f' ({resume_point} %)'
+                    label += f' [COLOR gold]({int(resume_point)}%)[/COLOR] '
                 try:
                     premiered = i['premiered']
                     if (premiered == '0' and status in ['Upcoming', 'In Production', 'Planned']) or\
@@ -1390,7 +1407,6 @@ class movies:
                 systitle = quote_plus(title)
                 systrailer = quote_plus(i['trailer']) if 'trailer' in i else '0'
 
-                meta = dict((k, v) for k, v in i.items() if not v == '0')
                 meta.update({'code': imdb, 'imdbnumber': imdb})
                 meta.update({'tmdb_id': tmdb})
                 meta.update({'imdb_id': imdb})
@@ -1463,9 +1479,7 @@ class movies:
                 art.update({'discart': discart})
 
                 item.setArt(art)
-
                 item.addContextMenuItems(cm)
-
                 item.setProperty('IsPlayable', isPlayable)
 
                 castwiththumb = i.get('castwiththumb')
@@ -1473,11 +1487,8 @@ class movies:
                 if castwiththumb and not castwiththumb == '0':
                     item.setCast(castwiththumb)
 
-                if not resume_point:
-                    offset = bookmarks.get('movie', imdb, '', '', True)
-                    #c.log(f"[CM Debug @ 1683 in movies.py] offset: {offset}")
-                else:
-                    offset =float(int(meta['duration']) * (resume_point / 100))
+
+                c.log(f"[CM Debug @ 11477 in movies.py] offset 2: {offset} for {title}")
 
                 item.setProperty('imdb_id', imdb)
                 item.setProperty('tmdb_id', tmdb)
@@ -1496,6 +1507,8 @@ class movies:
                 unique_ids = {'imdb': imdb, 'tmdb': str(tmdb)}
                 info_tag.set_unique_ids(unique_ids)
                 info_tag.set_cast(meta.get('cast', []))
+
+                c.log(f"[CM Debug @ 1508 in movies.py] offset = meta['resume_point'] = {meta['offset']} with duration = {meta['duration']}")
 
                 if(offset > 0):
                     info_tag.set_resume_point(meta, 'offset', 'duration', False)

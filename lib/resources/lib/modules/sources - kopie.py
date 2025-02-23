@@ -151,7 +151,7 @@ class sources:
         systitle = sysname = quote_plus(title)
 
         if 'tvshowtitle' in meta and 'season' in meta and 'episode' in meta:
-            sysname += quote_plus(' S%02dE%02d' % (int(meta['season']), int(meta['episode'])))
+            sysname += quote_plus(f" S{meta['season']:02d}E{meta['episode']:02d}")
         elif 'year' in meta:
             sysname += quote_plus(f" ({meta['year']})")
 
@@ -245,7 +245,7 @@ class sources:
 
             for i in range(1, 1000):
                 try:
-                    u = control.infoLabel('ListItem(%s).FolderPath' % str(i))
+                    u = control.infoLabel(f'ListItem({i}).FolderPath')
                     if u in total:
                         raise Exception()
                     total.append(u)
@@ -256,7 +256,7 @@ class sources:
                     break
             for i in range(-1000,0)[::-1]:
                 try:
-                    u = control.infoLabel('ListItem(%s).FolderPath' % str(i))
+                    u = control.infoLabel(f'ListItem({i}).FolderPath')
                     if u in total:
                         raise Exception()
                     total.append(u)
@@ -297,8 +297,8 @@ class sources:
                     if item['source'] == block:
                         raise Exception('block')
 
-                    w = workers.Thread(self.sourcesResolve, item)
-                    w.start()
+                    thread = workers.Thread(self.sourcesResolve, item)
+                    thread.start()
 
                     offset = 60 * 2 if item.get('source') in self.hostcapDict else 0
 
@@ -317,13 +317,13 @@ class sources:
                         if k:
                             m += '1'
                             m = m[-1]
-                        if (w.is_alive() is False or x > 30 + offset) and not k:
+                        if (thread.is_alive() is False or x > 30 + offset) and not k:
                             break
                         k = control.condVisibility('Window.IsActive(yesnoDialog)')
                         if k:
                             m += '1'
                             m = m[-1]
-                        if (w.is_alive() is False or x > 30 + offset) and not k:
+                        if (thread.is_alive() is False or x > 30 + offset) and not k:
                             break
                         time.sleep(0.5)
 
@@ -338,7 +338,7 @@ class sources:
 
                         if m == '':
                             break
-                        if w.is_alive() is False:
+                        if thread.is_alive() is False:
                             break
                         time.sleep(0.5)
 
