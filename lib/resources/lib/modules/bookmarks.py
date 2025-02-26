@@ -60,29 +60,68 @@ def get_movie_progress_old(trakt_info, imdb):
     return 0
 
 
-def get_episode_progress(imdb, tmdb=0, trakt=0, tvdb=0, season=0, episode=0):
-    return get_progress_bookmark(imdb,tmdb,trakt,tvdb, season, episode, 'episode')
-
-def get_movie_progress(imdb=0, tmdb=0, trakt=0, tvdb=0):
-    return get_progress_bookmark(imdb,tmdb,trakt,tvdb, 'movie')
 
 
-def get_progress_bookmark(imdb,tmdb,traktid,tvdb, mediatype, season, episode):
-    #sql_select = f"SELECT * from progress WHERE imdb = '{imdb}' or tmdb = {tmdb} or trakt = {trakt} or tvdb = {tvdb} and media_type = '{mediatype}'"
-    sql_select = f"SELECT resume_point from progress WHERE imdb = '{imdb}' or tmdb = {tmdb} or trakt = {traktid} or tvdb = {tvdb} and media_type = '{mediatype}'"
-    c.log(f"[CM Debug @ 69 in bookmarks.py]sql = {sql_select}")
-    control.makeFile(control.dataPath)
-    dbcon = database.connect(control.traktsyncFile)
-    dbcur = dbcon.cursor()
-    dbcur.execute(sql_select)
-    result = dbcur.fetchone()
-    c.log(f"[CM Debug @ 74 in bookmarks.py] result = {result[0]}")
-    dbcon.commit()
-    if result:
-        return result[0]
-    else:
-        return 0
+def get_progress_bookmark(imdb = 0, tmdb = 0, traktid = 0, tvdb = 0, mediatype = '', season = 0, episode = 0):
+    try:
 
+        #sql_select = f"SELECT * from progress WHERE imdb = '{imdb}' or tmdb = {tmdb} or trakt = {trakt} or tvdb = {tvdb} and media_type = '{mediatype}'"
+        sql_base = "SELECT * from progress WHERE "
+        if mediatype != '':
+            sql_base += f"media_type = '{mediatype}'"
+
+        tmdb = int(tmdb)
+        traktid = int(traktid)
+        tvdb = int(tvdb)
+
+        sql_add = []
+        if imdb !=0:
+            sql_add.append(f"imdb = '{imdb}'")
+        if tmdb !=0:
+            sql_add.append(f"tmdb = {tmdb}")
+        if traktid !=0:
+            sql_add.append(f"trakt = {traktid}")
+        if tvdb !=0:
+            sql_add.append(f"tvdb = {tvdb}")
+
+        #if season != 0:
+            #sql_add.append(f"season = {season}")
+        #if episode != 0:
+            #sql_add.append(f"episode = {episode}")
+        sql_select = sql_base + ' or '.join(sql_add)
+
+        c.log(f"[CM Debug @ 88 in bookmarks.py] sql_select = {sql_select}")
+
+
+
+
+
+
+        sql_select = f"SELECT resume_point from progress WHERE imdb = '{imdb}' or tmdb = {tmdb} or trakt = {traktid} or tvdb = {tvdb} and media_type = '{mediatype}'"
+        c.log(f"[CM Debug @ 69 in bookmarks.py]sql = {sql_select}")
+        control.makeFile(control.dataPath)
+        dbcon = database.connect(control.traktsyncFile)
+        dbcur = dbcon.cursor()
+        dbcur.execute(sql_select)
+        result = dbcur.fetchone()
+        c.log(f"[CM Debug @ 74 in bookmarks.py] result = {result[0]}")
+        dbcon.commit()
+        if result:
+            return result[0]
+        else:
+            return 0
+    except Exception as e:
+        import traceback
+        failure = traceback.format_exc()
+        c.log(f'[CM Debug @ 113 in bookmarks.py]Traceback:: {failure}')
+        c.log(f'[CM Debug @ 113 in bookmarks.py]Exception raised. Error = {e}')
+        pass
+
+def get_episode_progress(imdb, tmdb=0, traktid=0, tvdb=0, season=0, episode=0):
+    return get_progress_bookmark(imdb=imdb,tmdb=tmdb,traktid=traktid,tvdb=tvdb, mediatype='episode', season=season, episode=episode)
+
+def get_movie_progress(imdb, tmdb=0, traktid=0, tvdb=0, season=0, episode=0):
+    return get_progress_bookmark(imdb=imdb,tmdb=tmdb,traktid=traktid,tvdb=tvdb, mediatype='movie', season=season, episode=episode)
 
 
 def get_local_bookmark(imdb, media_type,season, episode):
@@ -311,7 +350,7 @@ def get_indicators():
     else:
         return []
 
-
+#! This def is going to be deprecated
 def get_watched(media_type, imdb, season, episode):
     """
     Return the watched status of a media item.

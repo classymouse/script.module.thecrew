@@ -496,6 +496,7 @@ def cachesyncTVShows(timeout=0):
 
 def timeoutsyncTVShows():
     timeout = cache.timeout(syncTVShows, trakt_user)
+    c.log(f"[CM Debug @ 499 in trakt.py] timeout = {timeout}")
     if not timeout:
         timeout = 0
     return timeout
@@ -768,6 +769,15 @@ sql_dict = {
         'INSERT OR REPLACE INTO progress (media_type, trakt, imdb, tmdb, media_id, tvdb, title, year, season, episode, resume_point, curr_time, last_played, resume_id) VALUES (?,?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ',
     'sql_update_service' :
         'UPDATE service SET value = ? where setting = ?',
+
+    'sql_create_sync_data' :
+        'CREATE TABLE sync_data (media_type TEXT NOT NULL, name TEXT NOT NULL, date TEXT);',
+    'sql_insert_sync_data' :
+        'INSERT OR REPLACE INTO sync_data (media_type, name, date) VALUES (?,?,?)',
+    'sql_select_sync_data' :
+        'SELECT date FROM sync_data WHERE media_type = ? AND name = ?',
+    'sql_delete_sync_data' :
+        'DELETE FROM sync_data WHERE media_type = ? AND name = ?',
     'sql_create_trakt_watched' :
         'CREATE TABLE IF NOT EXISTS watched (media_type text not null, trakt INT, tvdb INT, imdb TEXT, tmdb INT, season integer, episode integer, last_played text, title text, unique (media_type, media_id, season, episode))',
     'sql_insert_trakt_watched' :
@@ -777,82 +787,125 @@ sql_dict = {
 def syncTrakt():
     c.infoDialog('Syncing with Trakt', 'Please wait', icon='main_classy.png', sound=False)
     try:
-        # fetching progress from trakt
-        start, end = get_start_end(diff=365)
-        _type = 'movie' # cm - which for now seems to return all types anyways, movies and episodes
-        endpoint = f'sync/playback/{_type}?start_at={start}&end_at={end}'
-        #endpoint = (endpoint)
-        result = getTraktAsJson(endpoint)
-
-        if result:
-            if not table_exists('trakt_progress'):
-                create_table('trakt_progress')
-            for item in result:
-                c.log(f"[CM Debug @ 784 in trakt.py] -----> progressitem = {item}")
-                media_type = item.get('type')
-                resume_point = item.get('progress') # cm - percentage as float!
-                trakt = item.get(media_type).get('ids').get('trakt')
-                tvdb = item.get(media_type).get('ids').get('tvdb')
-                tmdb = item.get(media_type).get('ids').get('tmdb')
-                imdb = item.get(media_type).get('ids').get('imdb')
-                year = item.get(media_type).get('year') if media_type == 'movie' else item.get('show').get('year')
-                title = item.get(media_type).get('title')
-                season = item.get(media_type).get('season') if media_type == 'episode' else '0'
-                episode = item.get(media_type).get('number') if media_type == 'episode' else '0'
-                media_id = trakt if trakt else tmdb
-                curr_time = get_now_in_iso()
-                last_played = item.get('paused_at')
-                resume_id = item.get('id')
-
-                c.log(f"[CM Debug @ 783 in trakt.py] mediatype = {media_type} with trakt = {trakt} and resume_point = {resume_point}, season = {season} and episode = {episode}")
-                insert_trakt_progress(media_type, trakt, imdb, tmdb, tvdb, media_id, title, year, season, episode, resume_point, curr_time, last_played, resume_id)
+        fill_progress_table()
 
         _types = ['movies', 'shows']
+        _types = ['shows']
 
-        i_movies, i_tvshows = []
+        i_movies, i_tvshows = [], []
 
         for _type in _types:
             endpoint = f'sync/watched/{_type}'
             result = getTraktAsJson(endpoint)
-            c.log(f"[CM Debug @ 688 in trakt.py] result = {result}")
+            c.log(f"[CM Debug @ 827 in trakt.py] result = {result}")
             if result:
+                if _type == 'movies':
+                    indicators = [i['movie']['ids']['tmdb'] for i in result]
+                    c.log(f"[CM Debug @ 831 in trakt.py] indicators = {indicators}")
+                #else:
+                    #indicators = [(show['show']['ids']['tmdb'], show['show']['aired_episodes'], [(s['number'], e['number']) for s in show['seasons'] for e in s['episodes']]) for show in result]
+                    #c.log(f"[CM Debug @ 834 in trakt.py] indicator shows = {indicators}")
                 if not table_exists('trakt_watched'):
                     create_table('trakt_watched')
+
+
+                dbcon = get_connection(control.traktsyncFile, return_as_dict=True)
+                dbcur = get_connection_cursor(dbcon)
+
                 for item in result:
-                    c.log(f"[CM Debug @ 813 in trakt.py] -----> watcheditem = {item}")
-                    dbcon = get_connection(control.traktsyncFile, return_as_dict=True)
-                    dbcur = get_connection_cursor(dbcon)
+                    c.log(f"[CM Debug @ 832 in trakt.py] -----> type watcheditem = {type(item)} with value = {item}")
+
                     if _type == 'movies':
-                        dbcur.execute(sql_dict['sql_insert_trakt_watched'], ('movie', item.get('ids').get('trakt'), item.get('ids').get('tvdb'), item.get('ids').get('imdb'), item.get('ids').get('tmdb'), '0', '0', item.get('last_watched_at'), item.get('title')))
+                        dbcur.execute(sql_dict['sql_insert_trakt_watched'], ('movie', item.get('movie').get('ids').get('trakt'), item.get('movie').get('ids').get('tvdb'), item.get('movie').get('ids').get('imdb'), item.get('movie').get('ids').get('tmdb'), '0', '0', item.get('last_watched_at'), item.get('movie').get('title')))
                     else:
-                        dbcur.execute(sql_dict['sql_insert_trakt_watched'], ('show', item.get('ids').get('trakt'), item.get('ids').get('tvdb'), item.get('ids').get('imdb'), item.get('ids').get('tmdb'), item.get('season'), item.get('episode'), item.get('last_watched_at'), item.get('title')))
 
+                        media_type = 'show'
+                        trakt_id = item.get('show').get('ids').get('trakt')
+                        tvdb_id = item.get('show').get('ids').get('tvdb')
+                        imdb_id = item.get('show').get('ids').get('imdb')
+                        tmdb_id = item.get('show').get('ids').get('tmdb')
+                        seasons = item.get('show').get('seasons')
+                        episode = '0'
+                        last_watched_at = item.get('last_watched_at')
+                        title = item.get('show').get('title')
+                        c.log(f"[CM Debug @ 827 in trakt.py] media_type = {media_type}, trakt_id = {trakt_id}, tvdb_id = {tvdb_id}, imdb_id = {imdb_id}, tmdb_id = {tmdb_id}, season = {seasons}, episode = {episode}, last_watched_at = {last_watched_at}, title = {title}")
+                        trace=None
+                        dbcon.set_callable_traceback(trace)
+                        dbcur.execute(sql_dict['sql_insert_trakt_watched'], (media_type, int(trakt_id), int(tvdb_id), imdb_id, int(tmdb_id), seasons, episode, last_watched_at, title))
+                        c.log(f"[CM Debug @ 831 in trakt.py] trace = {repr(trace)}")
+                        dbcon.set_callable_traceback(None)
 
-        endpoint = 'sync/watched/movies'
+                dbcon.commit()
+                dbcur.close()
+                dbcon.close()
 
+        #endpoint = 'sync/watched/movies'
 
-        #sync last activities
-        i = getTraktAsJson('/sync/last_activities')
-        _all = i.get('all')
-        _crew = cleandate.now_to_iso()#last run
+        sync_last_activities()
 
-        c.log(f"[CM Debug @ 797 in trakt.py] all = {_all} and crew = {_crew}")
-        update_service(_all, _crew)
-        c.log(f"[CM Debug @ 795 in trakt.py] i = {repr(i)}")
-        #activity = []
-        #activity = [cleandate.new_iso_to_utc(i) for i in activity]
-        #activity = sorted(activity, key=int)[-1]
 
 
         return c.infoDialog('Syncing with Trakt Finished', 'Please wait', icon='main_classy.png', sound=True)
     except OperationalError as e:
-        c.log(f'[CM Debug @ 750 in trakt.py]OperationalError raised. Error = {e}')
+        import traceback
+        failure = traceback.format_exc()
+        c.log(f'[CM Debug @ 866 in trakt.py]Traceback:: {failure}')
+        c.log(f'[CM Debug @ 867 in trakt.py]Exception raised. Error = {e}')
+        c.log(f'[CM Debug @ 861 in trakt.py]OperationalError raised. Error = {e}')
 
     except Exception as e:
         import traceback
         failure = traceback.format_exc()
-        c.log(f'[CM Debug @ 755 in trakt.py]Traceback:: {failure}')
-        c.log(f'[CM Debug @ 756 in trakt.py]Exception raised. Error = {e}')
+        c.log(f'[CM Debug @ 866 in trakt.py]Traceback:: {failure}')
+        c.log(f'[CM Debug @ 867 in trakt.py]Exception raised. Error = {e}')
+
+def fill_progress_table():
+    # fetching progress from trakt
+    start, end = get_start_end(diff=365)
+    _type = 'movie' # cm - which for now seems to return all types anyways, movies and episodes
+    endpoint = f'sync/playback/{_type}?extended=full&start_at={start}&end_at={end}'
+    #endpoint = (endpoint)
+    result = getTraktAsJson(endpoint)
+
+    if result:
+        if not table_exists('trakt_progress'):
+            create_table('trakt_progress')
+        for item in result:
+            media_type = item.get('type')
+            resume_point = item.get('progress') # cm - percentage as float!
+            trakt = item.get(media_type).get('ids').get('trakt')
+            tvdb = item.get(media_type).get('ids').get('tvdb')
+            tmdb = item.get(media_type).get('ids').get('tmdb')
+            imdb = item.get(media_type).get('ids').get('imdb')
+            year = item.get(media_type).get('year') if media_type == 'movie' else item.get('show').get('year')
+            title = item.get(media_type).get('title')
+            season = item.get(media_type).get('season') if media_type == 'episode' else '0'
+            episode = item.get(media_type).get('number') if media_type == 'episode' else '0'
+            media_id = trakt if trakt else tmdb
+            curr_time = get_now_in_iso()
+            last_played = item.get('paused_at')
+            resume_id = item.get('id')
+
+            c.log(f"[CM Debug @ 817 in trakt.py] mediatype = {media_type} with trakt = {trakt} and resume_point = {resume_point}, season = {season} and episode = {episode}")
+            insert_trakt_progress(media_type, trakt, imdb, tmdb, tvdb, media_id, title, year, season, episode, resume_point, curr_time, last_played, resume_id)
+    return
+
+
+
+
+
+def sync_last_activities():
+    #sync last activities
+    i = getTraktAsJson('/sync/last_activities')
+    _all = i.get('all')
+    _crew = cleandate.now_to_iso()#last run
+
+    c.log(f"[CM Debug @ 851 in trakt.py] all = {_all} and crew = {_crew}")
+    update_service(_all, _crew)
+    c.log(f"[CM Debug @ 853 in trakt.py] i = {repr(i)}")
+    #activity = []
+    #activity = [cleandate.new_iso_to_utc(i) for i in activity]
+    #activity = sorted(activity, key=int)[-1]
 
 
 
@@ -865,7 +918,7 @@ def update_service(_all, _crew):
         for k,v in d.items():
             sql = sql_dict['sql_update_service']
             #sql = sql_dict['sql_update_service']
-            c.log(f"[CM Debug @ 825 in trakt.py] sql = {sql}")
+            c.log(f"[CM Debug @ 880 in trakt.py] sql = {sql}")
             #dbcur.execute(sql, (_all, _crew))
             dbcur.execute(sql, (v, k))
             dbcon.commit()
@@ -1122,9 +1175,6 @@ def create_table(name='', query = ''):
         dbcur = get_connection_cursor(dbcon)
 
         if f'sql_create_{name}' in sql_dict:
-            #c.infoDialog(sql_dict[f'sql_create_{name}'], 'Msg From Classy', icon='main_classy.png', sound=True)
-            #c.infoDialog(sql_dict[f'sql_create_{name}'], 'Msg From Classy', icon='main_classy.png', sound=True)
-
             sql = sql_dict[f'sql_create_{name}']
             c.log(f"[CM Debug @ 1006 in trakt.py] sql = {sql}")
             dbcur.execute(sql)
@@ -1133,6 +1183,7 @@ def create_table(name='', query = ''):
                 dbcur.execute(query)
             else:
                 c.log(f"Trying to use invalid query in trakt::create_table, query = {query}, returning")
+                #no return here, let finally gracefully close the connection
 
     except Exception as e:
         import traceback
@@ -1142,7 +1193,6 @@ def create_table(name='', query = ''):
         pass
     finally:
         dbcon.commit()
-        dbcur.close()
         dbcon.close()
 
 
@@ -1185,11 +1235,46 @@ def get_trakt_collection(media_type="all"):
         c.log(f'[CM Debug @ 839 in trakt.py]Exception raised. Error = {e}')
     finally:
         if do_commit:
-            dbcur.close()
             dbcon.close()
         c.infoDialog('trakt collection updated', icon="main_orangehat.png", time=2000)
 
-def get_collection(media_type, trakt=0, imdb='', tmdb=0):
+def get_collection(media_type, trakt_id=0, imdb_id='', tmdb_id=0):
+    """
+    Retrieves collection entries from the trakt sync database for the specified media type and identifiers.
+
+    Args:
+        media_type (str): The type of media to retrieve, either 'movies' or 'shows'.
+        trakt_id (int, optional): The trakt ID for the media. Defaults to 0.
+        imdb_id (str, optional): The IMDb ID for the media. Defaults to an empty string.
+        tmdb_id (int, optional): The TMDb ID for the media. Defaults to 0.
+
+    Returns:
+        list: A list of rows from the database matching the specified identifiers.
+    """
+    try:
+        query = []
+
+        if trakt_id == 0 and imdb_id == '' and tmdb_id == 0:
+            sql = f"SELECT * FROM {media_type}_collection"
+        else:
+            if trakt_id != 0:
+                query.append(f"trakt = {trakt_id}")
+            if imdb_id != '':
+                query.append(f"imdb = '{imdb_id}'")
+            if tmdb_id != 0:
+                query.append(f"tmdb = {tmdb_id}")
+            sql = f"SELECT * FROM {media_type}_collection WHERE {' AND '.join(query)}"
+        c.log(f"[CM Debug @ 1224 in trakt.py] sql is of type: {type(sql)} and = {sql}")
+        dbcon = get_connection(control.traktsyncFile, return_as_dict=True)
+        dbcur = get_connection_cursor(dbcon)
+        dbcur.execute(sql)
+        return dbcur.fetchall()
+    except Exception as e:
+        c.log(f'Exception raised in get_collection. Error = {e}')
+        raise e
+
+
+def get_collection_orig(media_type, trakt=0, imdb='', tmdb=0):
     """
     Retrieves collection entries from the trakt sync database for the specified media type and identifiers.
 
@@ -1203,6 +1288,7 @@ def get_collection(media_type, trakt=0, imdb='', tmdb=0):
         list: A list of rows from the database matching the specified identifiers.
     """
     try:
+        sql = ''
         if media_type == 'movies':
             if trakt == 0 and imdb == '' and tmdb == 0:
                 sql = "SELECT * FROM movies_collection"
@@ -1227,8 +1313,6 @@ def get_collection(media_type, trakt=0, imdb='', tmdb=0):
         return dbcur.fetchall()
     except Exception as e:
         c.log(f'Exception raised in get_collection. Error = {e}')
-
-
 
 
 

@@ -201,14 +201,15 @@ class navigator:
 
             if traktCredentials is True:
                 self.addDirectoryItem(90050, 'calendar&url=onDeck', 'trakt.png', 'DefaultTVShows.png')
-                self.addDirectoryItem(32032, 'tvshows&url=traktcollection', 'trakt2.png', 'DefaultTVShows.png', context=(32551, 'tvshowsToLibrary&url=traktcollection'))
-                self.addDirectoryItem(32033, 'tvshows&url=traktwatchlist', 'trakt2.png', 'DefaultTVShows.png', context=(32551, 'tvshowsToLibrary&url=traktwatchlist'))
-                self.addDirectoryItem(32035, 'tvshows&url=traktfeatured', 'trakt2.png', 'DefaultTVShows.png')
+                self.addDirectoryItem(32624, 'tvProgress','main_classy.png', 'main_classy.png')
+                self.addDirectoryItem(32032, 'tvshows&url=traktcollection', 'trakt.png', 'DefaultTVShows.png', context=(32551, 'tvshowsToLibrary&url=traktcollection'))
+                self.addDirectoryItem(32033, 'tvshows&url=traktwatchlist', 'trakt.png', 'DefaultTVShows.png', context=(32551, 'tvshowsToLibrary&url=traktwatchlist'))
+                self.addDirectoryItem(32035, 'tvshows&url=traktfeatured', 'trakt.png', 'DefaultTVShows.png')
 
             if traktIndicators is True:
-                self.addDirectoryItem(32036, 'calendar&url=trakthistory', 'trakt2.png', 'DefaultTVShows.png', queue=True)
-                self.addDirectoryItem(32037, 'calendar&url=progress', 'trakt2.png','DefaultRecentlyAddedEpisodes.png', queue=True)
-                self.addDirectoryItem(32038, 'calendar&url=mycalendar','trakt2.png', 'DefaultRecentlyAddedEpisodes.png', queue=True)
+                self.addDirectoryItem(32036, 'calendar&url=trakthistory', 'trakt.png', 'DefaultTVShows.png', queue=True)
+                self.addDirectoryItem(32037, 'calendar&url=progress', 'trakt.png','DefaultRecentlyAddedEpisodes.png', queue=True)
+                self.addDirectoryItem(32038, 'calendar&url=mycalendar','trakt.png', 'DefaultRecentlyAddedEpisodes.png', queue=True)
 
             self.addDirectoryItem(32040, 'tvUserlists','userlists2.png', 'DefaultTVShows.png')
 
@@ -294,10 +295,10 @@ class navigator:
             control.idle()
 
             items = [
-                    (control.lang(32001), 'movies'),
-                    (control.lang(32002), 'tvshows'),
-                    (control.lang(32105), 'seasons'),
-                    (control.lang(32106), 'episodes')
+                (control.lang(32001), 'movies'),
+                (control.lang(32002), 'tvshows'),
+                (control.lang(32105), 'seasons'),
+                (control.lang(32106), 'episodes')
                     ]
             select = control.selectDialog([i[0] for i in items], control.lang(32049))
             if select == -1:
@@ -514,6 +515,7 @@ class navigator:
     #
     #######
     def developers(self):
+        self.addDirectoryItem('Update Services', 'update_service','main_classy.png', 'main_classy.png')
         self.addDirectoryItem('Run Trakt Sync setup', 'traktSyncsetup','main_orangehat.png', 'main_orangehat.png')
         self.addDirectoryItem('Check sync Tables', 'traktchecksync','main_classy.png', 'main_classy.png')
         self.addDirectoryItem('Get Collections', 'traktgetcollections','main_classy.png', 'main_classy.png')

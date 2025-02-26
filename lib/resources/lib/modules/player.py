@@ -48,6 +48,7 @@ class player(xbmc.Player):
     def __init__ (self):
         self.totalTime = 0
         self.currentTime = 0
+        self.duration = 0
         self.content = ''
         self.name = ''
         self.title = ''
@@ -65,7 +66,7 @@ class player(xbmc.Player):
 
         xbmc.Player.__init__(self)
 
-    def run(self, title, year, season, episode, imdb, tmdb, url, meta):
+    def run(self, title, year, season, episode, imdb, tmdb, url, meta):#: -> Any
         try:
             control.sleep(200)
 
@@ -91,15 +92,20 @@ class player(xbmc.Player):
             #self.ids = {'imdb': self.imdb, 'tmdb': self.tmdb}
             #self.ids = dict((k,v) for k, v in six.iteritems(self.ids) if not v == '0')
             self.ids = dict((k,v) for k, v in self.ids.items() if not v == '0')
+            self.duration = int(meta.get('duration', 0))
+            c.log(f"[CM Debug @ 96 in player.py] duration = {self.duration} with title = {self.title}")
 
             c.log(f"[CM Debug @ 93 in player.py] self.content = {self.content}")
 
-            self.offset = bookmarks.get(self.content, imdb, season, episode)
-            c.log(f"[CM Debug @ 94 in player.py] offset = {self.offset} with title = {self.title}")
+            self.offset = bookmarks.get(self.content, imdb=self.imdb, tmdb=self.tmdb)
+            #beware, new offset is in percentage of total playing time
+            #offset = float((self.duration * self.offset) / 100)
+            offset = (self.duration/100) * self.offset
+            self.offset = offset
 
+            c.log(f"[CM Debug @ 106 in player.py] offset = {self.offset} with title = {self.title}")
 
             poster, thumb, fanart, clearlogo, clearart, discart, meta = self.getMeta(meta)
-
 
             item = control.item(path=url)
             if self.content == 'movie':
@@ -126,8 +132,14 @@ class player(xbmc.Player):
 
             control.window.clearProperty('script.trakt.ids')
         except Exception as e:
-            c.log(f'player_fail, error = {e}')
+            import traceback
+            failure = traceback.format_exc()
+            c.log(f'[CM Debug @ 133 in player.py]Traceback:: {failure}')
+            c.log(f'[CM Debug @ 133 in player.py]Exception raised. Error = {e}')
             return
+        #except Exception as e:
+            #c.log(f'player_fail, error = {e}')
+            #return
 
     def getMeta(self, meta):
 
@@ -223,6 +235,8 @@ class player(xbmc.Player):
 #TC 2/01/19 started
     def keepPlaybackAlive_old(self):
         pname = f"{control.addonInfo('id')}.player.overlay"
+        control.window.clearProperty(pname)
+        pname2 = f"{control.addonInfo('id')}.player.playtime"
         control.window.clearProperty(pname)
 
         if self.content == 'movie':
@@ -408,11 +422,34 @@ class player(xbmc.Player):
                 break
             control.sleep(100)
 
-    def onPlayBackStarted(self):
-        control.execute('Dialog.Close(all,true)')
-        if self.getbookmark is True and self.offset != '0':
-            self.seekTime(float(self.offset))
-        c.log(f"[CM Debug @ 330 in player.py] onPlayBackStarted for title = {self.title} with seektime = {self.offset}")
+    def onAVStarted(self) -> None:
+        #control.execute('Dialog.Close(all,true)')
+        #if self.getbookmark is True and self.offset != '0':
+        #    self.seekTime(float(self.offset))
+        #    c.log(f"[CM Debug @ 429 in player.py] onPlayBackStarted for title = {self.title} with seektime = {self.offset}")
+        if control.setting('bookmarks') == 'true' and int(self.offset) > 0 and self.isPlayingVideo():
+            if control.setting('bookmarks.auto') == 'true':
+                self.seekTime(float(self.offset))
+            else:
+                self.pause()
+
+                minutes, seconds = divmod(float(self.offset), 60)
+                hours, minutes = divmod(minutes, 60)
+                label = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+                label = control.lang2(12022).format(label)
+                if control.setting('bookmarks') == 'true' and trakt.getTraktCredentialsInfo() is True:
+                    yes = control.yesnoDialog(label + '[CR]  (Trakt scrobble)', heading=control.lang2(13404))
+                else:
+                    yes = control.yesnoDialog(label, heading=control.lang2(13404))
+                if yes:
+                    self.seekTime(float(self.offset))
+                control.sleep(1000)
+                self.pause()
+
+
+            #subtitles().get(self.name, self.imdb, self.season, self.episode)
+            self.idleForPlayback()
+
 
     def onPlayBackPaused(self):
         if self.getbookmark is True:

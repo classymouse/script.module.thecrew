@@ -1357,13 +1357,12 @@ class movies:
 
                 if not resume_point:
                     #offset = float(bookmarks.get('movie', imdb, '', '', True))
-                    resume_point= float(bookmarks.get('movie', imdb, '', '', False))
-
+                    resume_point= float(bookmarks.get('movie', imdb=imdb, tmdb=tmdb))
                     c.log(f"[CM Debug @ 1471 in movies.py] offset 1: {resume_point} with type {type(resume_point)} for {title}")
-                    offset = float(int(meta['duration']) * (resume_point / 100)) #= float(int(7200) * (4.39013/100)) = 315.0 with playing time = 7200 secs om 4.3 % of the movie
-                else:
-                    offset =float(int(meta['duration']) * (resume_point / 100))
 
+
+
+                offset = float(int(meta['duration']) * (resume_point / 100)) #= float(int(7200) * (4.39013/100)) = 315.0 with playing time = 7200 secs om 4.3 % of the movie
                 c.log(f"[CM Debug @ 1366 in movies.py] offset = {offset}")
 
                 meta.update({'offset': offset})

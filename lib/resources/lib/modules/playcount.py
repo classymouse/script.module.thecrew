@@ -88,6 +88,15 @@ def get_movie_overlay(indicators, imdb):
     except Exception:
         return '6'
 
+def movie_has_indicator(indicators, imdb):
+    try:
+        if trakt.getTraktIndicatorsInfo() is False:
+            return False
+        else:
+            return imdb in indicators
+    except Exception:
+        return False
+
 def getTVShowOverlay(indicators, tmdb):
     try:
         playcount = [i[0] for i in indicators if i[0] == tmdb and len(i[2]) >= int(i[1])]
