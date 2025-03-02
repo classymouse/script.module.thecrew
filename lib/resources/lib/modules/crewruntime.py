@@ -101,9 +101,6 @@ class CrewRuntime:
         self._theme = ''
         self.art = ''
 
-
-
-
         self.initialize_all()
 
     def __del__(self):
@@ -149,7 +146,10 @@ class CrewRuntime:
         self.set_imagesizes()
 
 
-
+    def addon_exists(script_name) -> bool:
+        if not script_name:
+            return False
+        return xbmc.getCondVisibility(f'System.HasAddon({script_name})') == 1
 
     def _has_silent_boot(self) -> bool:
         return self.get_setting('silent.boot') == 'true'
@@ -216,28 +216,22 @@ class CrewRuntime:
             if not isinstance(msg, str):
                 raise Exception('c.log() msg not of type str!')
 
-
             if trace == 1:
                 caller = getframeinfo(stack()[1][0])
-                #caller.filename, caller.lineno
-                head = debug_prefix
 
-                #failure = str(traceback.format_exc()){failure}
+                head = debug_prefix
                 _msg = f'\n     {msg}:\n    \n--> called from file {caller.filename} @ {caller.lineno}'
-                #_msg = f'\n    {msg}'
             else:
                 head = info_prefix
                 _msg = f'\n    {msg}'
 
             if debug_log== '1':
-                xbmc.log(f"\n\n--> addon name @ 147 = {self.name} | {self.pluginversion} | {self.moduleversion}  \n\n")
+                #xbmc.log(f"\n\n--> addon name @ 147 = {self.name} | {self.pluginversion} | {self.moduleversion}  \n\n")
 
                 if not os.path.exists(log_file):
                     _file = open(log_file, 'a', encoding="utf8")
                     line = 'Classy started this file\n'
                     _file.write(line.rstrip('\r\n') + '\n')
-
-                    _file.close()
                 with open(log_file, 'a', encoding="utf8") as _file:
                     now = datetime.now()
                     _dt = now.strftime("%Y-%m-%d %H:%M:%S")

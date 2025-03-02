@@ -297,18 +297,21 @@ def get_trakt_addon_movie_info():
     """
     Check if Trakt is enabled and authorized in the Trakt addon.
     """
+    if not c.addon_exists('script.trakt'):
+        return False
+
+
     try:
-        scrobble = control.addon('script.trakt').getSetting('scrobble_movie')
-    except LookupError:
-        scrobble = ''
-    try:
-        exclude_http = control.addon('script.trakt').getSetting('ExcludeHTTP')
-    except LookupError:
-        exclude_http = ''
-    try:
-        authorization = control.addon('script.trakt').getSetting('authorization')
-    except LookupError:
-        authorization = ''
+        scrobble = control.addon('script.trakt').getSetting('scrobble_movie') or ''
+        exclude_http = control.addon('script.trakt').getSetting('ExcludeHTTP') or ''
+        authorization = control.addon('script.trakt').getSetting('authorization') or ''
+    except LookupError as e:
+        c.log(f"[CM Debug @ 309 in trakt.py] Lookuperror in get_trakt_addon_movie_info. Error = {e}")
+    except Exception as e:
+        c.log(f"[CM Debug @ 311 in trakt.py] Exception in get_trakt_addon_movie_info. Error = {e}")
+        return False
+
+    c.log(f"[CM Debug @ 314 in trakt.py] scrobble = {scrobble} | exclude_http = {exclude_http} | authorization = {authorization}")
 
     return scrobble == 'true' and exclude_http == 'false' and authorization
 
@@ -764,9 +767,9 @@ sql_dict = {
     'sql_create_seasons_collection' :
         'CREATE TABLE IF NOT EXISTS seasons_collection (trakt INT, tvdb INT, imdb TEXT, tmdb INT, season INT, episode INT, collected_at TEXT);',
     'sql_create_trakt_progress' :
-        'CREATE TABLE progress (media_type text not null, trakt integer primary key, imdb text, tmdb integer, tvdb integer, media_id text, season integer, episode integer, resume_point real, curr_time text, last_played text, resume_id integer, title text, year intger)',
+        'CREATE TABLE progress (media_type text not null, trakt integer primary key, imdb text, tmdb integer, tvdb integer, showtrakt integer, showimdb text, showtmdb integer, showtvdb integer, season integer, episode integer, resume_point real, curr_time text, last_played text, resume_id integer, tvshowtitle text, title text, year integer)',
     'sql_insert_trakt_progress' :
-        'INSERT OR REPLACE INTO progress (media_type, trakt, imdb, tmdb, media_id, tvdb, title, year, season, episode, resume_point, curr_time, last_played, resume_id) VALUES (?,?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ',
+        'INSERT OR REPLACE INTO progress (media_type, trakt, imdb, tmdb, tvdb, showtrakt, showimdb, showtmdb, showtvdb, season, episode, resume_point, curr_time, last_played, resume_id, tvshowtitle, title, year) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?, ?, ?, ?) ',
     'sql_update_service' :
         'UPDATE service SET value = ? where setting = ?',
 
@@ -779,9 +782,9 @@ sql_dict = {
     'sql_delete_sync_data' :
         'DELETE FROM sync_data WHERE media_type = ? AND name = ?',
     'sql_create_trakt_watched' :
-        'CREATE TABLE IF NOT EXISTS watched (media_type text not null, trakt INT, tvdb INT, imdb TEXT, tmdb INT, season integer, episode integer, last_played text, title text, unique (media_type, media_id, season, episode))',
+        'CREATE TABLE IF NOT EXISTS watched (media_type text not null, trakt integer, tvdb integer, imdb TEXT, tmdb integer, season integer, episode integer, last_played text, title text, unique(media_type, trakt, season, episode))',
     'sql_insert_trakt_watched' :
-        'INSERT OR REPLACE INTO watched (media_type, trakt INT, tvdb INT, imdb TEXT, tmdb INT, season, episode, last_played, title) VALUES (?,?,?,?,?,?,?,?,?)',
+        'INSERT OR REPLACE INTO watched (media_type, trakt, tvdb, imdb, tmdb, season, episode, last_played, title) VALUES (?,?,?,?,?,?,?,?,?)',
 }
 
 def syncTrakt():
@@ -790,7 +793,7 @@ def syncTrakt():
         fill_progress_table()
 
         _types = ['movies', 'shows']
-        _types = ['shows']
+        #_types = ['shows']
 
         i_movies, i_tvshows = [], []
 
@@ -816,24 +819,35 @@ def syncTrakt():
                     c.log(f"[CM Debug @ 832 in trakt.py] -----> type watcheditem = {type(item)} with value = {item}")
 
                     if _type == 'movies':
-                        dbcur.execute(sql_dict['sql_insert_trakt_watched'], ('movie', item.get('movie').get('ids').get('trakt'), item.get('movie').get('ids').get('tvdb'), item.get('movie').get('ids').get('imdb'), item.get('movie').get('ids').get('tmdb'), '0', '0', item.get('last_watched_at'), item.get('movie').get('title')))
+                        media_type = 'movie'
+                        trakt_id = item.get('movie').get('ids').get('trakt')
+                        tvdb_id = item.get('movie').get('ids').get('tvdb') or 0
+                        imdb_id = item.get('movie').get('ids').get('imdb')
+                        tmdb_id = item.get('movie').get('ids').get('tmdb')
+                        seasons = 0
+                        episode = 0
+                        last_watched_at = item.get('last_watched_at')
+                        title = item.get('movie').get('title')
+
+
+
+
+                        c.log(f"[CM Debug @ 835 in trakt.py] media_type = {media_type}, trakt_id = {trakt_id}, tvdb_id = {tvdb_id}, imdb_id = {imdb_id}, tmdb_id = {tmdb_id}, season = {seasons}, episode = {episode}, last_watched_at = {last_watched_at}, title = {title}")
+
+                        dbcur.execute(sql_dict['sql_insert_trakt_watched'], (media_type, trakt_id, tvdb_id, imdb_id, tmdb_id, seasons, episode, last_watched_at, title))
                     else:
 
                         media_type = 'show'
                         trakt_id = item.get('show').get('ids').get('trakt')
-                        tvdb_id = item.get('show').get('ids').get('tvdb')
+                        tvdb_id = item.get('show').get('ids').get('tvdb') or 0
                         imdb_id = item.get('show').get('ids').get('imdb')
                         tmdb_id = item.get('show').get('ids').get('tmdb')
                         seasons = item.get('show').get('seasons')
                         episode = '0'
                         last_watched_at = item.get('last_watched_at')
                         title = item.get('show').get('title')
-                        c.log(f"[CM Debug @ 827 in trakt.py] media_type = {media_type}, trakt_id = {trakt_id}, tvdb_id = {tvdb_id}, imdb_id = {imdb_id}, tmdb_id = {tmdb_id}, season = {seasons}, episode = {episode}, last_watched_at = {last_watched_at}, title = {title}")
-                        trace=None
-                        dbcon.set_callable_traceback(trace)
-                        dbcur.execute(sql_dict['sql_insert_trakt_watched'], (media_type, int(trakt_id), int(tvdb_id), imdb_id, int(tmdb_id), seasons, episode, last_watched_at, title))
-                        c.log(f"[CM Debug @ 831 in trakt.py] trace = {repr(trace)}")
-                        dbcon.set_callable_traceback(None)
+                        c.log(f"[CM Debug @ 849 in trakt.py] media_type = {media_type}, trakt_id = {trakt_id}, tvdb_id = {tvdb_id}, imdb_id = {imdb_id}, tmdb_id = {tmdb_id}, season = {seasons}, episode = {episode}, last_watched_at = {last_watched_at}, title = {title}")
+                        dbcur.execute(sql_dict['sql_insert_trakt_watched'], (media_type, trakt_id, tvdb_id, imdb_id, tmdb_id, seasons, episode, last_watched_at, title))
 
                 dbcon.commit()
                 dbcur.close()
@@ -885,9 +899,21 @@ def fill_progress_table():
             curr_time = get_now_in_iso()
             last_played = item.get('paused_at')
             resume_id = item.get('id')
+            if 'show' in item:
+                tvshowtitle = item.get('show').get('title')
+                showtrakt = item.get('show').get('ids').get('trakt')
+                showimdb = item.get('show').get('ids').get('imdb')
+                showtmdb = item.get('show').get('ids').get('tmdb')
+                showtvdb = item.get('show').get('ids').get('tvdb')
+            else:
+                tvshowtitle = ''
+                showtrakt = '0'
+                showimdb = '0'
+                showtmdb = '0'
+                showtvdb = '0'
 
             c.log(f"[CM Debug @ 817 in trakt.py] mediatype = {media_type} with trakt = {trakt} and resume_point = {resume_point}, season = {season} and episode = {episode}")
-            insert_trakt_progress(media_type, trakt, imdb, tmdb, tvdb, media_id, title, year, season, episode, resume_point, curr_time, last_played, resume_id)
+            insert_trakt_progress(media_type, trakt, imdb, tmdb, tvdb, showtrakt, showimdb, showtmdb, showtvdb, season, episode, resume_point, curr_time, last_played, resume_id, tvshowtitle, title, year)
     return
 
 
@@ -927,13 +953,15 @@ def update_service(_all, _crew):
     except Exception as e:
         c.log(f"[CM Debug @ 831 in trakt.py] Exception raised. Error = {e}")
 
+#   insert_trakt_progress(media_type, trakt, imdb, tmdb, tvdb, showtrakt, showimdb, showtmdb, showtvdb, season, episode, resume_point, curr_time, last_played, resume_id, tvshowtitle, title, year)
 
-def insert_trakt_progress(media_type, trakt, imdb, tmdb, tvdb, media_id, title, year, season, episode, resume_point, curr_time, last_played, resume_id):
+def insert_trakt_progress(media_type, trakt, imdb, tmdb, tvdb, showtrakt, showimdb, showtmdb, showtvdb, season, episode, resume_point, curr_time, last_played, resume_id, tvshowtitle, title, year):
     dbcon = get_connection(control.traktsyncFile, return_as_dict=True)
     dbcur = get_connection_cursor(dbcon)
     #sql = "INSERT OR REPLACE INTO progress (media_type, trakt, imdb, tmdb, tvdb, media_id, title, season, episode, resume_point) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    #'INSERT OR REPLACE INTO progress (media_type, trakt, imdb, tmdb, tvdb, showtrakt, showimdb, showtmdb, showtvdb, season, episode, resume_point, curr_time, last_played, resume_id, tvshowtitle, title, year) VALUES (?,?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?, ?, ?, ?, ?) '
     sql = sql_dict['sql_insert_trakt_progress']
-    dbcur.execute(sql, (media_type, trakt, imdb, tmdb, tvdb, media_id, title, year, season, episode, resume_point, curr_time, last_played, resume_id))
+    dbcur.execute(sql, (media_type, trakt, imdb, tmdb, tvdb, showtrakt, showimdb, showtmdb, showtvdb, season, episode, resume_point, curr_time, last_played, resume_id, tvshowtitle, title, year))
     dbcon.commit()
     dbcur.close()
     dbcon.close()
@@ -1428,6 +1456,7 @@ def get_trakt_progress(media_type: str, media_id: int = 0) -> list:
         dbcon = get_connection(control.traktsyncFile, return_as_dict=True)
         dbcur = get_connection_cursor(dbcon)
         sql = f"SELECT * FROM progress WHERE media_type = '{media_type}'"
+        c.log(f"[CM Debug @ 1431 in trakt.py] sql = {sql}")
         if media_id:
             sql += f" AND media_id = {media_id}"
 

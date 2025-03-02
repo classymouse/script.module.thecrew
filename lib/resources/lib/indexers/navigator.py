@@ -201,7 +201,7 @@ class navigator:
 
             if traktCredentials is True:
                 self.addDirectoryItem(90050, 'calendar&url=onDeck', 'trakt.png', 'DefaultTVShows.png')
-                self.addDirectoryItem(32624, 'tvProgress','main_classy.png', 'main_classy.png')
+                self.addDirectoryItem(32624, 'calendar&url=tvProgress','main_classy.png', 'main_classy.png')
                 self.addDirectoryItem(32032, 'tvshows&url=traktcollection', 'trakt.png', 'DefaultTVShows.png', context=(32551, 'tvshowsToLibrary&url=traktcollection'))
                 self.addDirectoryItem(32033, 'tvshows&url=traktwatchlist', 'trakt.png', 'DefaultTVShows.png', context=(32551, 'tvshowsToLibrary&url=traktwatchlist'))
                 self.addDirectoryItem(32035, 'tvshows&url=traktfeatured', 'trakt.png', 'DefaultTVShows.png')

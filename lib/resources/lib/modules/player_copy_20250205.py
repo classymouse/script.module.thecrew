@@ -221,11 +221,11 @@ class player(xbmc.Player):
 
         if self.content == 'movie':
             #overlay = playcount.getMovieOverlay(playcount.getMovieIndicators(), self.imdb)
-            overlay = playcount.get_movie_overlay(playcount.getMovieIndicators(), self.imdb)
+            overlay = playcount.get_movie_overlay(playcount.get_movie_indicators(), self.imdb)
 
         elif self.content == 'episode':
             #overlay = playcount.getEpisodeOverlay(playcount.getTVShowIndicators(), self.imdb, self.tmdb, self.season, self.episode)
-            overlay = playcount.get_episode_overlay(playcount.getTVShowIndicators(), self.imdb, self.tmdb, self.season, self.episode)
+            overlay = playcount.get_episode_overlay(playcount.get_tvshow_indicators(), self.imdb, self.tmdb, self.season, self.episode)
 
         else:
             overlay = '6'

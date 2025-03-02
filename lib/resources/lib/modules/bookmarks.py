@@ -115,7 +115,7 @@ def get_progress_bookmark(imdb = 0, tmdb = 0, traktid = 0, tvdb = 0, mediatype =
         failure = traceback.format_exc()
         c.log(f'[CM Debug @ 113 in bookmarks.py]Traceback:: {failure}')
         c.log(f'[CM Debug @ 113 in bookmarks.py]Exception raised. Error = {e}')
-        pass
+        return 0
 
 def get_episode_progress(imdb, tmdb=0, traktid=0, tvdb=0, season=0, episode=0):
     return get_progress_bookmark(imdb=imdb,tmdb=tmdb,traktid=traktid,tvdb=tvdb, mediatype='episode', season=season, episode=episode)

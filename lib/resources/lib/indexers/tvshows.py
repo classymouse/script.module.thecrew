@@ -1722,7 +1722,7 @@ class tvshows:
         addon_discart = c.addon_discart()
 
         traktCredentials = trakt.getTraktCredentialsInfo()
-        indicators = playcount.getTVShowIndicators(refresh=True) if action == 'tvshows' else playcount.getTVShowIndicators()
+        indicators = playcount.get_tvshow_indicators(refresh=True) if action == 'tvshows' else playcount.get_tvshow_indicators()
         c.log(f"[CM Debug @ 1726 in tvshows.py] action = {action}")
         c.log(f"[CM Debug @ 1681 in tvshows.py] indicators = {indicators}")
         flatten = control.setting('flatten.tvshows') or 'false'

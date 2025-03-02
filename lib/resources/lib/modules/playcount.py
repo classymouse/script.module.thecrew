@@ -23,7 +23,7 @@ from .crewruntime import c
 
 from resources.lib.indexers import episodes
 
-def getMovieIndicators(refresh=False):
+def get_movie_indicators(refresh=False):
     try:
         if trakt.getTraktIndicatorsInfo():
             raise Exception()
@@ -46,7 +46,7 @@ def getMovieIndicators(refresh=False):
         pass
 
 
-def getTVShowIndicators(refresh=False):
+def get_tvshow_indicators(refresh=False):
     try:
         if not trakt.getTraktIndicatorsInfo():
             raise Exception()

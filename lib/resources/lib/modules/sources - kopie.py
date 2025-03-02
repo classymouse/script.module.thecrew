@@ -119,7 +119,7 @@ class sources:
         addon_clearlogo, addon_clearart = c.addon_clearlogo(), c.addon_clearart()
         addon_thumb, addon_discart = c.addon_thumb(), c.addon_discart()
 
-        indicators = playcount.getMovieIndicators(refresh=True)
+        indicators = playcount.get_movie_indicators(refresh=True)
 
         c.log(f"[CM Debug @ 124 in sources.py] inside addItem function, addon_poster = {addon_poster}")
 

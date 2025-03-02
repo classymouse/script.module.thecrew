@@ -1323,7 +1323,7 @@ class movies:
         traktCredentials = trakt.getTraktCredentialsInfo()
 
         isPlayable = 'true' if 'plugin' not in control.infoLabel( 'Container.PluginName') else 'false'
-        indicators = playcount.getMovieIndicators(refresh=True) if action == 'movies' else playcount.getMovieIndicators()
+        indicators = playcount.get_movie_indicators(refresh=True) if action == 'movies' else playcount.get_movie_indicators()
         c.log(f"[CM Debug @ 1595 in movies.py] indicators = {indicators}")
         findSimilar = c.lang(32100)
         playbackMenu = control.lang(32063) if control.setting('hosts.mode') == '2' else control.lang(32064)

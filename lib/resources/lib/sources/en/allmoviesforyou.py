@@ -93,7 +93,7 @@ class source:
                             valid, host = source_utils.is_host_valid(url, hostDict)
                             sources.append(
                                 {'source': host, 'quality': item[1], 'language': 'en', 'url': url,
-                                 'direct': False, 'debridonly': False})
+                                'direct': False, 'debridonly': False})
                 except:
                     pass
 

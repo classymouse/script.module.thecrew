@@ -16,5 +16,5 @@
 
 import threading
 class Thread(threading.Thread):
-    def __init__(self, target_func, *func_args):
+    def __init__(self, target_func, *func_args) -> None:
         super().__init__(target=target_func, args=func_args)

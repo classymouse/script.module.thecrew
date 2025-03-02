@@ -809,15 +809,24 @@ class episodes:
     def calendar(self, url):
         try:
 
-            url = getattr(self, url + '_link')
+            if url in ('tvProgress'):
+                pass
+            else:
+                url = getattr(self, url + '_link')
 
-            ####cm#
-            # Making it possible to use date[xx] in url's where xx is a str(int)
-            for i in re.findall(r'date\[(\d+)\]', url):
-                url = url.replace(
-                    f'date[{i}]',
-                    (self.datetime - datetime.timedelta(days=int(i))).strftime('%Y-%m-%d')
-                    )
+                ####cm#
+                # Making it possible to use date[xx] in url's where xx is a str(int)
+                for i in re.findall(r'date\[(\d+)\]', url):
+                    url = url.replace(
+                        f'date[{i}]',
+                        (self.datetime - datetime.timedelta(days=int(i))).strftime('%Y-%m-%d')
+                        )
+
+
+            if url == 'tvProgress':
+                c.log(f"[CM Debug @ 823 in episodes.py] url = {url}")
+                self.list = cache.get(self.trakt_tvprogress, 0)
+
 
             if url == self.progress_link:
                 self.blist = cache.get(self.trakt_progress_list, 720, url)
@@ -1100,6 +1109,87 @@ class episodes:
 
         itemlist = itemlist[::-1]
         return itemlist
+
+
+    def trakt_tvprogress(self):
+        try:
+            progress = trakt.get_trakt_progress('episode')
+
+            c.log(f"[CM Debug @ 923 in episodes.py] progress = {progress}")
+
+            for item in progress:
+                c.log(f"[CM Debug @ 894 in episode.py] item = {item}")
+
+                tmdb = str(item['tmdb'])
+                tvdb = str(item['tvdb'])
+                imdb = item['imdb']
+                trakt_id = str(item['trakt'])
+                title = item['title']
+                season = item['season']
+                episode = item['episode']
+                resume_point = item['resume_point']
+                year = item['year']
+
+
+                self.list.append({
+                                'title': title, 'imdb': imdb, 'tmdb': tmdb, 'tvdb': tvdb,
+                                'trakt': trakt_id, 'season': season, 'episode': episode,
+                                'resume_point': resume_point, 'year': year
+
+                                })
+            c.log(f"[CM Debug @ 950 in episodes.py] self.list = {self.list}")
+
+            for item in self.list:
+                c.log(f"[CM Debug @ 954 in episodes.py] item = {item}")
+
+            return self.list
+        except Exception as e:
+            import traceback
+            failure = traceback.format_exc()
+            c.log(f'[CM Debug @ 1140 in episodes.py]Traceback:: {failure}')
+            c.log(f'[CM Debug @ 1140 in episodes.py]Exception raised. Error = {e}')
+            pass
+
+
+    def episode_superinfo(self, item):
+        try:
+            if not item:
+                return
+            if item['season'] == '0':
+                raise ValueError()
+            if item['episode'] == '0':
+                raise ValueError()
+
+            tmdb = item['tmdb'] if 'tmdb' in item else 0
+            if tmdb != 0:
+                c.log(f"[CM Debug @ 1165 in episodes.py] tmdb = {tmdb}")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+            return item
+        except Exception as e:
+            import traceback
+            failure = traceback.format_exc()
+            c.log(f'[CM Debug @ 1157 in episodes.py]Traceback:: {failure}')
+            c.log(f'[CM Debug @ 1157 in episodes.py]Exception raised. Error = {e}')
+            pass
+
 
     def trakt_progress_list(self, url):
         try:
@@ -2003,7 +2093,7 @@ class episodes:
         addon_clearlogo, addon_clearart = c.addon_clearlogo(), c.addon_clearart()
         addon_discart, addon_thumb = c.addon_discart(), c.addon_thumb()
         trakt_credentials = trakt.getTraktCredentialsInfo()
-        indicators = playcount.getTVShowIndicators(refresh=True)
+        indicators = playcount.get_tvshow_indicators(refresh=True)
 
         try:
             multi = [i['tvshowtitle'] for i in items]
@@ -2069,7 +2159,7 @@ class episodes:
                 seasons_meta = quote_plus(json.dumps(meta))
 
                 title = quote_plus(item['title'])
-                tvshowtitle = quote_plus(item['tvshowtitle'])
+                tvshowtitle = quote_plus(item['tvshowtitle']) if 'tvshowtitle' in item else title
                 premiered = quote_plus(item['premiered'])
                 trailer = quote_plus(item.get('trailer', '0'))
                 year = item.get('year', '0')
