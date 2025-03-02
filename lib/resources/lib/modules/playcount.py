@@ -168,6 +168,7 @@ def markMovieDuringPlayback(imdb, watched):
             trakt.markMovieAsWatched(imdb)
         else:
             trakt.markMovieAsNotWatched(imdb)
+            c.log(f"[CM Debug @ 171 in playcount.py] markMovieAsNotWatched imdb={imdb}")
         trakt.cachesyncMovies()
 
         if trakt.get_trakt_addon_movie_info():

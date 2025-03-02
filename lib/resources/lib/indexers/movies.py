@@ -162,11 +162,8 @@ class movies:
         try:
             if url.startswith('https://'):
                 #check if i can show a listing
-                c.log(f"[CM Debug @ 165 in movies.py] url = {url}")
             else:
-                c.log(f"[CM Debug @ 167 in movies.py] url = {url}")
                 url = getattr(self, f"{url}_link", None)
-                c.log(f"[CM Debug @ 169 in movies.py] url = {url} and tid = {tid}")
 
 
             for days_offset in re.findall(r'date\[(\d+)\]', url):
@@ -174,7 +171,6 @@ class movies:
                 url = url.replace(f'date[{days_offset}]', replacement_date)
 
             parsed_url_netloc = urlparse(url).netloc.lower()
-            c.log(f"[CM Debug @ 173 in movies.py] parsed_url_netloc = {parsed_url_netloc}")
 
             if self.trakt_link in url and url == self.onDeck_link:
                 self.on_deck_list = cache.get(self.trakt_list, 720, url, self.trakt_user)
@@ -224,7 +220,6 @@ class movies:
                 #self.list = cache.get(self.imdb_list, 24, url)
 
             elif parsed_url_netloc in self.tmdb_networks_link and int(tid) > 0:
-                #c.log(f"[cm debug in movies.py @ 344] u={u} and url={url}")
                 #self.list = cache.get(self.tmdb_list, 24, url, tid)
                 self.list = self.tmdb_list(url, tid)
 
@@ -292,9 +287,6 @@ class movies:
 
         for _id, term in dbcur.fetchall():
             if term not in str(lst):
-
-                c.log(f"[CM Debug @ 325 in movies.py] id = {_id}, term = {term}")
-
                 cm.append((32070, f'movieDeleteTerm&id={_id})'))
                 navigator.navigator().addDirectoryItem(term,
                                     f'movieSearchterm&name={term}', 'search.png',
@@ -333,7 +325,6 @@ class movies:
 
     def search_term(self, name):
         url = self.search_link % quote_plus(name)
-        c.log(f"[CM Debug @ 346 in movies.py] url = {url}")
         self.get(url)
 
 
@@ -355,12 +346,11 @@ class movies:
             for _id, term in dbcur.fetchall():
                 c.log(f"[CM Debug @ 389 in movies.py] id = {_id}, term = {term}")
 
-            c.log(f"[CM Debug @ 391 in tvshows.py]running here with search_term_id = {search_term_id}")
             dbcon.commit()
             dbcur.close()
             control.refresh()
         except database.Error as e:
-            c.log(f'[CM Debug @ 396 in movies.py]Exception raised. Error = {e}')
+            c.log(f'Exception raised. Error = {e}')
 
         except Exception as e:
             import traceback
@@ -607,7 +597,6 @@ class movies:
 
         for item in items:
             try:
-                c.log(f"[CM Debug @ 608 in movies.py] item = {item}")
                 title = item.get('title')
                 title = client.replaceHTMLCodes(title)
 
@@ -792,7 +781,6 @@ class movies:
         collection = trakt.get_collection('movies')
 
         for item in collection:
-            c.log(f"[CM Debug @ 894 in movies.py] item = {item}")
             try:
                 tmdb = str(item['tmdb'])
                 imdb = item['imdb']
@@ -806,7 +794,7 @@ class movies:
                                 'trakt': _trakt, 'slug': slug
                                 })
             except Exception as e:
-                c.log(f"[CM Debug @ 904 in movies.py] e = {e}")
+                c.log(f"Exception raised in collection_list() with e = {e}")
                 pass
 
         return self.list
@@ -815,11 +803,7 @@ class movies:
         try:
             progress = trakt.get_trakt_progress('movie')
 
-            c.log(f"[CM Debug @ 923 in movies.py] progress = {progress}")
-
             for item in progress:
-                c.log(f"[CM Debug @ 894 in movies.py] item = {item}")
-
                 tmdb = str(item['tmdb'])
                 tvdb = str(item['tvdb'])
                 imdb = item['imdb']
@@ -838,11 +822,8 @@ class movies:
 
                                 })
         except Exception as e:
-            c.log(f"[CM Debug @ 904 in movies.py] e = {e}")
+            c.log(f"Exception raised in movie_progress_list() with e = {e}")
             #pass
-
-
-        c.log(f"[CM Debug @ 950 in movies.py] self.list = {self.list}")
         return self.list
 
     def tmdb_cast_list(self, url):
@@ -922,8 +903,8 @@ class movies:
                                     'votes': votes, 'plot': plot, 'imdb': '0', 'tmdb': tmdb,
                                     'tvdb': '0', 'fanart': fanart, 'poster': poster})
             except Exception as e:
-                c.log('[Error @ 1012 in movies.py] Exception raised: e= = ' + str(e))
-                pass
+                c.log(f'Exception raised: error = {e}')
+
 
         return self.list
 
@@ -937,18 +918,15 @@ class movies:
         try:
             if int(tid) > 0:
                 url = url % tid
-                c.log(f"[CM Debug @ 940 in movies.py] url = {url}")
 
             response = self.session.get(url, timeout=15).json()
             items = response.get('results', [])
         except Exception as e:
-            c.log(f"[CM Debug @ 944 in movies.py] error = {e}")
             return
 
         try:
             page = int(response.get('page', 0))
             total_pages = int(response.get('total_pages', 0))
-            c.log(f"[CM Debug @ 949 in movies.py] page = {page} with total_pages = {total_pages}")
 
             if page >= total_pages or 'page=' not in url:
                 raise ValueError("Invalid page or URL format")
@@ -1012,15 +990,12 @@ class movies:
             try:
                 name = item['name']
                 _id = item['id']
-                c.log(f"[CM Debug @ 1092 in movies.py] profile_path = {item['profile_path']}")
                 profile_img = item['profile_path'] if 'profile_path' in item else ''
                 if profile_img:
                     image = self.tmdb_img_link % (c.tmdb_profilesize, profile_img)
                 else:
                     image = c.addon_poster
-                c.log(f"[CM Debug @ 1093 in movies.py] name = {name}, _id = {_id}, image = {image}")
                 url = self.personmovies_link % _id
-                c.log(f"[CM Debug @ 1101 in movies.py] url = {url}")
                 self.list.append({'name': name, 'url': url, 'image': image, 'poster': image})
             except Exception:
                 pass
@@ -1029,7 +1004,6 @@ class movies:
 
     def worker(self, level=0):
 
-        c.log(f"[CM Debug @ 1028 in movies.py] \n==========================\nInside Worker\nlevel = {level}\n=================================\n\n")
 
         self.meta = []
         total = len(self.list)
@@ -1070,13 +1044,10 @@ class movies:
         '''
         try:
             if self.list[i]['metacache'] is True:
-                #c.log(f"[CM Debug @ 1241 in movies.py] inside super_info, metacache is True so I will skip this\n\ncomplete list = \n\n{repr(self.list[i])}")
                 return
 
 
 
-            #if self.list[i]['tmdb'] != '0':
-                #c.log(f"[CM Debug @ 1325 in movies.py] inside super_info, tmdb = {self.list[i]['tmdb']}\n\nI need the meta-info for {self.list[i]['title']} so I will get it from TMDB\n\ncomplete list = \n\n{self[i]}")
             lst = self.list[i]
             imdb = lst['imdb'] if 'imdb' in lst else '0'
             tmdb = lst['tmdb'] if 'tmdb' in lst else '0'
@@ -1115,12 +1086,10 @@ class movies:
             url = en_url if self.lang == 'en' else trans_url
 
             item = self.session.get(url, timeout=15).json()
-            #c.log(f"[CM Debug @ 1392 in movies.py] item = {item}")
 
             if imdb == '0':
                 try:
                     imdb = item['external_ids']['imdb_id']
-                    c.log(f"[CM Debug @ 1363 in movies.py] imdb = {imdb}")
                     if not imdb:
                         imdb = '0'
                 except Exception:
@@ -1143,7 +1112,6 @@ class movies:
             original_title = item.get('original_title', '')
             en_trans_name = en_trans_item.get(
                 'title', '') if not self.lang == 'en' else None
-            # c.log('self_lang: %s | original_language: %s | list_title: %s | name: %s | original_title: %s | en_trans_name: %s' % (self.lang, original_language, list_title, name, original_name, en_trans_name))
 
             if self.lang == 'en':
                 title = label = name
@@ -1263,9 +1231,6 @@ class movies:
             poster3 = fanart2 = ''
             banner = clearlogo = clearart = landscape = discart = '0'
 
-            #art = fanart_tv.get_fanart_tv_art(tvdb = '0', imdb = imdb, lang='en', mediatype='movie')
-            #if art:
-                #c.log(f"[CM Debug @ 1107 in movies.py] art = {art}")
             if imdb not in ['0', None]:
                 tempart = fanart_tv.get_fanart_tv_art(imdb=imdb, tvdb='0', mediatype='movie')
                 poster3 = tempart.get('poster', '0')
@@ -1275,9 +1240,6 @@ class movies:
                 clearart = tempart.get('clearart', '0')
                 landscape = tempart.get('landscape', '0')
                 discart = tempart.get('discart', '0')
-                c.log(f"[CM Debug @ 1274 in movies.py] type tempart = {type(tempart)}, tempart = {repr(tempart)}")
-                c.log(f"[CM Debug @ 1275 in movies.py] \n\n====================\n\n")
-                c.log(f"[CM Debug @ 1276 in movies.py] poster3 = {poster3}, fanart2 = {fanart2}, banner = {banner}, clearlogo = {clearlogo}, clearart = {clearart}, landscape = {landscape}, discart = {discart}\n\n====================\n\n")
 
             poster = poster3 or poster2 or poster1
             fanart = fanart2 or fanart1
@@ -1324,7 +1286,7 @@ class movies:
 
         isPlayable = 'true' if 'plugin' not in control.infoLabel( 'Container.PluginName') else 'false'
         indicators = playcount.get_movie_indicators(refresh=True) if action == 'movies' else playcount.get_movie_indicators()
-        c.log(f"[CM Debug @ 1595 in movies.py] indicators = {indicators}")
+
         findSimilar = c.lang(32100)
         playbackMenu = control.lang(32063) if control.setting('hosts.mode') == '2' else control.lang(32064)
         watchedMenu = control.lang(32068) if traktCredentials else control.lang(32066)
@@ -1336,7 +1298,7 @@ class movies:
         infoMenu = control.lang(32101)
 
         for i in items:
-            # c.log('[CM Debug @ 1507 in movies.py] i =' + repr(i))
+
             try:
                 #label = '%s (%s)' % (i['title'], i['year'])
                 #label = f"{i['title']} ({i['year']})"
@@ -1352,26 +1314,26 @@ class movies:
 
                 # cm - resume_point -warning: percentage, float!
                 resume_point = int(i['resume_point']) if 'resume_point' in i else 0
-                c.log(f"[CM Debug @ 1469 in movies.py]duration of title {title} = {meta['duration']}")
+
                 offset = 0.0
 
                 if not resume_point:
                     #offset = float(bookmarks.get('movie', imdb, '', '', True))
                     resume_point= float(bookmarks.get('movie', imdb=imdb, tmdb=tmdb))
-                    c.log(f"[CM Debug @ 1471 in movies.py] offset 1: {resume_point} with type {type(resume_point)} for {title}")
-
-
 
                 offset = float(int(meta['duration']) * (resume_point / 100)) #= float(int(7200) * (4.39013/100)) = 315.0 with playing time = 7200 secs om 4.3 % of the movie
-                c.log(f"[CM Debug @ 1366 in movies.py] offset = {offset}")
-
                 meta.update({'offset': offset})
                 meta.update({'resume_point': resume_point})
 
 
 
                 if resume_point:
-                    label += f' [COLOR gold]({int(resume_point)}%)[/COLOR] '
+                    #resume_point = percentage_played so remaining = 100 - percentage_played
+                    percentage_played = resume_point
+                    remaining = float(100 - resume_point) #percentage
+                    remaining_minutes = float(remaining/100 * float(meta['duration']))
+                    label += f' [COLOR gold]({int(remaining_minutes)} min. remaining)[/COLOR] '
+                    #label += f' [COLOR gold]({int(resume_point)}%)[/COLOR] '
                 try:
                     premiered = i['premiered']
                     if (premiered == '0' and status in ['Upcoming', 'In Production', 'Planned']) or\

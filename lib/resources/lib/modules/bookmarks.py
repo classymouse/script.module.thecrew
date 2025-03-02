@@ -68,20 +68,20 @@ def get_progress_bookmark(imdb = 0, tmdb = 0, traktid = 0, tvdb = 0, mediatype =
         #sql_select = f"SELECT * from progress WHERE imdb = '{imdb}' or tmdb = {tmdb} or trakt = {trakt} or tvdb = {tvdb} and media_type = '{mediatype}'"
         sql_base = "SELECT * from progress WHERE "
         if mediatype != '':
-            sql_base += f"media_type = '{mediatype}'"
+            sql_base += f"media_type = '{mediatype}' and "
 
         tmdb = int(tmdb)
         traktid = int(traktid)
         tvdb = int(tvdb)
 
         sql_add = []
-        if imdb !=0:
+        if imdb != 0:
             sql_add.append(f"imdb = '{imdb}'")
-        if tmdb !=0:
+        if tmdb != 0:
             sql_add.append(f"tmdb = {tmdb}")
-        if traktid !=0:
+        if traktid != 0:
             sql_add.append(f"trakt = {traktid}")
-        if tvdb !=0:
+        if tvdb != 0:
             sql_add.append(f"tvdb = {tvdb}")
 
         #if season != 0:
@@ -90,24 +90,19 @@ def get_progress_bookmark(imdb = 0, tmdb = 0, traktid = 0, tvdb = 0, mediatype =
             #sql_add.append(f"episode = {episode}")
         sql_select = sql_base + ' or '.join(sql_add)
 
-        c.log(f"[CM Debug @ 88 in bookmarks.py] sql_select = {sql_select}")
-
-
-
-
-
-
-        sql_select = f"SELECT resume_point from progress WHERE imdb = '{imdb}' or tmdb = {tmdb} or trakt = {traktid} or tvdb = {tvdb} and media_type = '{mediatype}'"
-        c.log(f"[CM Debug @ 69 in bookmarks.py]sql = {sql_select}")
+        c.log(f"[CM Debug @ 93 in bookmarks.py] sql_select = {sql_select}")
         control.makeFile(control.dataPath)
         dbcon = database.connect(control.traktsyncFile)
         dbcur = dbcon.cursor()
         dbcur.execute(sql_select)
         result = dbcur.fetchone()
-        c.log(f"[CM Debug @ 74 in bookmarks.py] result = {result[0]}")
+        c.log(f"[CM Debug @ 99 in bookmarks.py] result = {repr(result)}")
+
+        c.log(f"[CM Debug @ 100 in bookmarks.py] result[11] = {result[11]}")
+
         dbcon.commit()
         if result:
-            return result[0]
+            return result[11]
         else:
             return 0
     except Exception as e:
@@ -118,10 +113,10 @@ def get_progress_bookmark(imdb = 0, tmdb = 0, traktid = 0, tvdb = 0, mediatype =
         return 0
 
 def get_episode_progress(imdb, tmdb=0, traktid=0, tvdb=0, season=0, episode=0):
-    return get_progress_bookmark(imdb=imdb,tmdb=tmdb,traktid=traktid,tvdb=tvdb, mediatype='episode', season=season, episode=episode)
+    return get_progress_bookmark(imdb=imdb, tmdb=tmdb, traktid=traktid, tvdb=tvdb, mediatype='episode', season=season, episode=episode)
 
 def get_movie_progress(imdb, tmdb=0, traktid=0, tvdb=0, season=0, episode=0):
-    return get_progress_bookmark(imdb=imdb,tmdb=tmdb,traktid=traktid,tvdb=tvdb, mediatype='movie', season=season, episode=episode)
+    return get_progress_bookmark(imdb=imdb, tmdb=tmdb, traktid=traktid, tvdb=tvdb, mediatype='movie', season=season, episode=episode)
 
 
 def get_local_bookmark(imdb, media_type,season, episode):
@@ -179,7 +174,7 @@ def get(media_type, imdb, tmdb=0, traktid=0, tvdb=0, season=0, episode=0, local=
 
             #trakt_info = trakt.getTraktAsJson('https://api.trakt.tv/sync/playback/movies?extended=full')
             #return get_movie_progress(trakt_info, imdb)
-            c.log("[CM Debug @ 139 in bookmarks.py] gettimg movie progress from get_movie_progress")
+            c.log("[CM Debug @ 139 in bookmarks.py] gettig movie progress from get_movie_progress")
             return get_movie_progress(imdb, tmdb, traktid, tvdb)
         except BaseException:
             return 0
@@ -203,11 +198,16 @@ def reset(current_time, total_time, media_type, imdb, season='', episode=''):
     :param int episode: The episode number for TV shows
     """
     try:
+        c.log(f"[CM Debug @ 206 in bookmarks.py] inside reset function | current_time = {current_time} | total_time = {total_time} | media_type = {media_type} | imdb = {imdb} | season = {season} | episode = {episode}")
         _playcount = 0
         overlay = 6
         time_in_seconds = str(current_time)
-        ok = int(current_time) > 120 and (current_time / total_time) < .92
+        ok = int(current_time) > 0 and (current_time / total_time) < .92
         watched = (current_time / total_time) >= .92
+        resume_point = float(float(current_time) / float(total_time))
+        c.log(f"[CM Debug @ 214 in bookmarks.py] resume_point = {resume_point}")
+
+        c.log(f"[CM Debug @ 214 in bookmarks.py] watched = {watched} | ok = {ok}")
 
         sql_select = f"SELECT * FROM bookmarks WHERE imdb = '{imdb}'"
         if media_type == 'episode':
@@ -219,6 +219,7 @@ def reset(current_time, total_time, media_type, imdb, season='', episode=''):
 
         if media_type == 'movie':
             sql_update_watched = f"UPDATE bookmarks SET timeInSeconds = '0', playcount = %s, overlay = %s WHERE imdb = '{imdb}'"
+            sql_update_progress = f"UPDATE bookmarks SET resume_point = '{resume_point}' WHERE imdb = '{imdb}'"
         elif media_type == 'episode':
             sql_update_watched = f"UPDATE bookmarks SET timeInSeconds = '0', playcount = %s, overlay = %s WHERE imdb = '{imdb}' AND season = '{season}' AND episode = '{episode}'"
 
@@ -229,6 +230,7 @@ def reset(current_time, total_time, media_type, imdb, season='', episode=''):
 
         if media_type == 'movie':
             sql_insert_watched = f"INSERT INTO bookmarks Values ('{time_in_seconds}', '{media_type}', '{imdb}', '', '', '%s', '%s')"
+            c.log(f"[CM Debug @ 234 in bookmarks.py] sql_insert_watched = {sql_insert_watched}")
         elif media_type == 'episode':
             sql_insert_watched = f"INSERT INTO bookmarks Values ('{time_in_seconds}', '{media_type}', '{imdb}', '{season}', '{episode}', '%s', '%s')"
 
@@ -256,13 +258,18 @@ def reset(current_time, total_time, media_type, imdb, season='', episode=''):
         # ""UNIQUE(imdb, season, episode)"");")
         dbcur.execute(sql_select)
         match = dbcur.fetchone()
+        #match = ('3148.21', 'movie', 'tt16366836', '', '', 1, 7)
+        c.log(f"[CM Debug @ 262 in bookmarks.py] match = {repr(match)} and ok = {ok} and watched = {watched}")
         if match:
             if ok:
+                c.log(f"[CM Debug @ 268 in bookmarks.py] sql_update = {sql_update}")
                 dbcur.execute(sql_update)
             elif watched:
                 _playcount = match[5] + 1
                 overlay = 7
                 dbcur.execute(sql_update_watched % (_playcount, overlay))
+
+                dbcur.execute(sql_update_progress)
         else:
             if ok:
                 dbcur.execute(sql_insert)
@@ -271,12 +278,18 @@ def reset(current_time, total_time, media_type, imdb, season='', episode=''):
                 overlay = 7
                 dbcur.execute(sql_insert_watched % (_playcount, overlay))
         dbcon.commit()
-    except Exception:
-        c.log('Exception in bookmarks.reset()')
+    except Exception as e:
+        import traceback
+        failure = traceback.format_exc()
+        c.log(f'[CM Debug @ 274 in bookmarks.py]Traceback:: {failure}')
+        c.log(f'[CM Debug @ 274 in bookmarks.py]Exception raised. Error = {e}')
+        pass
+    #except Exception:
+    #    c.log('Exception in bookmarks.reset()')
 
 
 
-def set_scrobble(current_time, total_time, content, imdb='', season='', episode=''):
+def set_scrobble(current_time, total_time, content, imdb='', season='', episode='', action='pause'):
     """
     Update the scrobble status for a movie or TV episode on Trakt.
 
@@ -298,16 +311,16 @@ def set_scrobble(current_time, total_time, content, imdb='', season='', episode=
         c.log(f"[CM Debug @ 232 in bookmarks.py] percent = {percent}")
         if 0 < percent < 92:# and current_time > 120
             if content == 'movie':
-                c.log(f"[CM Debug @ 235 in bookmarks.py] imdb = {imdb} | percent = {percent}, paused on {current_time}/{total_time}")
-                trakt.scrobbleMovie(imdb, percent, 'pause')
+                c.log(f"[CM Debug @ 235 in bookmarks.py] imdb = {imdb} | percent = {percent}, {action} on {current_time}/{total_time}")
+                trakt.scrobbleMovie(imdb, percent, action)
 
-                c.log(f"[CM Debug @ 237 in bookmarks.py] after scrobbleMovie: imdb = {imdb} | percent = {percent}, paused on {current_time}/{total_time}")
+                c.log(f"[CM Debug @ 237 in bookmarks.py] after scrobbleMovie: imdb = {imdb} | percent = {percent}, {action} on {current_time}/{total_time}")
             else:
-                trakt.scrobbleEpisode(imdb, season, episode, percent, 'pause')
+                trakt.scrobbleEpisode(imdb, season, episode, percent, action)
 
             if control.setting('trakt.scrobble.notify') == 'true':
                 control.sleep(1000)
-                control.infoDialog('Trakt: Scrobble Paused')
+                control.infoDialog(f'Trakt: Scrobble, action = {action}')
         elif percent >= 92:
             #trakt.scrobbleMovie(imdb, percent, 'stop') if content == 'movie' else trakt.scrobbleEpisode(imdb, season, episode, percent, 'stop')
             if content == 'movie':

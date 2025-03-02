@@ -14,6 +14,7 @@
  ********************************************************cm*
 '''
 
+from argparse import Action
 import base64
 import codecs
 import gzip
@@ -69,6 +70,7 @@ class player(xbmc.Player):
     def run(self, title, year, season, episode, imdb, tmdb, url, meta):#: -> Any
         try:
             control.sleep(200)
+            c.log(f"[CM Debug @ 72 in player.py] inside player.run with title = {title}, year = {year}, season = {season}, episode = {episode}, imdb = {imdb}, tmdb = {tmdb}, url = {url}, meta = {meta}")
 
             self.totalTime = 0
             self.currentTime = 0
@@ -98,9 +100,10 @@ class player(xbmc.Player):
             c.log(f"[CM Debug @ 93 in player.py] self.content = {self.content}")
 
             self.offset = bookmarks.get(self.content, imdb=self.imdb, tmdb=self.tmdb)
+            c.log(f"[CM Debug @ 102 in player.py] self.offset = {self.offset} with title = {self.title}")
             #beware, new offset is in percentage of total playing time
             #offset = float((self.duration * self.offset) / 100)
-            offset = (self.duration/100) * self.offset
+            offset = float((self.duration/100) * float(self.offset))
             self.offset = offset
 
             c.log(f"[CM Debug @ 106 in player.py] offset = {self.offset} with title = {self.title}")
@@ -319,8 +322,7 @@ class player(xbmc.Player):
     def keepPlaybackAlive(self):
         pname = f"{control.addonInfo('id')}.player.overlay"
         control.window.clearProperty(pname)
-        pname2 = f"{control.addonInfo('id')}.player.playtime"
-        control.window.clearProperty(pname2)
+
 
         if self.content == 'movie':
             #overlay = playcount.getMovieOverlay(playcount.getMovieIndicators(), self.imdb)
@@ -354,6 +356,7 @@ class player(xbmc.Player):
                     self.currentTime = self.getTime()
 
                     watcher = self.currentTime / self.totalTime >= .92
+                    c.log(f"[CM Debug @ 356 in player.py] watcher: {watcher}")
                     _property = control.window.getProperty(pname)
 
                     if watcher is True and not _property == '7':
@@ -427,7 +430,7 @@ class player(xbmc.Player):
         #control.execute('Dialog.Close(all,true)')
         #if self.getbookmark is True and self.offset != '0':
         #    self.seekTime(float(self.offset))
-        #    c.log(f"[CM Debug @ 429 in player.py] onPlayBackStarted for title = {self.title} with seektime = {self.offset}")
+        c.log(f"[CM Debug @ 429 in player.py] onPlayBackStarted for title = {self.title} with seektime = {self.offset}")
         if control.setting('bookmarks') == 'true' and int(self.offset) > 0 and self.isPlayingVideo():
             if control.setting('bookmarks.auto') == 'true':
                 self.seekTime(float(self.offset))
@@ -437,7 +440,7 @@ class player(xbmc.Player):
                 minutes, seconds = divmod(float(self.offset), 60)
                 hours, minutes = divmod(minutes, 60)
                 label = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
-                label = control.lang2(12022).format(label)
+                label = c.lang(32350).format(label)
                 if control.setting('bookmarks') == 'true' and trakt.getTraktCredentialsInfo() is True:
                     yes = control.yesnoDialog(label + '[CR]  (Trakt scrobble)', heading=control.lang2(13404))
                 else:
@@ -451,18 +454,44 @@ class player(xbmc.Player):
             #subtitles().get(self.name, self.imdb, self.season, self.episode)
             self.idleForPlayback()
 
+    def update_time(self, action='pause') -> None:
+        if self.totalTime == 0 or self.currentTime == 0:
+            control.sleep(2000)
+            return
+
+        if self.getbookmark is True:
+            c.log(f"[CM Debug @ 462 in player.py] update_time for title = {self.title}, currentTime = {self.currentTime}, totalTime = {self.totalTime}, name = {self.name}, year = {self.year}")
+            bookmarks.reset(self.currentTime, self.totalTime, self.content, self.imdb, self.season, self.episode)
+
+        if (trakt.getTraktCredentialsInfo() is True and control.setting('trakt.scrobble') == 'true'):
+            if action is not None:
+                bookmarks.set_scrobble(self.currentTime, self.totalTime, self.content, self.imdb, self.season, self.episode, action)
+
+        if float(self.currentTime / self.totalTime) >= 0.92:
+            self.libForPlayback()
+
+            control.refresh()
+
+
+
+    def onPlayBackResumed(self):
+        self.update_time('start')
 
     def onPlayBackPaused(self):
-        if self.getbookmark is True:
-            bookmarks.reset(self.currentTime, self.totalTime, self.name, self.year)
+        self.update_time('pause')
 
 
     def onPlayBackStopped(self):
-        if self.getbookmark is True:
-            bookmarks.reset(self.currentTime, self.totalTime, self.name, self.year)
+        self.update_time('stop')
 
     def onPlayBackEnded(self):
-        self.onPlayBackStopped()
+        self.update_time('stop')
+
+    def onPlayBackSeek(self, time, seekOffset):
+        secs_time = float(time/60)
+        secs_seekOffset = float(seekOffset/60)
+        c.log(f"[CM Debug @ 489 in player.py] time = {time}, seekOffset = {seekOffset}")
+
 
 
 

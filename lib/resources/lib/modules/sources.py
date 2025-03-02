@@ -70,11 +70,9 @@ class sources:
             url = None
 
             items = self.getSources(title, year, imdb, tmdb, season, episode, tvshowtitle, premiered)
-            c.log(f"[CM Debug @ 73 in sources.py] items = {repr(items)}")
             select = control.setting('hosts.mode') if not select else select # cm - this is ALWAYS select, always 1
 
             metadata = json.loads(meta) if meta is not None else {}
-            c.log(f"[CM Debug @ 77 in sources.py] meta = {metadata}")
             mediatype = metadata['mediatype'] if 'mediatype' in metadata else ''
 
             if mediatype != 'movie':
@@ -130,8 +128,6 @@ class sources:
 
         items = control.window.getProperty(self.itemProperty)
         items = json.loads(items)
-
-        #c.log(f"[CM Debug @ 131 in sources.py] items = {items}")
 
         if items is None or len(items) == 0:
             control.idle()
