@@ -162,6 +162,7 @@ class movies:
         try:
             if url.startswith('https://'):
                 #check if i can show a listing
+                c.log(f"[CM Debug @ 823 in movies.py] url = {url}")
             else:
                 url = getattr(self, f"{url}_link", None)
 
@@ -838,69 +839,44 @@ class movies:
             try:
                 tmdb = str(item['id'])
                 title = item['title']
-                originaltitle = item['original_title']
-                if not originaltitle:
-                    originaltitle = title
+                originaltitle = item['original_title'] if 'original_title' in item else title
 
-                try:
-                    rating = str(item['vote_average'])
-                except Exception:
-                    rating = ''
-                if not rating:
-                    rating = '0'
 
-                try:
-                    votes = str(item['vote_count'])
-                except Exception:
-                    votes = ''
-                if not votes:
-                    votes = '0'
+                rating = str(item.get('vote_average', '0'))
 
-                try:
-                    premiered = item['release_date']
-                except Exception:
+                vote_count = str(item.get('vote_count', '0'))
+
+
+                premiered = item.get('release_date', '0')
+
+                year = item.get('release_year', '0')
+
+                if premiered is None or premiered == '0':
                     premiered = ''
-                if not premiered:
-                    premiered = '0'
+                else:
+                    premiered = premiered.split('-')[0]
 
-                try:
-                    year = re.findall(r'(\d{4})', premiered)[0]
-                except Exception:
-                    year = ''
-                if not year:
-                    year = '0'
-
-                if not premiered or premiered == '0':
-                    pass
-                elif int(re.sub('[^0-9]', '', str(premiered))) > int(re.sub('[^0-9]', '', str(self.today_date))):
+                if premiered > self.today_date[:4]:
                     if self.showunaired != 'true':
                         raise Exception()
 
-                try:
-                    plot = item['overview']
-                except Exception:
-                    plot = ''
-                if not plot:
-                    plot = '0'
+                plot = item.get('overview', '')
 
-                try:
-                    poster_path = item['poster_path']
-                except Exception:
-                    poster_path = ''
+                poster_path = item.get('poster_path', '')
                 if poster_path:
                     poster = self.tmdb_img_link.format(c.tmdb_postersize, poster_path)
                 else:
                     poster = '0'
 
-                backdrop_path = item['backdrop_path'] if 'backdrop_path' in item else ''
+                backdrop_path = item.get('backdrop_path', '')
                 if backdrop_path:
-                    fanart = self.tmdb_img_link.format(c.tmdb_fanartsize, 'backdrop_path')
+                    fanart = self.tmdb_img_link.format(c.tmdb_fanartsize, backdrop_path)
                 else:
                     fanart = ''
 
                 self.list.append({'title': title, 'originaltitle': originaltitle,
                                     'premiered': premiered, 'year': year, 'rating': rating,
-                                    'votes': votes, 'plot': plot, 'imdb': '0', 'tmdb': tmdb,
+                                    'votes': vote_count, 'plot': plot, 'imdb': '0', 'tmdb': tmdb,
                                     'tvdb': '0', 'fanart': fanart, 'poster': poster})
             except Exception as e:
                 c.log(f'Exception raised: error = {e}')
@@ -1324,6 +1300,8 @@ class movies:
                 offset = float(int(meta['duration']) * (resume_point / 100)) #= float(int(7200) * (4.39013/100)) = 315.0 with playing time = 7200 secs om 4.3 % of the movie
                 meta.update({'offset': offset})
                 meta.update({'resume_point': resume_point})
+
+                c.log(f"[CM Debug @ 1328 in movies.py] meta = {meta}")
 
 
 
