@@ -181,7 +181,8 @@ class movies:
                 self.list = self.list[::-1]
             elif 'collection' in url:
                 self.list = self.collection_list()
-                self.list = sorted(self.list, key=lambda k: int(k['year']), reverse=True)
+                c.log(f"[CM Debug @ 184 in movies.py] collection list = {self.list}")
+                self.list = sorted(self.list, key=lambda k: int(k['year']), reverse=False)
             elif 'movieProgress' in url:
                 self.list = cache.get(self.movie_progress_list, 0)
                 self.list = sorted(self.list, key=lambda k: int(k['year']), reverse=True)
@@ -983,6 +984,7 @@ class movies:
 
         self.meta = []
         total = len(self.list)
+        c.log(f"[CM Debug @ 986 in movies.py] total = {total}")
 
         if total == 0:
             control.infoDialog('List returned no relevant results', icon='INFO', sound=False)
@@ -1009,6 +1011,7 @@ class movies:
                 thread.join()
 
         if self.meta:
+            c.log(f"[CM Debug @ 1014 in movies.py] inserting meta = {self.meta}")
             metacache.insert(self.meta)
 
     def no_info(self, i) -> None:
@@ -1062,6 +1065,7 @@ class movies:
             url = en_url if self.lang == 'en' else trans_url
 
             item = self.session.get(url, timeout=15).json()
+            c.log(f"[CM Debug @ 1066 in movies.py] item = {item}")
 
             if imdb == '0':
                 try:
