@@ -52,7 +52,6 @@ def get_movie_progress_old(trakt_info, imdb):
     :rtype: float
     """
     for i in trakt_info:
-        c.log(f"[CM Debug @ 55 in bookmarks.py] trakt_info = {trakt_info}")
         if imdb == i['movie']['ids']['imdb']:
             seekable = 1 < i['progress'] < 92
             if seekable:
@@ -90,15 +89,11 @@ def get_progress_bookmark(imdb = 0, tmdb = 0, traktid = 0, tvdb = 0, mediatype =
             #sql_add.append(f"episode = {episode}")
         sql_select = sql_base + ' or '.join(sql_add)
 
-        c.log(f"[CM Debug @ 93 in bookmarks.py] sql_select = {sql_select}")
         control.makeFile(control.dataPath)
         dbcon = database.connect(control.traktsyncFile)
         dbcur = dbcon.cursor()
         dbcur.execute(sql_select)
         result = dbcur.fetchone()
-        c.log(f"[CM Debug @ 99 in bookmarks.py] result = {repr(result)}")
-
-        c.log(f"[CM Debug @ 100 in bookmarks.py] result[11] = {result[11]}")
 
         dbcon.commit()
         if result:
@@ -163,7 +158,6 @@ def get(media_type, imdb, tmdb=0, traktid=0, tvdb=0, season=0, episode=0, local=
     :return: The seek position in seconds for the media
     :rtype: float
     """
-    c.log(f"[CM Debug @ 129 in bookmarks.py] setting = {control.setting('bookmarks')} | local = {local} | trakt.getTraktCredentialsInfo() = {trakt.getTraktCredentialsInfo()}")
     if control.setting('bookmarks') == 'true' and trakt.getTraktCredentialsInfo() and not local:
         try:
             if media_type == 'episode':
@@ -174,7 +168,6 @@ def get(media_type, imdb, tmdb=0, traktid=0, tvdb=0, season=0, episode=0, local=
 
             #trakt_info = trakt.getTraktAsJson('https://api.trakt.tv/sync/playback/movies?extended=full')
             #return get_movie_progress(trakt_info, imdb)
-            c.log("[CM Debug @ 139 in bookmarks.py] gettig movie progress from get_movie_progress")
             return get_movie_progress(imdb, tmdb, traktid, tvdb)
         except BaseException:
             return 0
@@ -198,16 +191,12 @@ def reset(current_time, total_time, media_type, imdb, season='', episode=''):
     :param int episode: The episode number for TV shows
     """
     try:
-        c.log(f"[CM Debug @ 206 in bookmarks.py] inside reset function | current_time = {current_time} | total_time = {total_time} | media_type = {media_type} | imdb = {imdb} | season = {season} | episode = {episode}")
         _playcount = 0
         overlay = 6
         time_in_seconds = str(current_time)
         ok = int(current_time) > 0 and (current_time / total_time) < .92
         watched = (current_time / total_time) >= .92
         resume_point = float(float(current_time) / float(total_time))
-        c.log(f"[CM Debug @ 214 in bookmarks.py] resume_point = {resume_point}")
-
-        c.log(f"[CM Debug @ 214 in bookmarks.py] watched = {watched} | ok = {ok}")
 
         sql_select = f"SELECT * FROM bookmarks WHERE imdb = '{imdb}'"
         if media_type == 'episode':
@@ -230,7 +219,6 @@ def reset(current_time, total_time, media_type, imdb, season='', episode=''):
 
         if media_type == 'movie':
             sql_insert_watched = f"INSERT INTO bookmarks Values ('{time_in_seconds}', '{media_type}', '{imdb}', '', '', '%s', '%s')"
-            c.log(f"[CM Debug @ 234 in bookmarks.py] sql_insert_watched = {sql_insert_watched}")
         elif media_type == 'episode':
             sql_insert_watched = f"INSERT INTO bookmarks Values ('{time_in_seconds}', '{media_type}', '{imdb}', '{season}', '{episode}', '%s', '%s')"
 
@@ -259,10 +247,8 @@ def reset(current_time, total_time, media_type, imdb, season='', episode=''):
         dbcur.execute(sql_select)
         match = dbcur.fetchone()
         #match = ('3148.21', 'movie', 'tt16366836', '', '', 1, 7)
-        c.log(f"[CM Debug @ 262 in bookmarks.py] match = {repr(match)} and ok = {ok} and watched = {watched}")
         if match:
             if ok:
-                c.log(f"[CM Debug @ 268 in bookmarks.py] sql_update = {sql_update}")
                 dbcur.execute(sql_update)
             elif watched:
                 _playcount = match[5] + 1
@@ -306,15 +292,10 @@ def set_scrobble(current_time, total_time, content, imdb='', season='', episode=
     :param episode: The episode number for TV episodes. Default is an empty string.
     """
     try:
-        c.log(f"[CM Debug @ 230 in bookmarks.py] inside set_scrobble with current_time = {current_time}, total_time = {total_time}, content = {content}, imdb = {imdb}, season = {season}, episode = {episode}")
         percent = current_time / total_time * 100 if current_time != 0 and total_time != 0 else 0
-        c.log(f"[CM Debug @ 232 in bookmarks.py] percent = {percent}")
         if 0 < percent < 92:# and current_time > 120
             if content == 'movie':
-                c.log(f"[CM Debug @ 235 in bookmarks.py] imdb = {imdb} | percent = {percent}, {action} on {current_time}/{total_time}")
                 trakt.scrobbleMovie(imdb, percent, action)
-
-                c.log(f"[CM Debug @ 237 in bookmarks.py] after scrobbleMovie: imdb = {imdb} | percent = {percent}, {action} on {current_time}/{total_time}")
             else:
                 trakt.scrobbleEpisode(imdb, season, episode, percent, action)
 

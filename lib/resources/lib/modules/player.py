@@ -427,32 +427,37 @@ class player(xbmc.Player):
             control.sleep(100)
 
     def onAVStarted(self) -> None:
-        #control.execute('Dialog.Close(all,true)')
-        #if self.getbookmark is True and self.offset != '0':
-        #    self.seekTime(float(self.offset))
-        c.log(f"[CM Debug @ 429 in player.py] onPlayBackStarted for title = {self.title} with seektime = {self.offset}")
-        if control.setting('bookmarks') == 'true' and int(self.offset) > 0 and self.isPlayingVideo():
-            if control.setting('bookmarks.auto') == 'true':
-                self.seekTime(float(self.offset))
-            else:
-                self.pause()
-
-                minutes, seconds = divmod(float(self.offset), 60)
-                hours, minutes = divmod(minutes, 60)
-                label = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
-                label = c.lang(32350).format(label)
-                if control.setting('bookmarks') == 'true' and trakt.getTraktCredentialsInfo() is True:
-                    yes = control.yesnoDialog(label + '[CR]  (Trakt scrobble)', heading=control.lang2(13404))
-                else:
-                    yes = control.yesnoDialog(label, heading=control.lang2(13404))
-                if yes:
+        try:
+            control.execute('Dialog.Close(all,true)')
+            if control.setting('bookmarks') == 'true' and int(self.offset) > 0 and self.isPlayingVideo():
+                if control.setting('bookmarks.auto') == 'true':
                     self.seekTime(float(self.offset))
-                control.sleep(1000)
-                self.pause()
+                else:
+                    self.pause()
+                    minutes, seconds = divmod(float(self.offset), 60)
+                    hours, minutes = divmod(minutes, 60)
+                    label = f"{int(hours):02d}:{int(minutes):02d}:{int(seconds):02d}"
+                    label = c.lang(32350) % label
+                    if control.setting('bookmarks') == 'true' and trakt.getTraktCredentialsInfo() is True:
+                        yes = control.yesnoDialog(label + '[CR][I]Trakt sync is enabled [scrobble][/I] ', heading=c.lang(13404)) #RESUME
+                    else:
+                        yes = control.yesnoDialog(label, heading=c.lang(13404))
+                    if yes:
+                        self.seekTime(float(self.offset))
+                    if not yes:
+                        self.seekTime(0.0)
+                    control.sleep(1000)
+                    self.pause()
 
 
-            #subtitles().get(self.name, self.imdb, self.season, self.episode)
-            self.idleForPlayback()
+                #subtitles().get(self.name, self.imdb, self.season, self.episode)
+                self.idleForPlayback()
+        except Exception as e:
+            import traceback
+            failure = traceback.format_exc()
+            c.log(f'[CM Debug @ 458 in player.py]Traceback:: {failure}')
+            c.log(f'[CM Debug @ 458 in player.py]Exception raised. Error = {e}')
+            pass
 
     def update_time(self, action='pause') -> None:
         if self.totalTime == 0 or self.currentTime == 0:
@@ -460,7 +465,6 @@ class player(xbmc.Player):
             return
 
         if self.getbookmark is True:
-            c.log(f"[CM Debug @ 462 in player.py] update_time for title = {self.title}, currentTime = {self.currentTime}, totalTime = {self.totalTime}, name = {self.name}, year = {self.year}")
             bookmarks.reset(self.currentTime, self.totalTime, self.content, self.imdb, self.season, self.episode)
 
         if (trakt.getTraktCredentialsInfo() is True and control.setting('trakt.scrobble') == 'true'):

@@ -125,7 +125,7 @@ class movies:
         self.tmdb_providers_link = f'{self.tmdb_link}discover/movie?api_key={self.tmdb_user}&sort_by=popularity.desc&with_watch_providers=%s&watch_region=%s&page=1'
         self.tmdb_art_link = f'{self.tmdb_link}movie/%s/images?api_key={self.tmdb_user}&language=en-US&include_image_language=en,%s,null'
 
-        self.tmdb_api_link = f'{self.tmdb_link}movie/%s?api_key={self.tmdb_user}&language={self.lang}&append_to_response=aggregate_credits,content_ratings,external_ids'
+        self.tmdb_api_link = f'{self.tmdb_link}movie/%s?api_key={self.tmdb_user}&language={self.lang}&append_to_response=credits,ratings,external_ids'
         self.tmdb_networks_link = f'{self.tmdb_link}discover/movie?api_key={self.tmdb_user}&with_networks=%s&language=en-US&release_date.lte={self.today_date}&sort_by=primary_release_date.desc&page=1'
         self.tmdb_networks_no_unaired_link = f'{self.tmdb_link}discover/movie?api_key={self.tmdb_user}&first_air_date.lte={self.today_date}&sort_by=first_air_date.desc&with_networks=%s&page=1'
         self.tmdb_search_movie_link = f'{self.tmdb_link}search/movie?api_key={self.tmdb_user}&language=en-US&query=%s&page=1'
@@ -814,6 +814,7 @@ class movies:
                 season = item['season']
                 episode = item['episode']
                 resume_point = item['resume_point']
+                c.log(f"[CM Debug @ 817 in movies.py] resume_point = {resume_point} with title = {title}")
                 year = item['year']
 
 
@@ -984,7 +985,6 @@ class movies:
 
         self.meta = []
         total = len(self.list)
-        c.log(f"[CM Debug @ 986 in movies.py] total = {total}")
 
         if total == 0:
             control.infoDialog('List returned no relevant results', icon='INFO', sound=False)
@@ -1011,7 +1011,6 @@ class movies:
                 thread.join()
 
         if self.meta:
-            c.log(f"[CM Debug @ 1014 in movies.py] inserting meta = {self.meta}")
             metacache.insert(self.meta)
 
     def no_info(self, i) -> None:
@@ -1022,8 +1021,9 @@ class movies:
         Filling missing pieces
         '''
         try:
-            if self.list[i]['metacache'] is True:
-                return
+            #if self.list[i]['metacache'] is True:
+
+                #return
 
 
 
@@ -1037,7 +1037,7 @@ class movies:
                 try:
                     url = self.tmdb_external_ids_by_tmdb % tmdb
                     result = self.session.get(url, timeout=15).json()
-                    imdb = result['imdb_id'] if 'imdb_id' in result and result['imdb_id'].startswith('tt') else '0'
+                    imdb = result['imdb_id'] if 'imdb_id' in result else '0'
                 except Exception:
                     imdb = '0'
 
@@ -1065,15 +1065,9 @@ class movies:
             url = en_url if self.lang == 'en' else trans_url
 
             item = self.session.get(url, timeout=15).json()
-            c.log(f"[CM Debug @ 1066 in movies.py] item = {item}")
 
             if imdb == '0':
-                try:
-                    imdb = item['external_ids']['imdb_id']
-                    if not imdb:
-                        imdb = '0'
-                except Exception:
-                    imdb = '0'
+                imdb =  item.get('external_ids').get('imdb_id') if 'external_ids' in item and 'imdb_id' in item.get('external_ids') and item.get('external_ids').get('imdb_id').startswith('tt') else '0'
 
             mpaa = item.get('mpaa', '0')
 
@@ -1090,8 +1084,7 @@ class movies:
 
             name = item.get('title', '')
             original_title = item.get('original_title', '')
-            en_trans_name = en_trans_item.get(
-                'title', '') if not self.lang == 'en' else None
+            en_trans_name = en_trans_item.get('title', '') if not self.lang == 'en' else None
 
             if self.lang == 'en':
                 title = label = name
@@ -1108,7 +1101,7 @@ class movies:
 
             plot = item.get('overview')
             if not plot:
-                plot = lst['plot'] if 'plot' in lst else 'The Crew - No Plot Available'
+                plot = lst['plot'] if 'plot' in lst else c.lang(32623)
 
             tagline = item.get('tagline') or '0'
 
@@ -1152,47 +1145,55 @@ class movies:
                 genre = '0'
 
             try:
-                country = item['production_countries']
-                country = [c['name'] for c in country]
+                #country = item.get('country').upper() or '0'
+                countries = item.get('production_countries')
+                country = [c['name'] for c in countries]
                 country = ' / '.join(country)
             except Exception:
                 country = ''
             if not country:
                 country = '0'
 
-            try:
-                duration = str(item['runtime'])
-            except Exception:
-                duration = ''
-            if not duration:
-                duration = '0'
 
-            rating = item['vote_average'] if 'vote_average' in item else '0'
-            votes = item['votese'] if 'votes' in item else '0'
+            duration = str(item.get('runtime', "90"))
+
+
+            rating = item.get('vote_average', '0')
+            votes = item.get('vote_count', '0') #votes ?
 
             castwiththumb = []
             try:
-                cast = item['aggregate_credits']['cast'][:30]
+                cast = item['credits']['cast'][:30]
+                cast = item.get('credits').get('cast', '0')
                 for person in cast:
                     _icon = person['profile_path']
                     icon = self.tmdb_img_link % (c.tmdb_profilesize, _icon) if _icon else ''
                     castwiththumb.append(
                         {
                             'name': person['name'],
-                            'role': person['roles'][0]['character'],
+                            'role': person['character'],
                             'thumbnail': icon
                             })
-            except Exception:
+            except Exception as e:
+                c.log(f"[CM Debug @ 1183 in movies.py] error = {e}")
                 pass
+
             if not castwiththumb:
                 castwiththumb = '0'
 
-            try:
-                crew = item['credits']['crew']
-                director = ', '.join([d['name'] for d in [x for x in crew if x['job'] == 'Director']])
-                writer = ', '.join([w['name'] for w in [y for y in crew if y['job'] in ['Writer', 'Screenplay', 'Author', 'Novel']]])
-            except Exception:
-                director = writer = '0'
+
+            crew = item['credits']['crew'] if 'credits' in item  and 'crew' in item['credits'] else []
+
+            if crew:
+                try:
+                    director = ', '.join([d['name'] for d in [x for x in crew if x['job'] == 'Director']])
+                except:
+                    director = '0'
+
+                try:
+                    writer = ', '.join([w['name'] for w in [y for y in crew if y['job'] in ['Writer', 'Screenplay', 'Author', 'Novel']]])
+                except:
+                    writer = '0'
 
             poster1 = lst['poster'] if 'poster' in lst else ''
 
@@ -1224,14 +1225,16 @@ class movies:
             poster = poster3 or poster2 or poster1
             fanart = fanart2 or fanart1
 
-            item = {'title': title, 'originaltitle': title, 'year': year, 'imdb': imdb,
-                    'tmdb': tmdb, 'status': status, 'studio': studio, 'poster': poster,
-                    'banner': banner, 'fanart': fanart, 'fanart2': fanart2, 'landscape': landscape,
-                    'discart': discart,'clearlogo': clearlogo, 'clearart': clearart,
-                    'premiered': premiered, 'genre': genre,
-                    'duration': duration, 'rating': rating, 'votes': votes, 'mpaa': mpaa,
-                    'director': director, 'writer': writer, 'castwiththumb': castwiththumb,
-                    'plot': plot, 'tagline': tagline}
+            item = {
+                'title': title, 'originaltitle': title, 'year': year, 'imdb': imdb,
+                'tmdb': tmdb, 'status': status, 'studio': studio, 'poster': poster,
+                'banner': banner, 'fanart': fanart, 'fanart2': fanart2, 'landscape': landscape,
+                'discart': discart,'clearlogo': clearlogo, 'clearart': clearart,
+                'premiered': premiered, 'genre': genre,
+                'duration': duration, 'rating': rating, 'votes': votes, 'mpaa': mpaa,
+                'director': director, 'writer': writer, 'castwiththumb': castwiththumb,
+                'plot': plot, 'tagline': tagline
+                }
 
             item = dict((k, v) for k, v in item.items() if not v == '0')
             lst.update(item)
@@ -1280,8 +1283,6 @@ class movies:
         for i in items:
 
             try:
-                #label = '%s (%s)' % (i['title'], i['year'])
-                #label = f"{i['title']} ({i['year']})"
                 imdb = i['imdb']
                 tmdb = i['tmdb']
                 title = i['originaltitle']
@@ -1293,13 +1294,16 @@ class movies:
                 meta = dict((k, v) for k, v in i.items() if not v == '0')
 
                 # cm - resume_point -warning: percentage, float!
-                resume_point = int(i['resume_point']) if 'resume_point' in i else 0
+                resume_point = float(meta['resume_point']) if 'resume_point' in meta else 0
+
+                c.log(f"[CM Debug @ 1291 in movies.py] resume_point = {resume_point}")
 
                 offset = 0.0
 
                 if not resume_point:
                     #offset = float(bookmarks.get('movie', imdb, '', '', True))
                     resume_point= float(bookmarks.get('movie', imdb=imdb, tmdb=tmdb))
+
 
                 offset = float(int(meta['duration']) * (resume_point / 100)) #= float(int(7200) * (4.39013/100)) = 315.0 with playing time = 7200 secs om 4.3 % of the movie
                 meta.update({'offset': offset})
@@ -1422,13 +1426,14 @@ class movies:
                 art.update({'discart': discart})
 
                 item.setArt(art)
-                item.addContextMenuItems(cm)
+                #item.addContextMenuItems(cm)
                 item.setProperty('IsPlayable', isPlayable)
 
-                castwiththumb = i.get('castwiththumb')
+                #castwiththumb = i.get('castwiththumb')
 
-                if castwiththumb and not castwiththumb == '0':
-                    item.setCast(castwiththumb)
+
+                #if castwiththumb and not castwiththumb == '0':
+                    #item.setCast(castwiththumb)
 
 
                 c.log(f"[CM Debug @ 11477 in movies.py] offset 2: {offset} for {title}")
@@ -1449,7 +1454,7 @@ class movies:
                 info_tag.set_info(infolabels)
                 unique_ids = {'imdb': imdb, 'tmdb': str(tmdb)}
                 info_tag.set_unique_ids(unique_ids)
-                info_tag.set_cast(meta.get('cast', []))
+                info_tag.set_cast(meta.get('castwiththumb', []))
 
                 c.log(f"[CM Debug @ 1508 in movies.py] offset = meta['resume_point'] = {meta['offset']} with duration = {meta['duration']}")
 

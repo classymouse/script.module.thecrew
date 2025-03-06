@@ -579,6 +579,7 @@ def scrobbleMovie(imdb, watched_percent, action):
             imdb = 'tt' + imdb
         c.log(f"[CM Debug @ 496 in trakt.py]inside trakt.scrobbleMovie | imdb = {imdb} | watched_percent = {watched_percent} | action = {action}")
         r = get_trakt(f'/scrobble/{action}', {"movie": {"ids": {"imdb": imdb}}, "progress": watched_percent})
+        update_progress(imdb=imdb, progress=watched_percent)
         c.log(f"[CM Debug @ 498 in trakt.py] r = {r}")
         #return get_trakt(f'/scrobble/{action}', {"movie": {"ids": {"imdb": imdb}}, "progress": watched_percent})[0]
         return r
@@ -795,7 +796,6 @@ def syncTrakt():
                 dbcur = get_connection_cursor(dbcon)
 
                 for item in result:
-                    c.log(f"[CM Debug @ 832 in trakt.py] -----> type watcheditem = {type(item)} with value = {item}")
 
                     if _type == 'movies':
                         media_type = 'movie'
@@ -807,15 +807,8 @@ def syncTrakt():
                         episode = 0
                         last_watched_at = item.get('last_watched_at')
                         title = item.get('movie').get('title')
-
-
-
-
-                        c.log(f"[CM Debug @ 835 in trakt.py] media_type = {media_type}, trakt_id = {trakt_id}, tvdb_id = {tvdb_id}, imdb_id = {imdb_id}, tmdb_id = {tmdb_id}, season = {seasons}, episode = {episode}, last_watched_at = {last_watched_at}, title = {title}")
-
                         dbcur.execute(sql_dict['sql_insert_trakt_watched'], (media_type, trakt_id, tvdb_id, imdb_id, tmdb_id, seasons, episode, last_watched_at, title))
                     else:
-
                         media_type = 'show'
                         trakt_id = item.get('show').get('ids').get('trakt')
                         tvdb_id = item.get('show').get('ids').get('tvdb') or 0
@@ -825,7 +818,6 @@ def syncTrakt():
                         episode = '0'
                         last_watched_at = item.get('last_watched_at')
                         title = item.get('show').get('title')
-                        c.log(f"[CM Debug @ 849 in trakt.py] media_type = {media_type}, trakt_id = {trakt_id}, tvdb_id = {tvdb_id}, imdb_id = {imdb_id}, tmdb_id = {tmdb_id}, season = {seasons}, episode = {episode}, last_watched_at = {last_watched_at}, title = {title}")
                         dbcur.execute(sql_dict['sql_insert_trakt_watched'], (media_type, trakt_id, tvdb_id, imdb_id, tmdb_id, seasons, episode, last_watched_at, title))
 
                 dbcon.commit()
@@ -836,12 +828,11 @@ def syncTrakt():
 
         _types = ['movies', 'episodes']
         start = '2016-06-01T00:00:00.000Z'
-        end = '2025-03-04T00:00:00.000Z'
+        end = cleandate.now_to_iso()
         for _type in _types:
             endpoint = f'/sync/history/{_type}?start_at={start}&end_at={end}'
             result = getTraktAsJson(endpoint)
 
-            c.log(f"[CM Debug @ 842 in trakt.py] result = {result}")
 
         sync_last_activities()
 
@@ -907,6 +898,46 @@ def fill_progress_table():
             c.log(f"[CM Debug @ 817 in trakt.py] mediatype = {media_type} with trakt = {trakt} and resume_point = {resume_point}, season = {season} and episode = {episode}")
             insert_trakt_progress(media_type, trakt, imdb, tmdb, tvdb, showtrakt, showimdb, showtmdb, showtvdb, season, episode, resume_point, curr_time, last_played, resume_id, tvshowtitle, title, year)
     return
+
+def update_progress(imdb=0, trakt=0, tmdb=0, progress=0) -> None:
+    try:
+        sql = f'UPDATE progress SET  resume_point = {progress} WHERE '
+        sql_add = []
+
+        if imdb != 0:
+            sql_add.append(f"imdb = '{imdb}'")
+
+        if trakt != 0:
+            sql_add.append(f"trakt = {trakt}")
+
+        if tmdb != 0:
+            sql_add.append(f"trakt = {tmdb}")
+
+        sql_complete= sql +  ' and '.join(sql_add)
+        c.log(f"[CM Debug @ 918 in trakt.py] sql = {sql_complete}")
+
+        dbcon = get_connection(control.traktsyncFile, return_as_dict=True)
+        dbcur = get_connection_cursor(dbcon)
+
+        dbcur.execute(sql_complete)
+        dbcon.commit()
+        dbcur.close()#needed as of py 3.11
+        dbcon.close()
+        return
+    except Exception as e:
+        import traceback
+        failure = traceback.format_exc()
+        c.log(f'[CM Debug @ 928 in trakt.py]Traceback:: {failure}')
+        c.log(f'[CM Debug @ 928 in trakt.py]Exception raised. Error = {e}')
+        pass
+    #except Exception as e:
+    #    c.log(f"[CM Debug @ 926 in trakt.py] Exception raised. Error = {e}")
+    #    return
+
+
+
+
+
 
 
 

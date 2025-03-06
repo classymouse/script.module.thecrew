@@ -17,6 +17,7 @@
 import time
 import datetime
 
+
 def new_iso_to_utc(iso_ts):
     if not iso_ts:
         return 0
