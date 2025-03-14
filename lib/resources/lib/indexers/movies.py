@@ -194,6 +194,7 @@ class movies:
                         if trakt.getActivity() > cache.timeout(self.trakt_list, url, self.trakt_user):
                             raise Exception()
                         self.list = cache.get(self.trakt_list, 720, url, self.trakt_user)
+                        #self.list = self.trakt_list(url, self.trakt_user)
                     else:
                         raise Exception()
                 except Exception:
@@ -599,6 +600,7 @@ class movies:
 
         for item in items:
             try:
+                c.log(f"[CM Debug @ 603 in movies.py] item = {item}")
                 title = item.get('title')
                 title = client.replaceHTMLCodes(title)
 
@@ -606,8 +608,8 @@ class movies:
                 year = re.sub(r'[^0-9]', '', str(year))
 
                 if int(year) > int((self.datetime).strftime('%Y')):
-                #   raise Exception()
-                    break
+                    raise Exception()
+                    #break
 
                 imdb = item.get('ids', {}).get('imdb')
                 if not imdb:
@@ -615,11 +617,8 @@ class movies:
                 else:
                     imdb = 'tt' + re.sub(r'[^0-9]', '', str(imdb))
 
-                tmdb = item.get('ids', {}).get('tmdb')
-                if not tmdb:
-                    tmdb = '0'
-                else:
-                    tmdb = str(tmdb)
+                tmdb = str(item.get('ids', {}).get('tmdb', '0'))
+
 
                 release_date = item.get('released')
                 if release_date:
@@ -932,7 +931,9 @@ class movies:
                 poster_path = item.get('poster_path', '')
                 poster = self.tmdb_img_link % (c.tmdb_postersize, poster_path) if poster_path else '0'
                 backdrop_path = item.get('backdrop_path', '')
-                fanart = self.tmdb_img_link % (c.tmdb_fanartsize, backdrop_path) if backdrop_path else ''
+                fanart = self.tmdb_img_link % (c.tmdb_fanartsize, backdrop_path) if backdrop_path else '0'
+
+                c.log(f"[CM Debug @ 937 in movies.py] poster = {poster}, fanart = {fanart}")
                 self.list.append({
                     'title': title,
                     'originaltitle': original_title,
@@ -1021,9 +1022,8 @@ class movies:
         Filling missing pieces
         '''
         try:
-            #if self.list[i]['metacache'] is True:
-
-                #return
+            if self.list[i]['metacache'] is True:
+                return
 
 
 
@@ -1145,7 +1145,6 @@ class movies:
                 genre = '0'
 
             try:
-                #country = item.get('country').upper() or '0'
                 countries = item.get('production_countries')
                 country = [c['name'] for c in countries]
                 country = ' / '.join(country)
@@ -1195,40 +1194,42 @@ class movies:
                 except:
                     writer = '0'
 
-            poster1 = lst['poster'] if 'poster' in lst else ''
+            lst_poster = lst['poster'] if 'poster' in lst else ''
 
-            poster_path = item.get('poster_path')
+            poster_path = item.get('poster_path', '')
             if poster_path:
-                poster2 = self.tmdb_img_link % (c.tmdb_postersize, poster_path)
+                tmdb_poster = self.tmdb_img_link % (c.tmdb_postersize, poster_path)
             else:
-                poster2 = ''
+                tmdb_poster = "0"
 
-            backdrop_path = item.get('backdrop_path')
+
+            backdrop_path = item.get('backdrop_path', '')#backdrop_path
+
             if backdrop_path:
-                fanart1 = self.tmdb_img_link.format(c.tmdb_fanartsize, backdrop_path)
+                tmdb_fanart = self.tmdb_img_link % (c.tmdb_fanartsize, backdrop_path)
             else:
-                fanart1 = '0'
+                tmdb_fanart = '0'
 
-            poster3 = fanart2 = ''
+            fanart_poster = fanart_fanart = ''
             banner = clearlogo = clearart = landscape = discart = '0'
 
             if imdb not in ['0', None]:
                 tempart = fanart_tv.get_fanart_tv_art(imdb=imdb, tvdb='0', mediatype='movie')
-                poster3 = tempart.get('poster', '0')
-                fanart2 = tempart.get('fanart', '0')
+                fanart_poster = tempart.get('poster', '0')
+                fanart_fanart = tempart.get('fanart', '0')
                 banner = tempart.get('banner', '0')
                 clearlogo = tempart.get('clearlogo', '0')
                 clearart = tempart.get('clearart', '0')
                 landscape = tempart.get('landscape', '0')
                 discart = tempart.get('discart', '0')
 
-            poster = poster3 or poster2 or poster1
-            fanart = fanart2 or fanart1
+            poster = tmdb_poster or fanart_poster or lst_poster
+            fanart = tmdb_fanart or fanart_fanart
 
             item = {
                 'title': title, 'originaltitle': title, 'year': year, 'imdb': imdb,
                 'tmdb': tmdb, 'status': status, 'studio': studio, 'poster': poster,
-                'banner': banner, 'fanart': fanart, 'fanart2': fanart2, 'landscape': landscape,
+                'banner': banner, 'fanart': fanart, 'fanart2': fanart_fanart, 'landscape': landscape,
                 'discart': discart,'clearlogo': clearlogo, 'clearart': clearart,
                 'premiered': premiered, 'genre': genre,
                 'duration': duration, 'rating': rating, 'votes': votes, 'mpaa': mpaa,
@@ -1295,9 +1296,6 @@ class movies:
 
                 # cm - resume_point -warning: percentage, float!
                 resume_point = float(meta['resume_point']) if 'resume_point' in meta else 0
-
-                c.log(f"[CM Debug @ 1291 in movies.py] resume_point = {resume_point}")
-
                 offset = 0.0
 
                 if not resume_point:
@@ -1308,10 +1306,6 @@ class movies:
                 offset = float(int(meta['duration']) * (resume_point / 100)) #= float(int(7200) * (4.39013/100)) = 315.0 with playing time = 7200 secs om 4.3 % of the movie
                 meta.update({'offset': offset})
                 meta.update({'resume_point': resume_point})
-
-                c.log(f"[CM Debug @ 1328 in movies.py] meta = {meta}")
-
-
 
                 if resume_point:
                     #resume_point = percentage_played so remaining = 100 - percentage_played
@@ -1429,15 +1423,6 @@ class movies:
                 #item.addContextMenuItems(cm)
                 item.setProperty('IsPlayable', isPlayable)
 
-                #castwiththumb = i.get('castwiththumb')
-
-
-                #if castwiththumb and not castwiththumb == '0':
-                    #item.setCast(castwiththumb)
-
-
-                c.log(f"[CM Debug @ 11477 in movies.py] offset 2: {offset} for {title}")
-
                 item.setProperty('imdb_id', imdb)
                 item.setProperty('tmdb_id', tmdb)
                 item.setInfo(type='Video', infoLabels=control.metadataClean(meta))
@@ -1455,8 +1440,6 @@ class movies:
                 unique_ids = {'imdb': imdb, 'tmdb': str(tmdb)}
                 info_tag.set_unique_ids(unique_ids)
                 info_tag.set_cast(meta.get('castwiththumb', []))
-
-                c.log(f"[CM Debug @ 1508 in movies.py] offset = meta['resume_point'] = {meta['offset']} with duration = {meta['duration']}")
 
                 if(offset > 0):
                     info_tag.set_resume_point(meta, 'offset', 'duration', False)

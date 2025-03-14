@@ -21,6 +21,7 @@ from six import ensure_text
 tmdb_key = ensure_text(base64.b64decode(b'MDA0OTc5NWVkYjU3NTY4Yjk1MjQwYmM5ZTYxYTlkZmM='))
 tvdb_key = ensure_text(base64.b64decode(b'MjdiZWYyOTc3OWJiZmZlOTQ3MjMyZGMzMTBhOTFmMGM='))
 fanart_key = ensure_text(base64.b64decode(b'MzliOTBhMDE3ZTM5MWFmZDMzNzUwZjk3ODI3ZjhkOTY='))
+orion_key = ensure_text(base64.b64decode(b'RVJOQlFRSEdUTE1WS0VURUQ5V05FRjZIR004NVhHRVU='))
 
 
 #cm - remember to update !!

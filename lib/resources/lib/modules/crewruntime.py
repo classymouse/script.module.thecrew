@@ -70,7 +70,6 @@ class CrewRuntime:
         '''
         # cm - can later be used on a child class as temp obj to super crewRuntime
         # super().__init__(self)
-        # removed pylinting some lines for now, just setting up
         '''
 
         self.name = None
@@ -136,6 +135,7 @@ class CrewRuntime:
         self.int_kodiversion = self._get_kodi_version(as_string=False, as_full=False)
         self.has_silent_boot = self._has_silent_boot()
         self.devmode = self.get_setting('dev_pw') == self.ensure_text(base64.b64decode(b'dGhlY3Jldw=='))
+        self.artworkPath = self.get_artwork_path()
 
 
         self._theme = self.appearance()
@@ -159,6 +159,8 @@ class CrewRuntime:
             self.log('User enabled silent boot option')
         else:
             self.log('User disabled silent boot option')
+    def get_artwork_path(self) -> str:
+        return xbmcaddon.Addon('script.thecrew.artwork').getAddonInfo('path')
 
     def _get_current_platform(self):
 
@@ -432,21 +434,6 @@ class CrewRuntime:
         return datetime.now()
 
 
-    def is_widget_listing_old(self):
-        '''
-        Check if the current window is a widget listing.
-
-        This method is an older version of `is_widget_listing()` and is kept for backwards compatibility.
-
-        Returns
-        -------
-        bool
-            True if the current window is a widget listing, else False.
-        '''
-        _id = xbmcgui.getCurrentWindowId()
-        if _id == 10000:
-            return True
-        return False
 
     def is_widget_listing(self) -> bool:
         """Check if the current window is a widget listing.

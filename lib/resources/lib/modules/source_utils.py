@@ -453,7 +453,7 @@ def get_size(url):
         return False
 
 
-def convert_size(size_bytes):
+def convert_size_old(size_bytes):
     import math
     if size_bytes == 0:
         return "0B"
@@ -464,6 +464,19 @@ def convert_size(size_bytes):
     if size_name[i] == 'B' or size_name[i] == 'KB':
         return None
     return "%s %s" % (s, size_name[i])
+
+def convert_size(size_bytes):
+    import math
+    if size_bytes == 0:
+        return "0B"
+    units = ("B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB")
+    index = int(math.floor(math.log(size_bytes, 1024)))
+    power = math.pow(1024, index)
+    size = round(size_bytes / power, 2)
+    if units[index] in ('B', 'KB'):
+        return None
+    return f"{size} {units[index]}"
+
 
 
 def check_directstreams(url, hoster='', quality='SD'):

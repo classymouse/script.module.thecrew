@@ -202,6 +202,25 @@ def router(params):
         from resources.lib.indexers import navigator
         navigator.navigator().library()
 
+    elif action == 'OrionNavigator':
+        from resources.lib.indexers import navigator
+        navigator.navigator().orionoid()
+
+    elif action == 'userdetailsOrion':
+        from .orion_api import OrionApi
+        #OrionApi.auth_orion()
+        OrionApi.authorize_orion()
+
+    elif action == 'settingsOrion':
+        from .orion_api import OrionApi
+        #OrionApi.auth_orion()
+        OrionApi.settings_orion()
+
+    elif action == 'userlabelOrion':
+        from .orion_api import OrionApi
+        #OrionApi.auth_orion()
+        OrionApi.info_orion()
+
     elif action == 'toolNavigator':
         from resources.lib.indexers import navigator
         navigator.navigator().tools()
@@ -413,6 +432,12 @@ def router(params):
 
 
     # developers menu
+    elif action == "get_qrcode":
+        from . import orion_api
+        orion_api.get_orion_qr()
+
+
+
     elif action == 'traktSyncsetup':
         from . import trakt
         trakt.traktSyncsetup()

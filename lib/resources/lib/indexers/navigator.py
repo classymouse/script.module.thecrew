@@ -22,6 +22,7 @@ from resources.lib.modules import control
 from resources.lib.modules import trakt
 from resources.lib.modules import cache
 from resources.lib.modules import views
+from resources.lib.modules.orion_api import oa
 from resources.lib.modules.crewruntime import c
 from datetime import date
 
@@ -37,6 +38,8 @@ imdbCredentials = control.setting('imdb.user') != ''
 
 traktCredentials = trakt.getTraktCredentialsInfo()
 traktIndicators = trakt.getTraktIndicatorsInfo()
+
+orionCredentials = oa.get_credentials_info()
 
 queueMenu = control.lang(32065)
 
@@ -235,6 +238,7 @@ class navigator:
     def tools(self):
         self.addDirectoryItem(32073, 'authTrakt','trakt.png', 'DefaultAddonProgram.png')
         self.addDirectoryItem(32609, 'ResolveUrlTorrent','resolveurl.png', 'DefaultAddonProgram.png')
+        self.addDirectoryItem(32127, 'OrionNavigator','Orion.png', 'DefaultAddonProgram.png')
         self.addDirectoryItem(32043, 'openSettings&query=0.0','tools.png', 'DefaultAddonProgram.png')
         self.addDirectoryItem(32628, 'openSettings&query=1.0', 'tools.png', 'DefaultAddonProgram.png')
         self.addDirectoryItem(32045, 'openSettings&query=2.0', 'tools.png', 'DefaultAddonProgram.png')
@@ -308,7 +312,7 @@ class navigator:
             title = control.lang(32059)
             url = '%s?action=addView&content=%s' % (sys.argv[0], content)
 
-            poster, banner, fanart = control.addonPoster(), control.addonBanner(), control.addon_fanart()
+            poster, banner, fanart = c.addon_poster(), c.addon_banner(), c.addon_fanart()
 
             item = control.item(label=title)
             item.setInfo(type='Video', infoLabels={'title': title})
@@ -507,14 +511,11 @@ class navigator:
 
     #######
     #
-    #
-    #
-    # Devs only, don't run these if you don't know what you are doing!
-    #
-    #
+    # cm - Devs only, don't run these if you don't know what you are doing!
     #
     #######
     def developers(self):
+        self.addDirectoryItem('Get QR Code', 'get_qrcode','main_classy.png', 'main_classy.png')
         self.addDirectoryItem('Update Services', 'update_service','main_classy.png', 'main_classy.png')
         self.addDirectoryItem('Run Trakt Sync setup', 'traktSyncsetup','main_orangehat.png', 'main_orangehat.png')
         self.addDirectoryItem('Check sync Tables', 'traktchecksync','main_classy.png', 'main_classy.png')
@@ -528,6 +529,13 @@ class navigator:
 
         self.endDirectory()
 
+
+    def orionoid(self):
+        self.addDirectoryItem(32128, 'userdetailsOrion', 'orion.png', 'orion.png')
+        self.addDirectoryItem(32129, 'settingsOrion', 'orion.png', 'orion.png')
+        self.addDirectoryItem(32129, 'userlabelOrion', 'orion.png', 'orion.png')
+
+        self.endDirectory()
 
     def holidays(self):
         self.addDirectoryItem(90161, 'movies&url=top50_holiday', 'holidays.png', 'holidays.png')

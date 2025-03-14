@@ -78,6 +78,7 @@ class trailers:
             self.search_link = f'https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=10&q=%s&key={self.key}'
             self.youtube_watch = 'https://www.youtube.com/watch?v=%s'
             self.yt_plugin_url = 'plugin://plugin.video.youtube/?action=play_video&videoid=%s'
+            self.yt_plugin_url2 = "https://www.youtube.com/embed/%s?autohide=0&iv_load_policy=3&modestbranding=0&rel=0&mute=0&autoplay=0&enablejsapi=1&origin=https://www.bubblegum.com&widgetid=1"
         except Exception as e:
             import traceback
             failure = traceback.format_exc()
@@ -154,6 +155,8 @@ class trailers:
             c.log(f"[CM Debug @ 140 in trailer.py] result = {repr(result)}")
 
             url = result['video']
+            if 'youtube' in url:
+                url = self.get_youtube_link(url)
             title = result['title']
             plot = result['plot']
             #icon = result['video']
@@ -247,13 +250,16 @@ class trailers:
                 result = self.session.get(url, timeout=15).json()
 
                 listItems = result['results']
+                c.log(f"[CM Debug @ 251 in trailer.py] url = {url}")
                 trailer_list = []
 
                 for item in listItems:
                     try:
                         title = item['name']
                         if item['site'] == 'YouTube':
+                            #trailer_url = self.yt_plugin_url2 % str(item['key'])
                             trailer_url = self.yt_plugin_url % str(item['key'])
+                            #trailer_url = self.get_youtube_link(trailer_url)
                         else:
                             trailer_url = ''
                         icon = control.addonThumb()
@@ -295,7 +301,70 @@ class trailers:
                     return 'canceled'
                 return trailer_list[select]
 
-            except Exception:
+            except Exception as e:
+                c.log(f"[CM Debug @ 302 in trailer.py] exception: {e}")
                 pass
-        except Exception:
+        except Exception as e:
+            c.log(f"[CM Debug @ 305 in trailer.py] exception: {e}")
             pass
+    def get_youtube_link2(self, url):
+        import re
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:82.0) Gecko/20100101 Firefox/82.0',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+            'Connection': 'keep-alive',
+            'Referer': 'https://qdownloader.io/',
+            'Upgrade-Insecure-Requests': '1',
+            'Pragma': 'no-cache',
+            'Cache-Control': 'no-cache',
+            'TE': 'Trailers',
+        }
+
+
+        params = (('url', url),)
+
+
+
+        response = client.request('https://qdownloader.io/download', headers=headers, post=params)
+        c.log(f"[CM Debug @ 327 in trailer.py] response = {response}")
+
+
+        regex=' download="(.+?)" href="(.+?)"'
+        match=re.compile(regex).findall(response)
+        all_results=[]
+        for name,link in match:
+
+            return link.replace('&amp;','&')
+            all_results.append((name,link.replace('&amp;','&')))
+
+
+
+    def get_youtube_link(self, url: str) -> str:
+        """
+        Get the YouTube download link.
+        """
+        import re
+
+        headers = {
+            "User-Agent": client.randomagent(),
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.5",
+            "Connection": "keep-alive",
+            "Referer": "https://qdownloader.io/",
+            "Upgrade-Insecure-Requests": "1",
+            "Pragma": "no-cache",
+            "Cache-Control": "no-cache",
+        }
+
+        params = (("url", url),)
+
+        response = client.request("https://qdownloader.io/download", headers=headers, post=params)
+
+        c.log(f"[CM Debug @ 364 in trailer.py] response = {response}")
+
+        regex = r" download=\"(.+?)\" href=\"(.+?)\""
+        match = re.compile(regex).findall(response.text)
+
+        for name, link in match:
+            return link.replace("&amp;", "&")

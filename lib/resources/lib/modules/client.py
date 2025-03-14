@@ -35,9 +35,6 @@ from . import hunter
 from .crewruntime import c
 
 
-
-
-
 try:
     from http import cookiejar as cookielib
     from html import unescape
@@ -444,38 +441,48 @@ def _get_result(response, limit=None):
     return result
 
 
-def parseDOM(html, name='', attrs=None, ret=False):
+def parseDom(html, name='', attrs=None, ret=False):
+    """Parses HTML string and returns a list of elements that match the given name and attributes.
 
+    Args:
+        html (str): HTML string to parse.
+        name (str): Name of the element to find. Default is an empty string.
+        attrs (dict): Attributes of the element to find. Default is None.
+        ret (str): Attribute to return from the parsed elements. Default is False.
 
+    Returns:
+        list: List of parsed elements.
+    """
     if attrs:
-
-        #attrs = dict((key, re.compile(value + ('$' if value else ''))) for key, value in six.iteritems(attrs))
-        attrs = dict((key, re.compile(value + ('$' if value else ''))) for key, value in list(attrs.items()))
+        attrs = {key: re.compile(value + ('$' if value else '')) for key, value in attrs.items()}
 
     results = dom_parser.parse_dom(html, name, attrs, ret)
 
     if ret:
-        results = [result.attrs[ret.lower()] for result in results]
+        results = [result.attrs.get(ret.lower(), '') for result in results]
     else:
         results = [result.content for result in results]
 
     return results
 
 
-def replaceHTMLCodes(txt):
-    txt = re.sub("(&#[0-9]+)([^;^0-9]+)", "\\1;\\2", txt)
-    txt = unescape(txt)
-    txt = txt.replace("&quot;", "\"")
-    txt = txt.replace("&amp;", "&")
-    txt = txt.replace("&lt;", "<")
-    txt = txt.replace("&gt;", ">")
-    txt = txt.replace("&#38;", "&")
-    txt = txt.replace("&nbsp;", "")
-    txt = txt.replace('&#8230;', '...')
-    txt = txt.replace('&#8217;', '\'')
-    txt = txt.replace('&#8211;', '-')
-    txt = txt.strip()
-    return txt
+def replaceHTMLCodes(text):
+    text = re.sub(r"(&#[0-9]+)([^;^0-9]+)", r"\1;\2", text)
+    text = unescape(text)
+    replacements = {
+        "&quot;": "\"",
+        "&amp;": "&",
+        "&lt;": "<",
+        "&gt;": ">",
+        "&#38;": "&",
+        "&nbsp;": "",
+        "&#8230;": "...",
+        "&#8217;": "'",
+        "&#8211;": "-"
+    }
+    for key, value in replacements.items():
+        text = text.replace(key, value)
+    return text.strip()
 
 
 def randomagent():

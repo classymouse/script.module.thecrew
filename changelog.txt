@@ -7,8 +7,9 @@
 * [COLOR green]Added[/COLOR]: total episodes/seasons and watched/unwatched episodes where available (if your skin supports it!)
 * [COLOR green]Added[/COLOR]: widgets don't show unaired episodes in progress list anymore. In normal listings they are colored based on your settings
 * [COLOR green]Added[/COLOR]: holiday/christmas movies menu item will be shown automagically in December
+* [COLOR green]Added[/COLOR]: * Now Watching * menu in movies and tvshows
 * [COLOR green]Added[/COLOR]: search items can be deleted per item inside dialog (hold button or right-click)
-* [COLOR green]Added[/COLOR]: progress percentage in title when movie or episode is paused
+* [COLOR green]Added[/COLOR]: progress time remaining in title when movie or episode is paused
 * [COLOR green]Added[/COLOR]: progress synced with trakt
 
 
