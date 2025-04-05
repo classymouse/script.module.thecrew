@@ -1438,7 +1438,9 @@ class sources:
             dbcur.execute(f"SELECT * FROM rel_src WHERE source = '{source}' AND imdb_id = '{imdb}' AND season = '' AND episode = ''")
             match = dbcur.fetchone()
             t1 = int(re.sub('[^0-9]', '', str(match[5])))
+            c.log(f"[CM Debug @ 1441 in sources.py] time 1 = {t1}")
             t2 = int(datetime.datetime.now().strftime("%Y%m%d%H%M"))
+            c.log(f"[CM Debug @ 1443 in sources.py] time 2 = {t2}")
             update = abs(t2 - t1) > 60
             if update is False:
                 sources = eval(c.ensure_str(match[4]))
@@ -1464,7 +1466,8 @@ class sources:
             # TODO: this (or 1) call.
             sources = []
             data = oa.get_movie(imdb, limit=25)
-            sources = oa.do_fake_scrape(data, 'movie')
+            c.log(f"[CM Debug @ 1469 in sources.py] data = {repr(data)}")
+            sources = oa.do_orion_scrape(data, 'movie')
             self.sources.extend(sources) if sources else []
         except Exception as e:
             import traceback

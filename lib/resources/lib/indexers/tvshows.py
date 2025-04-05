@@ -167,10 +167,13 @@ class tvshows:
 
     def get(self, url, tid=0, idx=True, create_directory=True):
         try:
-            try:
-                url = getattr(self, f'{url}_link')
-            except Exception:
+
+
+            if 'trakt' in url and '/search' in url:
                 pass
+            else:
+                url = getattr(self, f'{url}_link')
+            c.log(f"[CM Debug @ 172 in tvshows.py] url = {url}")
 
             ####cm#
             # Making it possible to use date[xx] in url's where xx is a str(int)
@@ -215,10 +218,10 @@ class tvshows:
             #    if idx is True:
             #        self.worker()
 
-            #elif u in self.tvmaze_link:
-            #    self.list = cache.get(self.tvmaze_list, 168, url)
-            #    if idx is True:
-            #        self.worker()
+            elif u in self.tvmaze_link:
+                self.list = cache.get(self.tvmaze_list, 168, url)
+                if idx is True:
+                    self.worker()
 
             elif u in self.tmdb_link and 'tv_credits' in url:
                 self.list = cache.get(self.tmdb_cast_list, 24, url)
@@ -248,35 +251,65 @@ class tvshows:
                 self.tvshowDirectory(self.list)
             return self.list
         except Exception as e:
-            c.log(f'[CM Debug @ 269 in tvshows.py]Exception raised. Error = {e}')
+            import traceback
+            failure = traceback.format_exc()
+            c.log(f'[CM Debug @ 249 in tvshows.py]Traceback:: {failure}')
+            c.log(f'[CM Debug @ 249 in tvshows.py]Exception raised. Error = {e}')
+            pass
+        #except Exception as e:
+            #c.log(f'[CM Debug @ 269 in tvshows.py]Exception raised. Error = {e}')
 
 
 
 #TC 2/01/19 started
     def search(self):
-        navigator.navigator().addDirectoryItem(32603, 'tvSearchnew', 'search.png', 'DefaultTVShows.png')
-        #sysaddon = sys.argv[0]
+        """
+        Executes a search operation for TV shows.
+
+        This function connects to a database to retrieve stored search terms
+        and displays them as directory items. If there are stored search terms,
+        an additional option to clear the search cache is added. The function
+        also ensures that the necessary database table exists.
+
+        The search terms are fetched from the 'tvshow' table in descending
+        order of their ID. Each unique term is added to a navigation directory
+        with an associated context menu item to delete the term.
+
+        Raises:
+            Exception: If there is an error creating the database table.
+        """
+
         dbcon = database.connect(control.searchFile)
         dbcur = dbcon.cursor()
 
+        navigator.navigator().addDirectoryItem(32603, 'tvSearchnew', 'search.png', 'DefaultTVShows.png')
+
         try:
-            dbcur.executescript("CREATE TABLE IF NOT EXISTS tvshow (ID Integer PRIMARY KEY AUTOINCREMENT, term TEXT);")
+            dbcur.execute("""CREATE TABLE IF NOT EXISTS tvshow (
+                                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                term TEXT
+                            )""")
         except Exception:
             pass
 
-        dbcur.execute("SELECT * FROM tvshow ORDER BY ID DESC")
+        dbcur.execute("SELECT * FROM tvshow ORDER BY id DESC")
 
-        lst = []
-        cm = []
+        search_terms = []
+        context_menu_items = []
         delete_option = False
-        for (_id, term) in dbcur.fetchall():
-            if term not in str(lst):
+        for (id, term) in dbcur.fetchall():
+            if term not in search_terms:
                 delete_option = True
-                c.log(f"[CM Debug @ 284 in tvshows.py] id = {_id}, term = {term}")
+                context_menu_items.append((32070, f'tvDeleteTerm&id={id}'))
+                navigator.navigator().addDirectoryItem(
+                    term,
+                    f'tvSearchterm&name={term}',
+                    'search.png',
+                    'DefaultTVShows.png',
+                    context=context_menu_items
+                )
+                search_terms.append(term)
 
-                cm.append((32070, f'tvDeleteTerm&id={_id})'))
-                navigator.navigator().addDirectoryItem(term, f'tvSearchterm&name={term}', 'search.png', 'DefaultTVShows.png', context=(cm))
-                lst += [(term)]
         dbcur.close()
 
         if delete_option:
@@ -284,47 +317,48 @@ class tvshows:
 
         navigator.navigator().endDirectory()
 
+
     def search_new(self):
+        """Search for a TV show."""
         control.idle()
 
-        t = control.lang(32010)
-        k = control.keyboard('', t)
-        k.doModal()
-        q = k.getText() if k.isConfirmed() else None
+        keyboard_header = control.lang(32010)
+        keyboard = control.keyboard('', keyboard_header)
+        keyboard.doModal()
+        search_query = keyboard.getText() if keyboard.isConfirmed() else None
 
-        if not q:
+        if search_query is None:
             return
-        q = q.lower()
-        clean_q = utils.title_key(q)
 
+        search_query = search_query.lower()
+        clean_search_query = utils.title_key(search_query)
 
-        dbcon = database.connect(control.searchFile)
-        dbcur = dbcon.cursor()
-        dbcur.execute("DELETE FROM tvshow WHERE term = ?", (q,))
-        dbcur.execute("INSERT INTO tvshow VALUES (?,?)", (None, q))
-        dbcon.commit()
-        dbcur.close()
-        url = self.search_link % quote_plus(clean_q)
+        db_connection = database.connect(control.searchFile)
+        db_cursor = db_connection.cursor()
+        db_cursor.execute("DELETE FROM tvshow WHERE term = ?", (search_query,))
+        db_cursor.execute("INSERT INTO tvshow VALUES (?,?)", (None, search_query))
+        db_connection.commit()
+        db_cursor.close()
 
+        url = self.search_link % quote_plus(clean_search_query)
         self.get(url)
-        #self.get(url)
 
-    def search_term(self, q):
+
+
+    def search_term(self, query):
         control.idle()
-        q = q.lower()
-        clean_q = utils.title_key(q)
+        query = query.lower()
+        cleaned_query = utils.title_key(query)
 
-        dbcon = database.connect(control.searchFile)
-        dbcur = dbcon.cursor()
-        dbcur.execute("DELETE FROM tvshow WHERE term = ?", (q,))
-        dbcur.execute("INSERT INTO tvshow VALUES (?,?)", (None, q))
-        dbcon.commit()
-        dbcur.close()
-        url = self.search_link % quote_plus(clean_q)
-        c.log(f"[CM Debug @ 325 in tvshows.py] url = {url}")
+        db_connection = database.connect(control.searchFile)
+        db_cursor = db_connection.cursor()
+        db_cursor.execute("DELETE FROM tvshow WHERE term = ?", (query,))
+        db_cursor.execute("INSERT INTO tvshow VALUES (?, ?)", (None, query))
+        db_connection.commit()
+        db_cursor.close()
 
-        self.get(url)
-        #self.get(url)
+        search_url = self.search_link % quote_plus(cleaned_query)
+        self.get(search_url)
 
     def delete_search_term(self, search_term_id):
         """
@@ -337,28 +371,17 @@ class tvshows:
         :type search_term_id: int
         """
         try:
-            dbcon = database.connect(control.searchFile)
-            dbcur = dbcon.cursor()
-            dbcur.execute("DELETE FROM tvshow WHERE ID = ?", (search_term_id,))
-            dbcur.execute("""
-                          SELECT * FROM tvshow ORDER BY ID DESC
-                        """)
-            for (_id, term) in dbcur.fetchall():
-                c.log(f"[CM Debug @ 355 in tvshows.py] id = {_id}, term = {term}")
-
-            c.log(f"[CM Debug @ 357 in tvshows.py]running here with search_term_id = {search_term_id}")
-            dbcon.commit()
-            dbcur.close()
+            db_connection = database.connect(control.searchFile)
+            db_cursor = db_connection.cursor()
+            db_cursor.execute("DELETE FROM tvshow WHERE ID = ?", (search_term_id,))
+            db_connection.commit()
+            db_cursor.close()
             control.refresh()
-        except database.Error as e:
-            c.log(f'[CM Debug @ 344 in tvshows.py]Exception raised. Error = {e}')
-
         except Exception as e:
             import traceback
-            failure = traceback.format_exc()
-            c.log(f'[CM Debug @ 352 in tvshows.py]Traceback:: {failure}')
-            c.log(f'[CM Debug @ 352 in tvshows.py]Exception raised. Error = {e}')
-            pass
+            error_traceback = traceback.format_exc()
+            c.log(f'[Error in delete_search_term] Traceback: {error_traceback}')
+            c.log(f'[Error in delete_search_term] Exception: {e}')
 
     def person(self):
         """
@@ -991,7 +1014,7 @@ class tvshows:
 
         return self.list
 
-    def disabled_tvmaze_list(self, url):
+    def tvmaze_list(self, url):
         try:
             result = client.request(url)
             result = client.parseDOM(result, 'section', attrs={'id': 'this-seasons-shows'})

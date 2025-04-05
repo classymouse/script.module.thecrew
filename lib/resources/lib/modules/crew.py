@@ -207,19 +207,19 @@ def router(params):
         navigator.navigator().orionoid()
 
     elif action == 'userdetailsOrion':
-        from .orion_api import OrionApi
+        from .orion_api import oa
         #OrionApi.auth_orion()
-        OrionApi.authorize_orion()
+        oa.authorize_orion()
 
     elif action == 'settingsOrion':
-        from .orion_api import OrionApi
+        from .orion_api import oa
         #OrionApi.auth_orion()
-        OrionApi.settings_orion()
+        oa.settings_orion()
 
     elif action == 'userlabelOrion':
-        from .orion_api import OrionApi
+        from .orion_api import oa
         #OrionApi.auth_orion()
-        OrionApi.info_orion()
+        oa.info_orion()
 
     elif action == 'toolNavigator':
         from resources.lib.indexers import navigator

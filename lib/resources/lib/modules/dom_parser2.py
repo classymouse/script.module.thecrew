@@ -1,19 +1,19 @@
 '''
-   Based on Parsedom for XBMC plugins
-   Copyright (C) 2010-2011 Tobias Ussing And Henrik Mosgaard Jensen
+    Based on Parsedom for XBMC plugins
+    Copyright (C) 2010-2011 Tobias Ussing And Henrik Mosgaard Jensen
 
-   This program is free software: you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation, either version 3 of the License, or
-   (at your option) any later version.
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
 
-   This program is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
 
-   You should have received a copy of the GNU General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 '''
 import re
 import six
@@ -24,11 +24,11 @@ re_type = type(re.compile(''))
 
 def __get_dom_content(html, name, match):
     if match.endswith('/>'): return ''
-    
+
     # override tag name with tag from match if possible
     tag = re.match('<([^\s/>]+)', match)
     if tag: name = tag.group(1)
-    
+
     start_str = '<%s' % (name)
     end_str = "</%s" % (name)
 
@@ -72,7 +72,7 @@ def __get_dom_elements(item, name, attrs):
             else:
                 temp_value = [value] if value_is_str else value
                 this_list = [r[0] for r in re_list if set(temp_value) <= set(r[2].split(' '))]
-                
+
             if not this_list:
                 has_space = (value_is_regex and ' ' in value.pattern) or (value_is_str and ' ' in value)
                 if not has_space:
@@ -82,13 +82,13 @@ def __get_dom_elements(item, name, attrs):
                         this_list = [r[0] for r in re_list if re.match(value, r[1])]
                     else:
                         this_list = [r[0] for r in re_list if value == r[1]]
-    
+
             if last_list is None:
                 last_list = this_list
             else:
                 last_list = [item for item in this_list if item in last_list]
         this_list = last_list
-    
+
     return this_list
 
 def __get_attribs(element):
@@ -120,7 +120,7 @@ def parse_dom(html, name='', attrs=None, req=False):
 
     if not name:
         return ''
-    
+
     if not isinstance(attrs, dict):
         return ''
 
@@ -128,12 +128,12 @@ def parse_dom(html, name='', attrs=None, req=False):
         if not isinstance(req, list):
             req = [req]
         req = set([key.lower() for key in req])
-        
+
     all_results = []
     for item in html:
         if isinstance(item, DomMatch):
             item = item.content
-            
+
         results = []
         for element in __get_dom_elements(item, name, attrs):
             attribs = __get_attribs(element)

@@ -6,6 +6,7 @@
 
 
 import os
+import sys
 import time
 import datetime
 import json
@@ -176,7 +177,8 @@ class DebridCheck:
         end_time = start_time + timeout
         while not progressDialog.isFinished():
             try:
-                if control.monitor.abortRequested(): return sys.exit()
+                if control.monitor.abortRequested():
+                    return sys.exit()
                 alive_threads = [x.getName() for x in self.main_threads if x.is_alive() is True]
                 remaining_debrids = [x[1] for x in self.starting_debrids_display if x[0] in alive_threads]
                 current_time = time.time()
@@ -306,7 +308,7 @@ class DebridCache:
         dbcon = database.connect(self.dbfile)
         dbcur = dbcon.cursor()
         dbcur.execute("""CREATE TABLE IF NOT EXISTS debrid_data
-                      (hash text not null, debrid text not null, cached text, expires integer, unique (hash, debrid))
+                        (hash text not null, debrid text not null, cached text, expires integer, unique (hash, debrid))
                         """)
         dbcon.close()
 

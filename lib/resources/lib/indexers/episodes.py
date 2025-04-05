@@ -665,7 +665,7 @@ class seasons:
                     info_tag.set_cast(cast)
                 elif 'castwiththumb' in meta:
                     cast = meta.get('castwiththumb')
-                    info_tag.set_cast(meta.get('castwiththumb'))
+                    info_tag.set_cast(cast)
                 else:
                     info_tag.set_cast([])
 
@@ -750,7 +750,7 @@ class episodes:
 
         # self.added_link = 'https://api.tvmaze.com/schedule'
         self.added_link = f'{self.trakt_link}/calendars/my/shows/date[5]/6/'
-        self.calendar_link = 'https://api.tvmaze.com/schedule?date=%s'
+        self.calendar_link = 'https://api.tvmaze.com/schedule?date=%s&country=US'
         # https://api.trakt.tv/calendars/all/shows/date[30]/31 #use this for new episodes?
         # self.mycalendar_link = f'{self.trakt_link}/calendars/my/shows/date[29]/60/'
         # go back 30 and show all shows aired until tomorrow
@@ -808,11 +808,19 @@ class episodes:
 
     def calendar(self, url):
         try:
+            c.log(f"[CM Debug @ 811 in episodes.py] url = {url}")
 
-            if url in ('tvProgress'):
-                pass
+            elements = ['tvProgress', 'tvmaze']
+            for i in elements:
+                if i in url:
+                    c.log(f"[CM Debug @ 816 in episodes.py] {i} in url {url}")
+                    break
+
+            #if  any(elem in url for elem in elements):
+                #pass
             else:
                 url = getattr(self, url + '_link')
+                c.log(f"[CM Debug @ 816 in episodes.py] url = {url}")
 
                 ####cm#
                 # Making it possible to use date[xx] in url's where xx is a str(int)
@@ -879,8 +887,14 @@ class episodes:
 
             self.episodeDirectory(self.list)
             return self.list
-        except Exception:
+        except Exception as e:
+            import traceback
+            failure = traceback.format_exc()
+            c.log(f'[CM Debug @ 884 in episodes.py]Traceback:: {failure}')
+            c.log(f'[CM Debug @ 884 in episodes.py]Exception raised. Error = {e}')
             pass
+        #except Exception as e:
+            #c.log(f"[CM Debug @ 885 in episodes.py] Exception: {e}")
 
     def widget(self):
 
@@ -1766,6 +1780,7 @@ class episodes:
 
         for item in items:
             try:
+                c.log(f"[CM Debug @ 1783 in episodes.py] \n\ntvmaze item = \n\n{item}\n\n\n")
                 if 'english' not in item['show']['language'].lower():
                     raise Exception()
 
@@ -1775,6 +1790,11 @@ class episodes:
                     and 'scripted' not in item['show']['type'].lower()
                 ):
                     raise Exception()
+                tvshowtitle = item['_links']['show']['name']
+                if not tvshowtitle:
+                    tvshowtitle = ''
+                else:
+                    tvshowtitle = client.replaceHTMLCodes(tvshowtitle)
 
                 title = item['name']
                 if not title:
@@ -1782,12 +1802,12 @@ class episodes:
                 title = client.replaceHTMLCodes(title)
 
                 season = item['season']
-                season = re.sub('[^0-9]', '', '%01d' % int(season))
+                season = re.sub('[^0-9]', '', '%02d' % int(season))
                 if not season:
                     raise Exception('no season')
 
                 episode = item['number']
-                episode = re.sub('[^0-9]', '', '%01d' % int(episode))
+                episode = re.sub('[^0-9]', '', '%02d' % int(episode))
                 if episode == '0':
                     raise Exception('episode = 0')
 
@@ -2294,7 +2314,7 @@ class episodes:
 
         for i in items:
             try:
-                c.log(f'[CM DEBUG in episodes.py @ 1982] type i={type(i)}')
+                #c.log(f'[CM DEBUG in episodes.py @ 1982] type i={type(i)}')
                 name = i['name']
 
                 if i['image'].startswith('http'):
@@ -2303,7 +2323,7 @@ class episodes:
                     thumb = os.path.join(art_path, i['image'])
                 else:
                     thumb = addon_thumb
-                c.log(f"[CM Debug @ 1992 in episodes.py] thumb={thumb}")
+                #c.log(f"[CM Debug @ 1992 in episodes.py] thumb={thumb}")
 
                 url = f"{sysaddon}?action={i['action']}"
                 try:

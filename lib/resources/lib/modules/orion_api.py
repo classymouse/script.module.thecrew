@@ -58,7 +58,6 @@ class orionApi:
             data = json.dumps(data) if data else None
             #build url
 
-
             response = self.session.post(url, json=data, headers=headers)
 
             c.log(f"[CM Debug @ 76 in orion_api.py] response = {response.text}")
@@ -88,18 +87,17 @@ class orionApi:
 
     # ! TODO change limit
     def get_movie(self,imdb, limit=25) -> dict:
-        #tt5519340 = Bright
         results = self.orion.streams(type = Orion.TypeMovie, idImdb = imdb, limitCount = limit)
-        c.log(f"[CM Debug @ 101 in orion_api.py] results = {results}")
         return results
 
 
-    def do_fake_scrape(self, data, _type='movie'):
+    def do_orion_scrape(self, data, _type='movie'):
         try:
             sources = []
+            c.log(f"[CM Debug @ 98 in orion_api.py] len data = {len(data)} data = {repr(data)}")
             if _type == 'movie':
                 for i, item in enumerate(data):
-                    c.log(f"[CM Debug @ 110 in orion_api.py] type item = (type) {type(item)}")
+                    #c.log(f"[CM Debug @ 110 in orion_api.py] type item = (type) {type(item)}")
                     links = item.get("links", [])
                     url = ''
                     for link in links:
@@ -108,10 +106,11 @@ class orionApi:
                         else:
                             continue
 
-                    fileinfo = item['file']
+                    fileinfo = item.get("file",)
+                    c.log(f"[CM Debug @ 111 in orion_api.py] fileinfo = {fileinfo}")
                     name = fileinfo.get("name",)
                     size = fileinfo.get("size")
-                    hash = fileinfo.get("hash")
+                    #hash = fileinfo.get("hash")
                     pack = fileinfo.get("pack")
 
                     quality, info = source_utils.get_release_quality(name)
@@ -125,7 +124,7 @@ class orionApi:
                     sources.append({'provider' : 'Orion', 'source': 'Torrent', 'quality': quality, 'language': 'en', 'url': url, 'info': info,'direct': False, 'debridonly': True, 'size': dsize, 'name': name})
 
 
-                c.log(f"[CM Debug @ 146 in orion_api.py] sources = {sources}")
+                #c.log(f"[CM Debug @ 146 in orion_api.py] sources = {sources}")
 
                 return sources
             else:

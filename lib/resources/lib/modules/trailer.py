@@ -338,13 +338,22 @@ class trailers:
             return link.replace('&amp;','&')
             all_results.append((name,link.replace('&amp;','&')))
 
-
+    def creat_youtube_link(self, url) -> None:
+        """
+        Create the YouTube download link.
+        """
+        key = url.rsplit('=', 1)[1]
+        url = f'https://www.youtube.com/watch?v={key}'
+        c.log(f"[CM Debug @ 347 in trailer.py] url = {url}")
+        return url
 
     def get_youtube_link(self, url: str) -> str:
         """
         Get the YouTube download link.
         """
         import re
+
+        c.log(f"[CM Debug @ 349 in trailer.py] url = {url}")
 
         headers = {
             "User-Agent": client.randomagent(),
@@ -357,14 +366,22 @@ class trailers:
             "Cache-Control": "no-cache",
         }
 
-        params = (("url", url),)
+        url = self.creat_youtube_link(url)
+
+        params = (("v", url),)
 
         response = client.request("https://qdownloader.io/download", headers=headers, post=params)
 
-        c.log(f"[CM Debug @ 364 in trailer.py] response = {response}")
+        #response = self.session.post("https://qdownloader.io/download", headers=headers, data=params)
+
+        c.log(f"[CM Debug @ 377 in trailer.py] response = {response}")
 
         regex = r" download=\"(.+?)\" href=\"(.+?)\""
-        match = re.compile(regex).findall(response.text)
+        #match = re.compile(regex).findall(response.text)
+
+        match = re.findall(regex, response)
+
+        c.log(f"[CM Debug @ 373 in trailer.py] match = {match}")
 
         for name, link in match:
             return link.replace("&amp;", "&")

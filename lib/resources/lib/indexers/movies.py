@@ -270,66 +270,105 @@ class movies:
         # else:
         # self.get(self.featured_link)
 
+
     def search(self):
-        navigator.navigator().addDirectoryItem(32603,
-                                            'movieSearchnew', 'search.png', 'DefaultMovies.png')
+        """
+        Executes a search operation for TV shows.
+
+        This function connects to a database to retrieve stored search terms
+        and displays them as directory items. If there are stored search terms,
+        an additional option to clear the search cache is added. The function
+        also ensures that the necessary database table exists.
+
+        The search terms are fetched from the 'tvshow' table in descending
+        order of their ID. Each unique term is added to a navigation directory
+        with an associated context menu item to delete the term.
+
+        Raises:
+            Exception: If there is an error creating the database table.
+        """
 
         dbcon = database.connect(control.searchFile)
         dbcur = dbcon.cursor()
 
+        navigator.navigator().addDirectoryItem(32603, 'movieSearchnew', 'search.png', 'DefaultMovies.png')
+
         try:
-            dbcur.executescript(
-                "CREATE TABLE IF NOT EXISTS movies (ID Integer PRIMARY KEY AUTOINCREMENT, term TEXT);"
-                )
+            dbcur.execute("""CREATE TABLE IF NOT EXISTS movies (
+                                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                term TEXT
+                            )""")
         except Exception:
             pass
 
-        dbcur.execute("SELECT * FROM movies ORDER BY ID DESC")
-        lst = []
-        cm = []
+        dbcur.execute("SELECT * FROM movies ORDER BY id DESC")
 
-        for _id, term in dbcur.fetchall():
-            if term not in str(lst):
-                cm.append((32070, f'movieDeleteTerm&id={_id})'))
-                navigator.navigator().addDirectoryItem(term,
-                                    f'movieSearchterm&name={term}', 'search.png',
-                                    'DefaultTVShows.png', context=cm)
-                lst += [(term)]
+        search_terms = []
+        context_menu_items = []
+        delete_option = False
+        for (id, term) in dbcur.fetchall():
+            if term not in search_terms:
+                delete_option = True
+                context_menu_items.append((32070, f'movieDeleteTerm&id={id}'))
+                navigator.navigator().addDirectoryItem(
+                    term,
+                    f'movieSearchterm&name={term}',
+                    'search.png',
+                    'DefaultTVShows.png',
+                    context=context_menu_items
+                )
+                search_terms.append(term)
+
         dbcur.close()
 
-        if len(lst) > 0:
+        if delete_option:
             navigator.navigator().addDirectoryItem(32605,
                                         'clearCacheSearch', 'tools.png', 'DefaultAddonProgram.png')
 
         navigator.navigator().endDirectory()
 
+
     def search_new(self):
+        """Search for a Movie."""
         control.idle()
 
-        t = control.lang(32010)
-        k = control.keyboard('', t)
-        k.doModal()
-        q = k.getText() if k.isConfirmed() else None
+        keyboard_header = control.lang(32010)
+        keyboard = control.keyboard('', keyboard_header)
+        keyboard.doModal()
+        search_query = keyboard.getText() if keyboard.isConfirmed() else None
 
-        if not q:
+        if search_query is None:
             return
 
-        q = q.lower()
+        search_query = search_query.lower()
+        clean_search_query = utils.title_key(search_query)
 
-        dbcon = database.connect(control.searchFile)
-        dbcur = dbcon.cursor()
-        dbcur.execute("DELETE FROM movies WHERE term = ?", (q,))
-        dbcur.execute("INSERT INTO movies VALUES (?,?)", (None, q))
-        dbcon.commit()
-        dbcur.close()
-        url = self.search_link % quote_plus(q)
+        db_connection = database.connect(control.searchFile)
+        db_cursor = db_connection.cursor()
+        db_cursor.execute("DELETE FROM movies WHERE term = ?", (search_query,))
+        db_cursor.execute("INSERT INTO movies VALUES (?,?)", (None, search_query))
+        db_connection.commit()
+        db_cursor.close()
 
+        url = self.search_link % quote_plus(clean_search_query)
         self.get(url)
 
-    def search_term(self, name):
-        url = self.search_link % quote_plus(name)
-        self.get(url)
 
+
+    def search_term(self, query):
+        control.idle()
+        query = query.lower()
+        cleaned_query = utils.title_key(query)
+
+        db_connection = database.connect(control.searchFile)
+        db_cursor = db_connection.cursor()
+        db_cursor.execute("DELETE FROM movies WHERE term = ?", (query,))
+        db_cursor.execute("INSERT INTO movies VALUES (?, ?)", (None, query))
+        db_connection.commit()
+        db_cursor.close()
+
+        search_url = self.search_link % quote_plus(cleaned_query)
+        self.get(search_url)
 
     def delete_search_term(self, search_term_id):
         """
@@ -342,40 +381,54 @@ class movies:
         :type search_term_id: int
         """
         try:
-            dbcon = database.connect(control.searchFile)
-            dbcur = dbcon.cursor()
-            dbcur.execute("DELETE FROM movies WHERE ID = ?", (search_term_id,))
-            dbcur.execute("SELECT * FROM movies ORDER BY ID DESC")
-            for _id, term in dbcur.fetchall():
-                c.log(f"[CM Debug @ 389 in movies.py] id = {_id}, term = {term}")
-
-            dbcon.commit()
-            dbcur.close()
+            db_connection = database.connect(control.searchFile)
+            db_cursor = db_connection.cursor()
+            db_cursor.execute("DELETE FROM movies WHERE ID = ?", (search_term_id,))
+            db_connection.commit()
+            db_cursor.close()
             control.refresh()
-        except database.Error as e:
-            c.log(f'Exception raised. Error = {e}')
-
         except Exception as e:
             import traceback
-            failure = traceback.format_exc()
-            c.log(f'[CM Debug @ 352 in movies.py]Traceback:: {failure}')
-            c.log(f'[CM Debug @ 352 in movies.py]Exception raised. Error = {e}')
-            pass
+            error_traceback = traceback.format_exc()
+            c.log(f'[Error in delete_search_term] Traceback: {error_traceback}')
+            c.log(f'[Error in delete_search_term] Exception: {e}')
+
+
 
 
     def person(self):
-        try:
-            t = control.lang(32010)
-            k = control.keyboard('', t)
-            k.doModal()
-            q = k.getText() if k.isConfirmed() else None
+        """
+        Prompts the user for a person's name using a keyboard input dialog,
+        formats the input into a URL, and retrieves information about the person.
 
-            if (q is None or q == ''):
+        This method uses a control interface to display a keyboard for user input.
+        If a valid query is provided, it constructs a URL with the person's name
+        and calls the `persons` method to fetch the person's details.
+
+        Logs any errors encountered during user input, URL formatting,
+        or person data retrieval.
+
+        Exceptions:
+            Logs any exceptions that occur during user input, URL formatting,
+            or person data retrieval.
+        """
+        try:
+            search_header = control.lang(32010)
+            keyboard = control.keyboard('', search_header)
+            keyboard.doModal()
+            search_query = keyboard.getText() if keyboard.isConfirmed() else None
+
+            if not search_query:
                 return
 
-            url = self.person_link % quote_plus(q)
+            search_query = search_query.lower()
+            clean_search_query = utils.title_key(search_query)
+            url = self.person_link % quote_plus(clean_search_query)
+            c.log(f"[CM Debug @ 427 in movies.py] url = {url}")
             self.persons(url)
-        except Exception:
+
+        except Exception as e:
+            c.log(f'Error in person method: {e}')
             return
 
 
@@ -961,6 +1014,8 @@ class movies:
     def tmdb_person_list(self, url):
         try:
             result = self.session.get(url, timeout=15).json()
+
+            c.log(f"[CM Debug @ 1018 in movies.py] result = {result}")
             items = result['results']
         except Exception:
             pass

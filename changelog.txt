@@ -1,6 +1,6 @@
 [COLOR orchid][B]version 2.1.0[/B][/COLOR]
 
-* [COLOR teal]Info[/COLOR]: This is a major release where a lot of things have been changed and it is almost a complete rewrite of the addon. While it has been tested on a lot of different systems, bugs on some devices/systems may occur. Please let us know.
+* [COLOR teal]Info[/COLOR]: This is a major release where a lot of things have been changed and it's almost a complete rewrite of the addon. While it has been tested on a lot of different systems, bugs on some devices/systems may occur. Please let us know.
 
 * [COLOR red]Warning[/COLOR]: As of his version The crew will only (!) supports Python 3.8 and above which means, for now, kodi v20 and 21. Unexpected results WILL happen when using on v19.
 
@@ -11,6 +11,7 @@
 * [COLOR green]Added[/COLOR]: search items can be deleted per item inside dialog (hold button or right-click)
 * [COLOR green]Added[/COLOR]: progress time remaining in title when movie or episode is paused
 * [COLOR green]Added[/COLOR]: progress synced with trakt
+* [COLOR green]Added[/COLOR]: Extensive Orion support (see https://www.orionoid.com for info)
 
 
 * [COLOR orange]Fixed[/COLOR]: trailers playing again
@@ -22,7 +23,7 @@
 * [COLOR orange]Fixed[/COLOR]: several indicators (e.g. progress indicators movies)
 * [COLOR orange]Fixed[/COLOR]: countless errors and created numerous new defs to fix old code
 * [COLOR orange]Fixed[/COLOR]: reading of the trakt/local bookmarks setting in Settings
-* [COLOR orange]Fixed[/COLOR]:
+* [COLOR orange]Fixed[/COLOR]: a lot of regex strings to string literals (raw) to prevent deprecation warnings
 * [COLOR orange]Fixed[/COLOR]:
 
 * [COLOR cyan]Changed[/COLOR]: several (missing) language strings
