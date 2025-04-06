@@ -77,7 +77,8 @@ class trailers:
 
             self.search_link = f'https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=10&q=%s&key={self.key}'
             self.youtube_watch = 'https://www.youtube.com/watch?v=%s'
-            self.yt_plugin_url = 'plugin://plugin.video.youtube/?action=play_video&videoid=%s'
+            self.yt_plugin_url1 = 'plugin://plugin.video.youtube/?action=play_video&videoid=%s'
+            self.yt_plugin_url = 'plugin://plugin.video.youtube/play/?video_id=%s'
             self.yt_plugin_url2 = "https://www.youtube.com/embed/%s?autohide=0&iv_load_policy=3&modestbranding=0&rel=0&mute=0&autoplay=0&enablejsapi=1&origin=https://www.bubblegum.com&widgetid=1"
         except Exception as e:
             import traceback
@@ -155,8 +156,8 @@ class trailers:
             c.log(f"[CM Debug @ 140 in trailer.py] result = {repr(result)}")
 
             url = result['video']
-            if 'youtube' in url:
-                url = self.get_youtube_link(url)
+            #if 'youtube' in url:
+                #url = self.get_youtube_link(url)
             title = result['title']
             plot = result['plot']
             #icon = result['video']

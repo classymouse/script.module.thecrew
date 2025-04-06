@@ -434,7 +434,7 @@ def getWatchedActivity():
     try:
         i = getTraktAsJson('/sync/last_activities')
 
-        c.log(f"[CM Debug @ 425 in trakt.py] i = {i}")
+        #c.log(f"[CM Debug @ 425 in trakt.py] i = {i}")
 
         activity = []
         activity.append(i['movies']['watched_at'])
@@ -486,7 +486,7 @@ def cachesyncTVShows(timeout=0):
 
 def timeoutsyncTVShows():
     timeout = cache.timeout(syncTVShows, trakt_user)
-    c.log(f"[CM Debug @ 499 in trakt.py] timeout = {timeout}")
+    #c.log(f"[CM Debug @ 499 in trakt.py] timeout = {timeout}")
     if not timeout:
         timeout = 0
     return timeout
@@ -742,7 +742,7 @@ def getEpisodeRating(imdb, season, episode):
 sql_dict = {
     'sql_create_movie_collection' :
         'CREATE TABLE IF NOT EXISTS movies_collection (last_collected_at TEXT, last_updated_at TEXT, Title TEXT, Year INT, trakt INT, slug TEXT, imdb TEXT, tmdb INT, UNIQUE(trakt, imdb, tmdb));',
-    'sql_create_tvshow_collection' :
+    'sql_create_shows_collection' :
         'CREATE TABLE IF NOT EXISTS shows_collection (last_collected_at TEXT, last_updated_at TEXT, Title TEXT, Year INT, trakt INT, slug TEXT, tvdb INT, imdb TEXT, tmdb INT, tvrage TEXT, UNIQUE(trakt, tvdb, imdb, tmdb));',
     'sql_create_seasons_collection' :
         'CREATE TABLE IF NOT EXISTS seasons_collection (trakt INT, tvdb INT, imdb TEXT, tmdb INT, season INT, episode INT, collected_at TEXT);',
@@ -887,7 +887,7 @@ def fill_progress_table():
                 showtmdb = item.get('show').get('ids').get('tmdb')
                 showtvdb = item.get('show').get('ids').get('tvdb')
                 extended = get_show_extended_info(showtrakt)
-                c.log(f"[CM Debug @ 901 in trakt.py] extended = {extended}")
+                #c.log(f"[CM Debug @ 901 in trakt.py] extended = {extended}")
             else:
                 tvshowtitle = ''
                 showtrakt = '0'
@@ -895,7 +895,7 @@ def fill_progress_table():
                 showtmdb = '0'
                 showtvdb = '0'
 
-            c.log(f"[CM Debug @ 817 in trakt.py] mediatype = {media_type} with trakt = {trakt} and resume_point = {resume_point}, season = {season} and episode = {episode}")
+            #c.log(f"[CM Debug @ 817 in trakt.py] mediatype = {media_type} with trakt = {trakt} and resume_point = {resume_point}, season = {season} and episode = {episode}")
             insert_trakt_progress(media_type, trakt, imdb, tmdb, tvdb, showtrakt, showimdb, showtmdb, showtvdb, season, episode, resume_point, curr_time, last_played, resume_id, tvshowtitle, title, year)
     return
 
@@ -949,9 +949,9 @@ def sync_last_activities():
     _all = i.get('all')
     _crew = cleandate.now_to_iso()#last run
 
-    c.log(f"[CM Debug @ 851 in trakt.py] all = {_all} and crew = {_crew}")
+    #c.log(f"[CM Debug @ 851 in trakt.py] all = {_all} and crew = {_crew}")
     update_service(_all, _crew)
-    c.log(f"[CM Debug @ 853 in trakt.py] i = {repr(i)}")
+    #c.log(f"[CM Debug @ 853 in trakt.py] i = {repr(i)}")
     #activity = []
     #activity = [cleandate.new_iso_to_utc(i) for i in activity]
     #activity = sorted(activity, key=int)[-1]
@@ -967,10 +967,10 @@ def update_service(_all, _crew):
         for k,v in d.items():
             sql = sql_dict['sql_update_service']
             #sql = sql_dict['sql_update_service']
-            c.log(f"[CM Debug @ 880 in trakt.py] sql = {sql}")
+            #c.log(f"[CM Debug @ 880 in trakt.py] sql = {sql}")
             #dbcur.execute(sql, (_all, _crew))
             dbcur.execute(sql, (v, k))
-            dbcon.commit()
+        dbcon.commit()
         dbcur.close()
         dbcon.close()
     except Exception as e:
@@ -1225,8 +1225,8 @@ def create_table(name='', query = ''):
         dbcur = get_connection_cursor(dbcon)
 
         if f'sql_create_{name}' in sql_dict:
+
             sql = sql_dict[f'sql_create_{name}']
-            c.log(f"[CM Debug @ 1006 in trakt.py] sql = {sql}")
             dbcur.execute(sql)
         elif query:
             if query.lower().startswith('create table'):
@@ -1234,7 +1234,8 @@ def create_table(name='', query = ''):
             else:
                 c.log(f"Trying to use invalid query in trakt::create_table, query = {query}, returning")
                 #no return here, let finally gracefully close the connection
-
+    except OperationalError as e:
+        c.log(f"[CM Debug @ 1238 in trakt.py] SQL Operational Error: {e}")
     except Exception as e:
         import traceback
         failure = traceback.format_exc()

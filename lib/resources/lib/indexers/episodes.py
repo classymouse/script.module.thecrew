@@ -1283,7 +1283,7 @@ class episodes:
                         '_last_watched': last_watched
                     })
             except Exception as e:
-                c.log(f"[CM Debug @ 1208 in episodes.py] error = {e}")
+                #c.log(f"[CM Debug @ 1208 in episodes.py] error = {e}")
                 pass
 
         try:
@@ -2138,7 +2138,7 @@ class episodes:
 
         for item in items:
             try:
-                c.log(f"[CM Debug @ 2048 in episodes.py] item = {item}")
+                #c.log(f"[CM Debug @ 2048 in episodes.py] item = {item}")
                 label = item['label'] if 'label' in item else item['title']
                 if 'unaired' in item and item['unaired'] == 'true':
                     label = unaired_color % label
@@ -2266,7 +2266,7 @@ class episodes:
                 #not all episodes have an imdb id, all do have a tmdb id
 
                 offset = bookmarks.get('episode', imdb=imdb_id, tmdb=tmdb_id, season=season, episode=episode, local=False)
-                c.log(f"[CM Debug @ 2159 in episodes.py] offset = {offset}")
+                #c.log(f"[CM Debug @ 2159 in episodes.py] offset = {offset}")
                 meta.update({'offset': offset})
 
                 meta['studio'] = c.string_split_to_list(meta['studio']) if 'studio' in meta else []

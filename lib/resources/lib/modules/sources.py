@@ -56,8 +56,6 @@ import sqlite3 as database
 import resolveurl
 import xbmc
 
-
-
 import six
 #from six.moves import reduce #zip,
 
@@ -1067,10 +1065,12 @@ class sources:
                 sourceDict = [(i[0], i[1], getattr(i[1], 'tvshow', None)) for i in sourceDict]
                 genres = trakt.getGenre('show', 'imdb', imdb)
 
-            sourceDict = [(i[0], i[1], i[2]) for i in sourceDict if not hasattr(i[1], 'genre_filter') or not i[1].genre_filter or any(x in i[1].genre_filter for x in genres)]
+            #sourceDict = [(i[0], i[1], i[2]) for i in sourceDict if not hasattr(i[1], 'genre_filter') or not i[1].genre_filter or any(x in i[1].genre_filter for x in genres)]
+
             sourceDict = [(i[0], i[1]) for i in sourceDict if i[2] is not None]
 
             language = self.getLanguage()
+            c.log(f"[CM Debug @ 1075 in sources.py] sourceDict: {sourceDict}")
             sourceDict = [(i[0], i[1], i[1].language) for i in sourceDict]
             sourceDict = [(i[0], i[1]) for i in sourceDict if any(x in i[2] for x in language)]
 

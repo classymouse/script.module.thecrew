@@ -21,7 +21,7 @@ import re
 import platform
 import json
 import base64
-from datetime import datetime
+import datetime
 from io import open
 #import traceback
 from inspect import getframeinfo, stack
@@ -31,6 +31,9 @@ import xbmcvfs
 import xbmcaddon
 import xbmcgui
 import xbmcplugin
+
+from . import keys
+from orion import *
 
 
 
@@ -144,6 +147,7 @@ class CrewRuntime:
         self.toggle = 1 # cm - internal debugging
 
         self.set_imagesizes()
+        self.check_orion()
 
 
     def addon_exists(script_name) -> bool:
@@ -235,7 +239,7 @@ class CrewRuntime:
                     line = 'Classy started this file\n'
                     _file.write(line.rstrip('\r\n') + '\n')
                 with open(log_file, 'a', encoding="utf8") as _file:
-                    now = datetime.now()
+                    now = datetime.datetime.now()
                     _dt = now.strftime("%Y-%m-%d %H:%M:%S")
 
                     #line = f'[{_date} {_time}] {head}: {msg}'
@@ -348,6 +352,36 @@ class CrewRuntime:
 
         # If it's neither a string nor bytes, raise an error
         raise TypeError("Input must be a string or bytes, not '{}'".format(type(s).__name__))
+
+    def check_orion(self):
+        #check if Orion is installed
+        if self.is_orion_installed():
+            result = Orion(keys.orion_key).user()
+            self.set_setting('orion.installed', '[COLOR lawngreen]Installed[/COLOR]')
+            self.set_setting('orion.boolinstalled', 'true')
+
+            if result.get('username') is not None:
+                temp = result.get("username")
+            else:
+                temp = self.obscure_email(result.get('email'))
+            self.set_setting('orion.username', temp)
+            package = result.get('subscription').get('package').get('name')
+            self.set_setting('orion.package', package)
+            expiration = result.get('subscription').get('time').get('expiration')
+            exp = datetime.datetime.fromtimestamp(expiration).strftime('%A %d %b, %Y')
+            self.set_setting('orion.expiration', str(exp))
+        else:
+            self.set_setting('orion.installed', '[COLOR red]Not Installed![/COLOR]')
+            self.set_setting('orion.boolinstalled', 'false')
+
+
+
+
+    def obscure_email(self, email):
+        return email[:2] + '*' * (len(email) - 4) + email[-2:]
+
+    def is_orion_installed(self):# -> Any:
+        return xbmc.getCondVisibility('System.HasAddon(script.module.orion)')
 
 
 
