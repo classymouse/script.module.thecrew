@@ -86,15 +86,15 @@ class source:
             #r = requests.get(url).content
             r = scraper.get(url).content
             r = ensure_text(r, errors='replace').replace('&nbsp;', ' ')
-            r = client.parseDOM(r, 'div', attrs={'class': 'col s12'})
-            posts = client.parseDOM(r, 'div')[1:]
+            r = client.parseDom(r, 'div', attrs={'class': 'col s12'})
+            posts = client.parseDom(r, 'div')[1:]
             posts = [i for i in posts if 'magnet/' in i]
             for post in posts:
 
-                links = client.parseDOM(post, 'a', ret='href')[0]
+                links = client.parseDom(post, 'a', ret='href')[0]
                 url = 'magnet:?xt=urn:btih:' + links.lstrip('magnet/')
                 try:
-                    name = client.parseDOM(post, 'a', ret='title')[0]
+                    name = client.parseDom(post, 'a', ret='title')[0]
                     if not query in cleantitle.get_title(name): continue
                 except:
                     name = ''

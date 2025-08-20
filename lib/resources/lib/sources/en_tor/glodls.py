@@ -121,12 +121,12 @@ class source:
         try:
             headers = {'User-Agent': client.agent()}
             r = client.request(url, headers=headers)
-            posts = client.parseDOM(r, 'tr', attrs={'class': 't-row'})
+            posts = client.parseDom(r, 'tr', attrs={'class': 't-row'})
             posts = [i for i in posts if not 'racker:' in i]
             for post in posts:
-                data = client.parseDOM(post, 'a', ret='href')
+                data = client.parseDom(post, 'a', ret='href')
                 url = [i for i in data if 'magnet:' in i][0]
-                name = client.parseDOM(post, 'a', ret='title')[0]
+                name = client.parseDom(post, 'a', ret='title')[0]
                 t = name.split(self.hdlr)[0]
 
                 if not cleantitle.get(re.sub('(|)', '', t)) == cleantitle.get(self.title): continue

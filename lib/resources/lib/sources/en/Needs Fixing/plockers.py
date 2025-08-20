@@ -66,7 +66,7 @@ class source:
 
     def sources(self, url, hostDict, hostprDict):
         try:
-            sources = []   
+            sources = []
             if url is None: return sources
 
             data = parse_qs(url)
@@ -85,18 +85,18 @@ class source:
             self.ua = {'User-Agent': client.agent(),
                        'Referer': self.base_link}
             r = self.s.get(url, headers=self.ua).text
-            posts = client.parseDOM(r, 'div', attrs={'class': 'item'})
-            posts = [(client.parseDOM(i, 'a', ret='href')[1],
-                      client.parseDOM(i, 'a')[1]) for i in posts if i]
+            posts = client.parseDom(r, 'div', attrs={'class': 'item'})
+            posts = [(client.parseDom(i, 'a', ret='href')[1],
+                      client.parseDom(i, 'a')[1]) for i in posts if i]
 
-            posts = [(i[0], client.parseDOM(i[1], 'i')[0]) for i in posts if i]
+            posts = [(i[0], client.parseDom(i[1], 'i')[0]) for i in posts if i]
 
             if 'tvshowtitle' in data:
                 sep = 'season %d' % int(data['season'])
                 sepi = 'season-%1d/episode-%1d.html' % (int(data['season']), int(data['episode']))
                 post = [i[0] for i in posts if sep in i[1].lower()][0]
                 data = self.s.get(post, headers=self.ua).content
-                link = client.parseDOM(data, 'a', ret='href')
+                link = client.parseDom(data, 'a', ret='href')
                 link = [i for i in link if sepi in i][0]
             else:
                 link = [i[0] for i in posts if cleantitle.get(i[1]) == cleantitle.get(title) and hdlr in i[1]][0]
@@ -105,7 +105,7 @@ class source:
             try:
                 v = re.findall('document.write\(Base64.decode\("(.+?)"\)', r)[0]
                 b64 = base64.b64decode(v).decode('utf-8')
-                url = client.parseDOM(b64, 'iframe', ret='src')[0]
+                url = client.parseDom(b64, 'iframe', ret='src')[0]
                 try:
                     host = re.findall('([\w]+[.][\w]+)$', urlparse.urlparse(url.strip().lower()).netloc)[0]
                     host = client.replaceHTMLCodes(host)
@@ -122,9 +122,9 @@ class source:
                     pass
             except:
                 pass
-            r = client.parseDOM(r, 'div', {'class': 'server_line'})
-            r = [(client.parseDOM(i, 'a', ret='href')[0],
-                  client.parseDOM(i, 'p', attrs={'class': 'server_servername'})[0]) for i in r]
+            r = client.parseDom(r, 'div', {'class': 'server_line'})
+            r = [(client.parseDom(i, 'a', ret='href')[0],
+                  client.parseDom(i, 'p', attrs={'class': 'server_servername'})[0]) for i in r]
             if r:
                 for i in r:
                     try:
@@ -153,11 +153,11 @@ class source:
                 r = self.s.get(url, headers=self.ua).text
                 v = re.findall('document.write\(Base64.decode\("(.+?)"\)', r)[0]
                 b64 = ensure_text(v)
-                url = client.parseDOM(b64, 'iframe', ret='src')[0]
+                url = client.parseDom(b64, 'iframe', ret='src')[0]
             except:
                 r = self.s.get(url, headers=self.ua)
-                r = client.parseDOM(r, 'div', attrs={'class': 'player'})
-                url = client.parseDOM(r, 'a', ret='href')[0]
+                r = client.parseDom(r, 'div', attrs={'class': 'player'})
+                url = client.parseDom(r, 'a', ret='href')[0]
 
             return url
         else:

@@ -72,7 +72,7 @@ class source:
             try:
                 url = urljoin(self.base_link, urls)
                 r = client.request(url, headers=self.headers)
-                r = client.parseDOM(r, 'article', attrs={'class': 'TPost B'})
+                r = client.parseDom(r, 'article', attrs={'class': 'TPost B'})
                 r = [re.findall(
                     '<a href="(.+?)">.+?<span class="Qlty">(.+?)</span>.+?<span class="Qlty Yr">(.+?)</span>.+?<h2 class="Title">(.+?)</h2>',
                     i, re.DOTALL)[0] for i in r]

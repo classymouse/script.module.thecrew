@@ -1,32 +1,24 @@
 # -*- coding: utf-8 -*-
 
-"""
-    Exodus Add-on
-    ///Updated for TheOath///
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-"""
+'''
+********************************************************cm*
+* The Crew Add-on
+*
+* @file source_utils.py
+* @package script.module.thecrew
+*
+* @copyright (c) 2025, The Crew
+* @license GNU General Public License, version 3 (GPL-3.0)
+*
+********************************************************cm*
+'''
 
 import base64
 import hashlib
 import re
-import xbmc
-#from kodi_six import xbmc
-import six
-#from six.moves import unquote
 
 from urllib.parse import unquote, urlparse, quote_plus
+import xbmc
 
 from . import cleantitle
 from . import client
@@ -73,10 +65,10 @@ def is_anime(content_type, content_id, genre_type):
 
 def get_release_quality(release_name, release_link=None):
 
-    if release_name is None:
-        return
-
     try:
+        if release_name is None:
+            return 'sd', []
+
         quality = None
         release_name = cleantitle.get_title(release_name)
         quality = get_quality(release_name)
@@ -84,18 +76,15 @@ def get_release_quality(release_name, release_link=None):
         if not quality:
             if release_link:
                 release_link = cleantitle.get_title(release_link)
-
                 quality = get_quality(release_link)
                 if not quality:
                     quality = 'sd'
             else:
                 quality = 'sd'
         info = []
-        #if '3d' in fmt or '.3D.' in release_name: info.append('3D')
-        #if any(i in ['hevc', 'h265', 'h.265', 'x265'] for i in fmt): info.append('HEVC')
-
         return quality, info
-    except Exception:
+    except Exception as e:
+        c.log(f'Exception in get_release_quality: {e}')
         return 'sd', []
 
 
@@ -106,100 +95,104 @@ def get_file_type(url):
     url = url.lower()
     url = re.sub('[^a-z0-9 ]+', ' ', url)
 
-    file_type = ''
+    file_types = []
 
     if any(i in url for i in ['bluray', 'blu ray']):
-        file_type += 'Bluray /'
+        file_types.append('Bluray')
     if any(i in url for i in ['bd r', 'bdr', 'bd rip', 'bdrip', 'br rip', 'brrip']):
-        file_type += 'BDRip /'
+        file_types.append('BDRip')
     if 'remux' in url:
-        file_type += 'Remux /'
+        file_types.append('Remux')
     if any(i in url for i in ['dvdrip', 'dvd rip']):
-        file_type += 'DVDRip /'
+        file_types.append('DVDRip')
     if any(i in url for i in ['dvd', 'dvdr', 'dvd r']):
-        file_type += 'DVD /'
+        file_types.append('DVD')
     if any(i in url for i in ['webdl', 'web dl', 'web', 'web rip', 'webrip']):
-        file_type += 'Web /'
+        file_types.append('Web')
     if 'hdtv' in url:
-        file_type += 'HDTV /'
+        file_types.append('HDTV')
     if 'sdtv' in url:
-        file_type += 'SDTV /'
+        file_types.append('SDTV')
     if any(i in url for i in ['hdrip', 'hd rip']):
-        file_type += 'HDRip /'
+        file_types.append('HDRip')
     if any(i in url for i in ['uhdrip', 'uhd rip']):
-        file_type += 'UHDRip /'
+        file_types.append('UHDRip')
     if 'r5' in url:
-        file_type += 'R5 /'
+        file_types.append('R5')
     if any(i in url for i in ['cam', 'hdcam', 'hd cam', 'cam rip', 'camrip']):
-        file_type += 'CAM /'
+        file_types.append('CAM')
     if any(i in url for i in ['ts', 'telesync', 'hdts', 'pdvd']):
-        file_type += 'TS /'
+        file_types.append('TS')
     if any(i in url for i in ['tc', 'telecine', 'hdtc']):
-        file_type += 'TC /'
+        file_types.append('TC')
     if any(i in url for i in ['scr', 'screener', 'dvdscr', 'dvd scr']):
-        file_type += 'SCR /'
+        file_types.append('SCR')
     if 'xvid' in url:
-        file_type += 'XVID /'
+        file_types.append('XVID')
     if 'avi' in url:
-        file_type += 'AVI /'
+        file_types.append('AVI')
     if any(i in url for i in ['h 264', 'h264', 'x264', 'avc']):
-        file_type += 'H.264 /'
+        file_types.append('H.264')
     if any(i in url for i in ['h 265', 'h256', 'x265', 'hevc']):
-        file_type += 'HEVC /'
+        file_types.append('HEVC')
     if 'hi10p' in url:
-        file_type += 'HI10P /'
+        file_types.append('HI10P')
     if '10bit' in url:
-        file_type += '10BIT /'
+        file_types.append('10BIT')
     if '3d' in url:
-        file_type += '3D /'
-    if any(i in url for i in ['hdr', 'hdr10', 'dolby vision', 'hlg']):
-        file_type += 'HDR /'
+        file_types.append('3D')
+    if any(i in url for i in ['hdr', 'hdr10', 'hlg']):
+        file_types.append('HDR')
+    if any(i in url for i in ['dolby vision', 'dolbyvision']):
+        file_types.append('DV')
     if 'imax' in url:
-        file_type += 'IMAX /'
+        file_types.append('IMAX')
     if any(i in url for i in ['ac3', 'ac 3']):
-        file_type += 'AC3 /'
+        file_types.append('AC3')
     if 'aac' in url:
-        file_type += 'AAC /'
-    if 'aac5 1' in url:
-        file_type += 'AAC / 5.1 /'
-    if any(i in url for i in ['dd', 'dolby', 'dolbydigital', 'dolby digital']):
-        file_type += 'DD /'
-    if any(i in url for i in ['truehd', 'true hd']):
-        file_type += 'TRUEHD /'
-    if 'atmos' in url:
-        file_type += 'ATMOS /'
+        file_types.append('AAC')
+    #cm doubles - AAC is already checked, 5.1 also
+    #if 'aac5 1' in url:
+        #file_types.append('AAC / 5.1')
     if any(i in url for i in ['ddplus', 'dd plus', 'ddp', 'eac3', 'eac 3']):
-        file_type += 'DD+ /'
+        file_types.append('DD+')
+    if any(i in url for i in ['dd', 'dolby', 'dolbydigital', 'dolby digital']) and 'DD' not in file_types and 'DD+' not in file_types:
+        file_types.append('DD')
+    if any(i in url for i in ['truehd', 'true hd']):
+        file_types.append('TRUEHD')
+    if 'atmos' in url:
+        file_types.append('ATMOS')
     if 'dts' in url:
-        file_type += 'DTS /'
+        file_types.append('DTS')
     if any(i in url for i in ['hdma', 'hd ma']):
-        file_type += 'HD.MA /'
+        file_types.append('HD.MA')
     if any(i in url for i in ['hdhra', 'hd hra']):
-        file_type += 'HD.HRA /'
+        file_types.append('HD.HRA')
     if any(i in url for i in ['dtsx', 'dts x']):
-        file_type += 'DTS:X /'
-    if 'dd5 1' in url:
-        file_type += 'DD / 5.1 /'
-    if 'ddp5 1' in url:
-        file_type += 'DD+ / 5.1 /'
+        file_types.append('DTS:X')
+    #cm doubles
+    #if 'dd5 1' in url:
+        #file_types.append('DD / 5.1')
+    #if 'ddp5 1' in url:
+        #file_types.append('DD+ / 5.1')
     if any(i in url for i in ['5 1', '6ch']):
-        file_type += '5.1 /'
+        file_types.append('5.1')
     if any(i in url for i in ['7 1', '8ch']):
-        file_type += '7.1 /'
+        file_types.append('7.1')
     if 'korsub' in url:
-        file_type += 'HC-SUBS /'
+        file_types.append('HC-SUBS')
     if any(i in url for i in ['subs', 'subbed', 'sub']):
-        file_type += 'SUBS /'
+        file_types.append('SUBS')
     if any(i in url for i in ['dub', 'dubbed', 'dublado']):
-        file_type += 'DUB /'
+        file_types.append('DUB')
     if 'repack' in url:
-        file_type += 'REPACK /'
+        file_types.append('REPACK')
     if 'proper' in url:
-        file_type += 'PROPER /'
+        file_types.append('PROPER')
     if 'nuked' in url:
-        file_type += 'NUKED /'
-    file_type = file_type.rstrip('/')
-    return file_type
+        file_types.append('NUKED')
+
+    return '[COLOR lawngreen] / [/COLOR]'.join(file_types)
 
 
 
@@ -440,6 +433,15 @@ def _size(siz):
     float_size = float(re.sub('[^0-9|/.|/,]', '', siz.replace(',', '.'))) / div
     str_size = str('%.2f GB' % float_size)
     return float_size, str_size
+
+def file_size(siz):
+    if siz in ['0', 0, '', None]:
+        return 0.0, ''
+    div = 1 if siz.lower().endswith(('gb', 'gib')) else 1024
+    float_size = float(re.sub('[^0-9|/.|/,]', '', siz.replace(',', '.'))) / div
+    str_size = str('%.2f GB' % float_size)
+    return float_size, str_size
+
 
 
 def get_size(url):

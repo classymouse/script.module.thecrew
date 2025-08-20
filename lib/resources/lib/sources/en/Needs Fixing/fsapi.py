@@ -90,7 +90,7 @@ class source:
             posts = client.request(url)
             #log_utils.log('fsapi_posts: ' + posts)
             r = re.findall('<a href="(.+?)" rel', posts)
-            r = client.parseDOM(posts, 'a', ret='href', attrs={'target': 'iframe_a'})
+            r = client.parseDom(posts, 'a', ret='href', attrs={'target': 'iframe_a'})
             urls = [u.split('url=')[1] for u in r]
             urls = [ensure_text(base64.b64decode(url), errors='ignore') for url in urls]
             urls = ['https:' + url if url.startswith('//') else url for url in urls]
@@ -147,7 +147,7 @@ class source:
         sources = []
         try:
             html = client.request(link)
-            urls = client.parseDOM(html, 'li', ret='data-video')
+            urls = client.parseDom(html, 'li', ret='data-video')
             if urls:
                 for url in urls:
                     url = url.replace('vidcloud.icu', 'vidembed.io').replace(

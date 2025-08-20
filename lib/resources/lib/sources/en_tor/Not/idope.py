@@ -85,7 +85,7 @@ class source:
 
             try:
                 r = client.request(url)
-                posts = client.parseDOM(r, 'tr')
+                posts = client.parseDom(r, 'tr')
                 for post in posts:
                     link = re.findall('a title="Download Torrent Magnet" href="(magnet:.+?)"', post, re.DOTALL)
                     try:

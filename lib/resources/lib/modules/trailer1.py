@@ -166,10 +166,10 @@ class trailers:
             url = 'https://www.youtube.com/watch?v=%s' % id
             result = client.request(url)
 
-            message = client.parseDOM(result, 'div', attrs={'id': 'unavailable-submessage'})
+            message = client.parseDom(result, 'div', attrs={'id': 'unavailable-submessage'})
             message = ''.join(message)
 
-            alert = client.parseDOM(result, 'div', attrs={'id': 'watch7-notification-area'})
+            alert = client.parseDom(result, 'div', attrs={'id': 'watch7-notification-area'})
 
             if len(alert) > 0: raise Exception()
             if re.search('[a-zA-Z]', message): raise Exception()

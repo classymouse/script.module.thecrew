@@ -47,7 +47,7 @@ class source:
             post = 'do=search&subaction=search&story=%s' % quote_plus(query)
 
             r = client.request(self.base_link, post=post)
-            r = client.parseDOM(r, 'div', attrs={'class': 'thumbnail text-center'})
+            r = client.parseDom(r, 'div', attrs={'class': 'thumbnail text-center'})
             for r in r:
                 r = re.findall('<p><a href="(.+?)" title="(.+?)">.+?</a></p>', r, re.DOTALL)
                 if data['title'] not in r[0][1]:

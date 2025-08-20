@@ -67,283 +67,157 @@ class indexer:
     def __init__(self):
         self.list = []
         self.hash = []
+        self.imdb_info_link = 'http://www.omdbapi.com/?i=%s&plot=full&r=json'
+        self.tvmaze_info_link = 'http://api.tvmaze.com/lookup/shows?thetvdb=%s'
+        self.lang = 'en'
+        self.meta = []
 
     def root_porn(self):
-        try:
-            #self.create_list('https://raw.githubusercontent.com/posadka/pinkhat/main/pinkhat/xxx.xml')
-            self.create_list('https://classymouse.github.io/temp/xxx.xml')
-        except:
-            pass
+        self.create_list('https://raw.githubusercontent.com/posadka/pinkhat/main/pinkhat/xxx.xml')
+        #self.create_list('https://classymouse.github.io/temp/xxx.xml')
 
     def root_base(self):
-        try:
-            self.create_list('https://pastebin.com/raw/K3YSAUsD')
-        except:
-            pass
+        self.create_list('https://pastebin.com/raw/K3YSAUsD')
 
     def root_waste(self):
-        try:
-            self.create_list('http://dystopiabuilds.xyz/waste/main.xml')
-        except:
-            pass
+        self.create_list('http://dystopiabuilds.xyz/waste/main.xml')
 
     def root_titan(self):
-        try:
-            self.create_list('http://magnetic.website/Mad%20Titan/main.xml')
-        except:
-            pass
+        self.create_list('http://magnetic.website/Mad%20Titan/main.xml')
 
     def root_greyhat(self):
-        try:
-            self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/kids/greyhat_main.xml')
-        except:
-            pass
+        self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/kids/greyhat_main.xml')
 
     def root_debridkids(self):
-        try:
-            self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/kids/debridkids.xml')
-        except:
-            pass
+        self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/kids/debridkids.xml')
 
     def root_waltdisney(self):
-        try:
-            self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/kids/disney_years/main.xml')
-        except:
-            pass
+        self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/kids/disney_years/main.xml')
 
     def root_learning(self):
-        try:
-            self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/kids/learning.xml')
-        except:
-            pass
+        self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/kids/learning.xml')
 
     def root_songs(self):
-        try:
-            self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/kids/songs.xml')
-        except:
-            pass
+        self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/kids/songs.xml')
 
     def root_yellowhat(self):
-        try:
-            self.create_list('https://pastebin.com/raw/d5cb3Wxw')
-        except:
-            pass
+        self.create_list('https://pastebin.com/raw/d5cb3Wxw')
 
     def root_redhat(self):
-        try:
-            self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/standup/main.xml')
-        except:
-            pass
+        self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/standup/main.xml')
 
     def root_blackhat(self):
-        try:
-            self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/fitness/main.xml')
-        except:
-            pass
+        self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/fitness/main.xml')
 
     def root_food(self):
-        try:
-            self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/food/food_main.xml')
-        except:
-            pass
+        self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/food/food_main.xml')
 
     def root_greenhat(self):
-        try:
-            self.create_list('http://thechains24.com/GREENHAT/green.xml')
-        except:
-            pass
+        self.create_list('http://thechains24.com/GREENHAT/green.xml')
 
     def root_whitehat(self):
-        try:
-            self.create_list('https://pastebin.com/raw/tMSGGbxc')
-        except:
-            pass
+        self.create_list('https://pastebin.com/raw/tMSGGbxc')
 
     def root_absolution(self):
-        try:
-            self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/absolution/absolution_main.xml')
-        except:
-            pass
+        self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/absolution/absolution_main.xml')
 
     def root_ncaa(self):
-        try:
-            self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/sports/ncaa/ncaa.xml')
-        except:
-            pass
+        self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/sports/ncaa/ncaa.xml')
 
     def root_ncaab(self):
-        try:
-            self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/sports/ncaa/ncaab.xml')
-        except:
-            pass
+        self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/sports/ncaa/ncaab.xml')
 
     def root_lfl(self):
-        try:
-            self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/sports/lfl/lfl.xml')
-        except:
-            pass
+        self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/sports/lfl/lfl.xml')
 
     def root_mlb(self):
-        try:
-            self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/sports/mlb/mlb.xml')
-        except:
-            pass
+        self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/sports/mlb/mlb.xml')
 
     def root_nfl(self):
-        try:
-            self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/sports/nfl/nfl.xml')
-        except:
-            pass
+        self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/sports/nfl/nfl.xml')
 
     def root_nhl(self):
-        try:
-            self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/sports/nhl/nhl.xml')
-        except:
-            pass
+        self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/sports/nhl/nhl.xml')
 
     def root_nba(self):
-        try:
-            self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/sports/nba/nba.xml')
-        except:
-            pass
+        self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/sports/nba/nba.xml')
 
     def root_ufc(self):
-        try:
-            self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/sports/ufc_mma/ufc.xml')
-        except:
-            pass
+        self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/sports/ufc_mma/ufc.xml')
 
     def root_motogp(self):
-        try:
-            self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/sports/motor/motogp.xml')
-        except:
-            pass
+        self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/sports/motor/motogp.xml')
 
     def root_boxing(self):
-        try:
-            self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/sports/boxing/boxing.xml')
-        except:
-            pass
+        self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/sports/boxing/boxing.xml')
 
     def root_fifa(self):
-        try:
-            self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/sports/fifa/fifa.xml')
-        except:
-            pass
+        self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/sports/fifa/fifa.xml')
 
     def root_wwe(self):
-        try:
-            self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/sports/wwe/wwe.xml')
-        except:
-            pass
+        self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/sports/wwe/wwe.xml')
 
     def root_sports_channels(self):
-        try:
-            self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/sports/channels/channels.xml')
-        except:
-            pass
+        self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/sports/channels/channels.xml')
 
     def root_sreplays(self):
-        try:
-            self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/sports/replays/replays.xml')
-        except:
-            pass
+        self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/sports/replays/replays.xml')
 
     def root_misc_sports(self):
-        try:
-            self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/sports/misc/misc_sports.xml')
-        except:
-            pass
+        self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/sports/misc/misc_sports.xml')
 
     def root_tennis(self):
-        try:
-            self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/sports/tennis/tennis.xml')
-        except:
-            pass
+        self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/sports/tennis/tennis.xml')
 
     def root_f1(self):
-        try:
-            self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/sports/motor/f1.xml')
-        except:
-            pass
+        self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/sports/motor/f1.xml')
 
     def root_pga(self):
-        try:
-            self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/sports/pga/pga.xml')
-        except:
-            pass
+        self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/sports/pga/pga.xml')
 
     def root_kiddo(self):
-        try:
-            self.create_list('http://cellardoortv.com/kiddo/master/main.xml')
-        except:
-            pass
+        self.create_list('http://cellardoortv.com/kiddo/master/main.xml')
 
     def root_purplehat(self):
-        try:
-            self.create_list('https://bitbucket.org/team-crew/purplehat/raw/master/CCcinema.xml')
-        except:
-            pass
+        self.create_list('https://bitbucket.org/team-crew/purplehat/raw/master/CCcinema.xml')
+
+
+    def root_classy(self):
+        self.create_list('https://raw.githubusercontent.com/classymouse/cc/main/CCcinema.xml')
+
+
+
+
 
     def root_personal(self):
-        try:
-            self.create_personal('personal.list')
-        except:
-            pass
+        self.create_personal('personal.list')
 
     def root_git(self):
-        try:
-            self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/iptv/main.xml')
-        except:
-            pass
+        self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/iptv/main.xml')
 
     def root_nascar(self):
-        try:
-            self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/sports/nascar/nascar.xml')
-        except:
-            pass
+        self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/sports/nascar/nascar.xml')
 
-    def root_xfl(self):#
-        try:
-            self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/sports/xfl/xfl.xml')
-        except:
-            pass
+    def root_xfl(self):
+        self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/sports/xfl/xfl.xml')
 
-    def root_tubi(self):#
-        try:
-            self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/iptv/tubitv.xml')
-        except:
-            pass
+    def root_tubi(self):
+        self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/iptv/tubitv.xml')
 
-    def root_pluto(self):#
-        try:
-            self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/iptv/pluto.xml')
-        except:
-            pass
+    def root_pluto(self):
+        self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/iptv/pluto.xml')
 
-    def root_bumble(self):#
-        try:
-            self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/iptv/bumblebee.xml')
-        except:
-            pass
+    def root_bumble(self):
+        self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/iptv/bumblebee.xml')
 
-    def root_xumo(self):#
-        try:
-            self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/iptv/xumo.xml')
-        except:
-            pass
+    def root_xumo(self):
+        self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/iptv/xumo.xml')
 
-    def root_distro(self):#
-        try:
-            self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/iptv/distro.xml')
-        except:
-            pass
+    def root_distro(self):
+        self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/iptv/distro.xml')
 
     def root_cricket(self):
-        try:
-            self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/sports/cricket/cricket.xml')
-        except:
-            pass
+        self.create_list('https://raw.githubusercontent.com/posadka/xmls2/main/sports/cricket/cricket.xml')
 
 #OH added 1-5-2021
     def create_list(self, url):
@@ -537,10 +411,17 @@ class indexer:
             except:
                 fanart = '0'
 
-            items = re.compile(
+            # items = re.compile(
+            #     '((?:<item>.+?</item>|<dir>.+?</dir>|<plugin>.+?</plugin>|<info>.+?</info>|<name>[^<]+</name><link>[^<]+</link><thumbnail>[^<]+</thumbnail><mode>[^<]+</mode>|<name>[^<]+</name><link>[^<]+</link><thumbnail>[^<]+</thumbnail><date>[^<]+</date>))',
+            #     re.MULTILINE|re.DOTALL
+            #     ).findall(result)
+
+
+            pattern = re.compile(
                 '((?:<item>.+?</item>|<dir>.+?</dir>|<plugin>.+?</plugin>|<info>.+?</info>|<name>[^<]+</name><link>[^<]+</link><thumbnail>[^<]+</thumbnail><mode>[^<]+</mode>|<name>[^<]+</name><link>[^<]+</link><thumbnail>[^<]+</thumbnail><date>[^<]+</date>))',
                 re.MULTILINE|re.DOTALL
-                ).findall(result)
+                )
+            items = pattern.findall(result)
 
             for item in items:
                 regdata = re.compile('(<regex>.+?</regex>)', re.MULTILINE|re.DOTALL).findall(item)
@@ -631,6 +512,7 @@ class indexer:
                     content = re.findall('<content>(.+?)</content>', meta)[0]
                 except:
                     content = '0'
+
                 if content == '0':
                     try:
                         content = re.findall('<content>(.+?)</content>', item)[0]
@@ -714,10 +596,6 @@ class indexer:
 #cm - checked
     def worker(self):
         try:
-            self.imdb_info_link = 'http://www.omdbapi.com/?i=%s&plot=full&r=json'
-            self.tvmaze_info_link = 'http://api.tvmaze.com/lookup/shows?thetvdb=%s'
-            self.lang = 'en'
-            self.meta = []
             total = len(self.list)
 
             if total == 0:

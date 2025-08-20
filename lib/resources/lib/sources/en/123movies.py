@@ -27,7 +27,7 @@ class source:
         self.priority = 1
         self.language = ['en']
         #self.domains = ['www11.123movie.movie', '123moviesfree.so', 'ww4.123moviesfree.net']
-        self.domains = ['ww4.123moviesfree.net']
+        self.domains = ['ww4.123moviesfree.net', 'https://ww5.123moviesfree.net/']
         #self.base_link = 'https://123moviesfree.so'
         self.base_link = 'https://ww4.123moviesfree.net'
         #self.search_link = '/movie/search/%s'
@@ -78,8 +78,8 @@ class source:
             url = urljoin(self.base_link, self.search_link % cleantitle.geturl(search))
             #c.log('123movies url: ' + url)
             r = scraper.get(url, timeout=10).text
-            r = client.parseDOM(r, 'div', attrs={'class': 'ml-item'})
-            r = zip(client.parseDOM(r, 'a', ret='href'), client.parseDOM(r, 'a', ret='title'))
+            r = client.parseDom(r, 'div', attrs={'class': 'ml-item'})
+            r = zip(client.parseDom(r, 'a', ret='href'), client.parseDom(r, 'a', ret='title'))
             r = [(i[0], i[1], re.findall('(.*?)\s+-\s+Season\s+(\d)', i[1])) for i in r]
             r = [(i[0], i[1], i[2][0]) for i in r if len(i[2]) > 0]
             url = [i[0] for i in r if self.matchAlias(i[2][0], aliases) and i[2][1] == season][0]
@@ -101,8 +101,8 @@ class source:
             #c.log(f"[CM Debug @ 100 in 123movies.py] url = {url}", 1)
 
             r = scraper.get(url, timeout=10).text
-            r = client.parseDOM(r, 'div', attrs={'class': 'ml-item'})
-            r = zip(client.parseDOM(r, 'a', ret='href'), client.parseDOM(r, 'a', ret='title'))
+            r = client.parseDom(r, 'div', attrs={'class': 'ml-item'})
+            r = zip(client.parseDom(r, 'a', ret='href'), client.parseDom(r, 'a', ret='title'))
             results = [(i[0], i[1], re.findall('\((\d{4})', i[1])) for i in r]
             try:
                 r = [(i[0], i[1], i[2][0]) for i in results if len(i[2]) > 0]
@@ -145,12 +145,12 @@ class source:
                 raise Exception()
 
             r = scraper.get(url, timeout=10).text
-            r = client.parseDOM(r, 'div', attrs={'class': 'les-content'})
+            r = client.parseDom(r, 'div', attrs={'class': 'les-content'})
             if 'tvshowtitle' in data:
                 ep = data['episode']
-                links = client.parseDOM(r, 'a', attrs={'episode-data': ep}, ret='player-data')
+                links = client.parseDom(r, 'a', attrs={'episode-data': ep}, ret='player-data')
             else:
-                links = client.parseDOM(r, 'a', ret='player-data')
+                links = client.parseDom(r, 'a', ret='player-data')
 
             for link in links:
                 try:

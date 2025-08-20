@@ -108,8 +108,8 @@ class source:
         try:
             headers = {'User-Agent': client.agent()}
             r = client.request(url, headers=headers)
-            posts = client.parseDOM(r, 'table', attrs={'class': 'table2'})[0]
-            posts = client.parseDOM(posts, 'tr')
+            posts = client.parseDom(r, 'table', attrs={'class': 'table2'})[0]
+            posts = client.parseDom(posts, 'tr')
             for post in posts:
                 data = dom.parse_dom(post, 'a', req='href')[1]
                 link = urljoin(self.base_link, data.attrs['href'])

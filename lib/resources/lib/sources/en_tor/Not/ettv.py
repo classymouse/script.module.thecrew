@@ -97,7 +97,7 @@ class source:
 
             try:
                 r = client.request(url)
-                links = client.parseDOM(r, "td", attrs={"nowrap": "nowrap"})
+                links = client.parseDom(r, "td", attrs={"nowrap": "nowrap"})
 
                 threads = []
                 for link in links:
@@ -130,7 +130,7 @@ class source:
             if url in str(self.sources):
                 raise Exception()
 
-            size_list = client.parseDOM(result, "td", attrs={"class": "table_col2"})
+            size_list = client.parseDom(result, "td", attrs={"class": "table_col2"})
 
             if any(x in url.lower() for x in ['french', 'italian', 'spanish', 'truefrench', 'dublado', 'dubbed']):
                 raise Exception()

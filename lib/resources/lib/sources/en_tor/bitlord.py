@@ -94,7 +94,7 @@ class source:
 
             try:
                 r = client.request(url)
-                links = zip(client.parseDOM(r, 'a', attrs={'class': 'btn btn-default magnet-button stats-action banner-button'}, ret='href'), client.parseDOM(r, 'td', attrs={'class': 'size'}))
+                links = zip(client.parseDom(r, 'a', attrs={'class': 'btn btn-default magnet-button stats-action banner-button'}, ret='href'), client.parseDom(r, 'td', attrs={'class': 'size'}))
 
                 for link in links:
                     url = link[0].replace('&amp;', '&')

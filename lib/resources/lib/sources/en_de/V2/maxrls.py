@@ -102,12 +102,12 @@ class source:
 
                     r = client.request(url)
 
-                posts = client.parseDOM(r, "h2", attrs={"class": "postTitle"})
+                posts = client.parseDom(r, "h2", attrs={"class": "postTitle"})
                 hostDict = hostprDict + hostDict
                 items = []
                 for post in posts:
                     try:
-                        u = client.parseDOM(post, 'a', ret='href')
+                        u = client.parseDom(post, 'a', ret='href')
                         for i in u:
                             name = str(i)
                             items.append(name)
@@ -121,9 +121,9 @@ class source:
                 try:
                     i = str(item)
                     r = client.request(i)
-                    u = client.parseDOM(r, "div", attrs={"class": "postContent"})
+                    u = client.parseDom(r, "div", attrs={"class": "postContent"})
                     for t in u:
-                        r = client.parseDOM(t, 'a', ret='href')
+                        r = client.parseDom(t, 'a', ret='href')
                         for url in r:
                             quality, info = source_utils.get_release_quality(url)
                             if 'SD' in quality:

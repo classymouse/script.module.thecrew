@@ -112,7 +112,7 @@ class source:
             html = client.request(url)
             html = html.replace('&nbsp;', ' ')
             try:
-                results = client.parseDOM(html, 'table', attrs={'id': 'searchResult'})[0]
+                results = client.parseDom(html, 'table', attrs={'id': 'searchResult'})[0]
             except Exception as e:
                 c.log(f'TPB1 - Failed to parse search results:{e}')
                 return sources

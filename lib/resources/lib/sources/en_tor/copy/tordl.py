@@ -92,11 +92,11 @@ class source:
             r = client.request(url)
             #r = scraper.get(url).content
             r = ensure_text(r, errors='replace').strip()
-            posts = client.parseDOM(r, 'table', attrs={'class': 'table2', 'cellspacing': '0'})[1]
-            posts = client.parseDOM(posts, 'tr')[1:]
+            posts = client.parseDom(r, 'table', attrs={'class': 'table2', 'cellspacing': '0'})[1]
+            posts = client.parseDom(posts, 'tr')[1:]
             for post in posts:
 
-                links = client.parseDOM(post, 'a', ret='href')[0]
+                links = client.parseDom(post, 'a', ret='href')[0]
                 links = client.replaceHTMLCodes(links).lstrip('/')
                 hash = links.split('/')[0]
                 name = links.split('/')[1]
@@ -105,7 +105,7 @@ class source:
 
                 quality, info = source_utils.get_release_quality(name)
                 try:
-                    size = client.parseDOM(post, 'td', attrs={'class': 'tdnormal'})[1]
+                    size = client.parseDom(post, 'td', attrs={'class': 'tdnormal'})[1]
                     dsize, isize = source_utils._size(size)
                 except:
                     dsize, isize = 0.0, ''

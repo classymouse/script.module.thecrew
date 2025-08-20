@@ -72,6 +72,8 @@ class sources:
             items = self.getSources(title, year, imdb, tmdb, season, episode, tvshowtitle, premiered)
             select = control.setting('hosts.mode') if not select else select # cm - this is ALWAYS select, always 1
 
+            c.log(f"[CM Debug @ 75 in sources - kopie (2).py] select is {select}")
+
             metadata = json.loads(meta) if meta is not None else {}
             mediatype = metadata['mediatype'] if 'mediatype' in metadata else ''
 

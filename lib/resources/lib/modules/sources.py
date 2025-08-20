@@ -26,6 +26,7 @@ import traceback
 import base64
 #import functools
 #import urllib
+import concurrent.futures as futures
 
 from urllib.parse import quote_plus, parse_qsl
 from functools import reduce
@@ -41,13 +42,20 @@ from . import keys
 from . import workers
 from . import source_utils
 from . import log_utils
-from .orion_api import oa
+
 from . import playcount
 from .listitem import ListItemInfoTag
 from .player import player
 from .crewruntime import c
 
-from orion import *
+
+try:
+    from orion import *
+    from .orion_api import oa
+    orion_installed = True
+except:
+    orion_installed = False
+    pass
 
 
 
@@ -56,7 +64,7 @@ import sqlite3 as database
 import resolveurl
 import xbmc
 
-import six
+#import six
 #from six.moves import reduce #zip,
 
 class sources:
@@ -68,15 +76,76 @@ class sources:
         if(control.setting('dev_pw') == c.ensure_text(base64.b64decode(b'dGhlY3Jldw=='))):
             self.dev_mode = True
         c.log(f"[CM Debug @ 70 in sources.py] devmode is {self.dev_mode}")
-        self.Orion = Orion(keys.orion_key)
+        if orion_installed:
+            self.Orion = Orion(keys.orion_key)
+        else:
+            self.Orion = None
 
 
-    def play(self, title, year, imdb, tmdb, season, episode, tvshowtitle, premiered, meta, select='1'):
+    def play(self, title, year, imdb_id, tmdb_id, season, episode, tvshowtitle, premiered, meta, select='1'):
+        """
+        Play a video based on the provided metadata.
+
+        :param title: The title of the video
+        :param year: The release year of the video
+        :param imdb_id: The IMDb ID of the video
+        :param tmdb_id: The TMDb ID of the video
+        :param season: The season number of the video (if applicable)
+        :param episode: The episode number of the video (if applicable)
+        :param tvshowtitle: The title of the TV show (if applicable)
+        :param premiered: The premiere date of the video (if applicable)
+        :param meta: A JSON string containing metadata about the video
+        :param select: A string indicating whether to select sources automatically (1) or show a dialog (0)
+        """
+        try:
+            url = None
+
+            metadata = json.loads(meta) if meta else {}
+            media_type = metadata.get('mediatype') or ''
+
+            if media_type != 'movie' and tvshowtitle:
+                title = tvshowtitle or title
+
+            returned_sources = self.getSources(title, year, imdb_id, tmdb_id, season, episode, tvshowtitle, premiered)
+            select = control.setting('hosts.mode') if not select else select
+
+            if returned_sources:
+                if select == '1' and 'plugin' in control.infoLabel('Container.PluginName'):
+                    control.window.clearProperty(self.itemProperty)
+                    control.window.setProperty(self.itemProperty, json.dumps(returned_sources))
+
+                    control.window.clearProperty(self.metaProperty)
+                    control.window.setProperty(self.metaProperty, meta)
+
+                    control.sleep(200)
+                    base_url = sys.argv[0]
+                    title_param = quote_plus(title)
+                    control.execute(f"Container.Update({base_url}?action=addItem&title={title_param})")
+
+                if select == '0' or select == '1':
+                    url = self.sourcesDialog(returned_sources)
+                else:
+                    url = self.sourcesDirect(returned_sources)
+
+            if not url or url == 'close://':
+                self.url = url
+                return self.errorForSources()
+
+            player().run(title, year, season, episode, imdb_id, tmdb_id, url, metadata)
+        except Exception:
+            pass
+
+
+
+
+    def play_orig(self, title, year, imdb, tmdb, season, episode, tvshowtitle, premiered, meta, select='1'):
         try:
             url = None
 
             items = self.getSources(title, year, imdb, tmdb, season, episode, tvshowtitle, premiered)
-            select = control.setting('hosts.mode') if not select else select # cm - this is ALWAYS select, always 1
+            select = control.setting('hosts.mode') if not select else select
+
+            c.log(f"[CM Debug @ 137 in sources.py] select is {select} and hosts.mode is {control.setting('hosts.mode')}")
 
             metadata = json.loads(meta) if meta is not None else {}
             mediatype = metadata['mediatype'] if 'mediatype' in metadata else ''
@@ -84,7 +153,6 @@ class sources:
             if mediatype != 'movie':
                 if tvshowtitle is not None:
                     title = tvshowtitle if len(tvshowtitle) > 0 else title
-                    pass
 
             if len(items) > 0:
 
@@ -97,9 +165,11 @@ class sources:
 
                     control.sleep(200)
 
-                    return control.execute('Container.Update(%s?action=addItem&title=%s)' % (sys.argv[0], quote_plus(title)))
+                    base_url = sys.argv[0]
+                    title_param = quote_plus(title)
+                    control.execute(f"Container.Update({base_url}?action=addItem&title={title_param})")
 
-                elif select == '0' or select == '1':
+                if select == '0' or select == '1':
                     url = self.sourcesDialog(items)
                 else:
                     url = self.sourcesDirect(items)
@@ -117,6 +187,8 @@ class sources:
             player().run(title, year, season, episode, imdb, tmdb, url, meta)
         except Exception:
             pass
+
+
 
     def addItem(self, title):
 
@@ -177,7 +249,7 @@ class sources:
             clearart = addon_clearart
             discart = addon_discart
 
-        meta = control.tagdataClean(meta)
+        #meta = control.tagdataClean(meta)
         sysimage = quote_plus(str(poster))
         download_menu = control.lang(32403)
 
@@ -199,6 +271,12 @@ class sources:
                 cm.append(('CM Test', f'RunPlugin({sysaddon}?action=classytest&title={systitle}&source={syssource})'))
                 item_list = control.item(label=label)
 
+
+                meta['studio'] = c.string_split_to_list(meta['studio']) if 'studio' in meta else []
+                meta['genre'] = c.string_split_to_list(meta['genre']) if 'genre' in meta else []
+                meta['director'] = c.string_split_to_list(meta['director']) if 'director' in meta else []
+                meta['writer'] = c.string_split_to_list(meta['writer']) if 'writer' in meta else []
+
                 info_tag = ListItemInfoTag(item_list, 'video')
                 infolabels = control.tagdataClean(meta)
                 info_tag.set_info(infolabels)
@@ -210,10 +288,10 @@ class sources:
                     })
 
                 video_streaminfo = {'codec': 'h264'}
-                item_list.addStreamInfo('video', video_streaminfo)
+                info_tag.add_stream_info('video', video_streaminfo)
 
                 item_list.addContextMenuItems(cm)
-                item_list.setInfo(type='Video', infoLabels=meta)
+                #item_list.setInfo(type='Video', infoLabels=meta)
 
                 control.addItem(handle=syshandle, url=sysurl, listitem=item_list, isFolder=False)
             except Exception as e:
@@ -256,7 +334,7 @@ class sources:
                     u = dict(parse_qsl(u.replace('?', '')))
                     u = json.loads(u['source'])[0]
                     _next.append(u)
-                    c.log(f"[CM Debug @ 257 in sources.py] u  = {u} and _next = {_next}")
+                    #c.log(f"[CM Debug @ 257 in sources.py] u  = {u} and _next = {_next}")
                 except Exception:
                     break
             for i in range(-1000,0)[::-1]:
@@ -513,7 +591,7 @@ class sources:
                     pass
 
                 #c.log(f"[CM Debug @ 545 in sources.py] debrid_status = {debrid_status}")
-                #d_4k_label = d_1080_label = d_720_label = d_sd_label = total_format = d_total_label = ''
+                #debrid_4k_label = debrid_1080_label = debrid_720_label = debrid_720_label = total_format = debrid_total_label = ''
                 #source_4k_label = source_1080_label = source_720_label = source_sd_label = source_total_label = ''
 
                 if len(self.sources) > 0:
@@ -538,11 +616,11 @@ class sources:
                     #c.log(f"[CM Debug @ 566 in sources.py] pdiag_list_debrid = {pdiag_list_debrid}")
 
                     if debrid_status:
-                        d_4k_label = total_format % ('red', pdiag_list_debrid[0]) if pdiag_list_debrid[0] == 0 else total_format % ('lime', pdiag_list_debrid[0])
-                        d_1080_label = total_format % ('red', pdiag_list_debrid[1]) if pdiag_list_debrid[1] == 0 else total_format % ('lime', pdiag_list_debrid[1])
-                        d_720_label = total_format % ('red', pdiag_list_debrid[2]) if pdiag_list_debrid[2] == 0 else total_format % ('lime', pdiag_list_debrid[2])
-                        d_sd_label = total_format % ('red', pdiag_list_debrid[3]) if pdiag_list_debrid[3] == 0 else total_format % ('lime', pdiag_list_debrid[3])
-                        d_total_label = total_format % ('red', pdiag_list_debrid[4]) if pdiag_list_debrid[4] == 0 else total_format % ('lime', pdiag_list_debrid[4])
+                        debrid_4k_label = total_format % ('red', pdiag_list_debrid[0]) if pdiag_list_debrid[0] == 0 else total_format % ('lime', pdiag_list_debrid[0])
+                        debrid_1080_label = total_format % ('red', pdiag_list_debrid[1]) if pdiag_list_debrid[1] == 0 else total_format % ('lime', pdiag_list_debrid[1])
+                        debrid_720_label = total_format % ('red', pdiag_list_debrid[2]) if pdiag_list_debrid[2] == 0 else total_format % ('lime', pdiag_list_debrid[2])
+                        debrid_720_label = total_format % ('red', pdiag_list_debrid[3]) if pdiag_list_debrid[3] == 0 else total_format % ('lime', pdiag_list_debrid[3])
+                        debrid_total_label = total_format % ('red', pdiag_list_debrid[4]) if pdiag_list_debrid[4] == 0 else total_format % ('lime', pdiag_list_debrid[4])
                     source_4k_label = total_format % ('red', pdiag_list[0]) if pdiag_list[0] == 0 else total_format % ('lime', pdiag_list[0])
                     source_1080_label = total_format % ('red', pdiag_list[1]) if pdiag_list[1] == 0 else total_format % ('lime', pdiag_list[1])
                     source_720_label = total_format % ('red', pdiag_list[2]) if pdiag_list[2] == 0 else total_format % ('lime', pdiag_list[2])
@@ -576,41 +654,41 @@ class sources:
                         if debrid_status:
                             if quality == 0:
                                 if not progressDialog == control.progressDialogBG:
-                                    line1 = ('%s:' + '|'.join(pdiag_format)) % (string6, d_4k_label, d_1080_label, d_720_label, d_sd_label, str(string4), d_total_label)
+                                    line1 = ('%s:' + '|'.join(pdiag_format)) % (string6, debrid_4k_label, debrid_1080_label, debrid_720_label, debrid_720_label, str(string4), debrid_total_label)
                                     line2 = ('%s:' + '|'.join(pdiag_format)) % (string7, source_4k_label, source_1080_label, source_720_label, source_sd_label, str(string4), source_total_label)
                                     print (line1 + '\n' + line2)
                                     c.log(f"[CM Debug @ 599 in sources.py] msg = {line1}\n{line2}")
                                 else:
                                     control.idle()
-                                    line1 = '|'.join(pdiag_bg_format[:-1]) % (source_4k_label, d_4k_label, source_1080_label, d_1080_label, source_720_label, d_720_label, source_sd_label, d_sd_label)
+                                    line1 = '|'.join(pdiag_bg_format[:-1]) % (source_4k_label, debrid_4k_label, source_1080_label, debrid_1080_label, source_720_label, debrid_720_label, source_sd_label, debrid_720_label)
                             elif quality == 1:
                                 if not progressDialog == control.progressDialogBG:
-                                    line1 = ('%s:' + '|'.join(pdiag_format[1:])) % (string6, d_1080_label, d_720_label, d_sd_label, str(string4), d_total_label)
+                                    line1 = ('%s:' + '|'.join(pdiag_format[1:])) % (string6, debrid_1080_label, debrid_720_label, debrid_720_label, str(string4), debrid_total_label)
                                     line2 = ('%s:' + '|'.join(pdiag_format[1:])) % (string7, source_1080_label, source_720_label, source_sd_label, str(string4), source_total_label)
                                 else:
                                     control.idle()
-                                    line1 = '|'.join(pdiag_bg_format[1:]) % (source_1080_label, d_1080_label, source_720_label, d_720_label, source_sd_label, d_sd_label, source_total_label, d_total_label)
+                                    line1 = '|'.join(pdiag_bg_format[1:]) % (source_1080_label, debrid_1080_label, source_720_label, debrid_720_label, source_sd_label, debrid_720_label, source_total_label, debrid_total_label)
                             elif quality == 2:
                                 if not progressDialog == control.progressDialogBG:
-                                    line1 = ('%s:' + '|'.join(pdiag_format[1:])) % (string6, d_1080_label, d_720_label, d_sd_label, str(string4), d_total_label)
+                                    line1 = ('%s:' + '|'.join(pdiag_format[1:])) % (string6, debrid_1080_label, debrid_720_label, debrid_720_label, str(string4), debrid_total_label)
                                     line2 = ('%s:' + '|'.join(pdiag_format[1:])) % (string7, source_1080_label, source_720_label, source_sd_label, str(string4), source_total_label)
                                 else:
                                     control.idle()
-                                    line1 = '|'.join(pdiag_bg_format[1:]) % (source_1080_label, d_1080_label, source_720_label, d_720_label, source_sd_label, d_sd_label, source_total_label, d_total_label)
+                                    line1 = '|'.join(pdiag_bg_format[1:]) % (source_1080_label, debrid_1080_label, source_720_label, debrid_720_label, source_sd_label, debrid_720_label, source_total_label, debrid_total_label)
                             elif quality == 3:
                                 if not progressDialog == control.progressDialogBG:
-                                    line1 = ('%s:' + '|'.join(pdiag_format[2:])) % (string6, d_720_label, d_sd_label, str(string4), d_total_label)
+                                    line1 = ('%s:' + '|'.join(pdiag_format[2:])) % (string6, debrid_720_label, debrid_720_label, str(string4), debrid_total_label)
                                     line2 = ('%s:' + '|'.join(pdiag_format[2:])) % (string7, source_720_label, source_sd_label, str(string4), source_total_label)
                                 else:
                                     control.idle()
-                                    line1 = '|'.join(pdiag_bg_format[2:]) % (source_720_label, d_720_label, source_sd_label, d_sd_label, source_total_label, d_total_label)
+                                    line1 = '|'.join(pdiag_bg_format[2:]) % (source_720_label, debrid_720_label, source_sd_label, debrid_720_label, source_total_label, debrid_total_label)
                             else:
                                 if not progressDialog == control.progressDialogBG:
-                                    line1 = ('%s:' + '|'.join(pdiag_format[3:])) % (string6, d_sd_label, str(string4), d_total_label)
+                                    line1 = ('%s:' + '|'.join(pdiag_format[3:])) % (string6, debrid_720_label, str(string4), debrid_total_label)
                                     line2 = ('%s:' + '|'.join(pdiag_format[3:])) % (string7, source_sd_label, str(string4), source_total_label)
                                 else:
                                     control.idle()
-                                    line1 = '|'.join(pdiag_bg_format[3:]) % (source_sd_label, d_sd_label, source_total_label, d_total_label)
+                                    line1 = '|'.join(pdiag_bg_format[3:]) % (source_sd_label, debrid_720_label, source_total_label, debrid_total_label)
                         else:
                             if quality == 0:
                                 line1 = '|'.join(pdiag_format) % (source_4k_label, source_1080_label, source_720_label, source_sd_label, str(string4), source_total_label)
@@ -853,16 +931,17 @@ class sources:
                         break
             try:
                 if control.monitor.abortRequested():
-                    return sys.exit()
+                    raise SystemExit("Monitor abort requested. Exiting gracefully.")
 
                 try:
                     if progressDialog.iscanceled():
                         break
-                except Exception:
+                except Exception as e:
+                    c.log(f"Exception occurred while checking progress dialog: {e}")
                     pass
 
                 #c.log(f"[CM Debug @ 545 in sources.py] debrid_status = {debrid_status}")
-                d_4k_label = d_1080_label = d_720_label = d_sd_label = total_format = d_total_label = ''
+                debrid_4k_label = debrid_1080_label = debrid_720_label = debrid_720_label = total_format = debrid_total_label = ''
 
                 if len(self.sources) > 0:
                     source_counts = {
@@ -886,11 +965,11 @@ class sources:
                     #c.log(f"[CM Debug @ 566 in sources.py] pdiag_list_debrid = {pdiag_list_debrid}")
 
                     if debrid_status:
-                        d_4k_label = total_format % ('red', pdiag_list_debrid[0]) if pdiag_list_debrid[0] == 0 else total_format % ('lime', pdiag_list_debrid[0])
-                        d_1080_label = total_format % ('red', pdiag_list_debrid[1]) if pdiag_list_debrid[1] == 0 else total_format % ('lime', pdiag_list_debrid[1])
-                        d_720_label = total_format % ('red', pdiag_list_debrid[2]) if pdiag_list_debrid[2] == 0 else total_format % ('lime', pdiag_list_debrid[2])
-                        d_sd_label = total_format % ('red', pdiag_list_debrid[3]) if pdiag_list_debrid[3] == 0 else total_format % ('lime', pdiag_list_debrid[3])
-                        d_total_label = total_format % ('red', pdiag_list_debrid[4]) if pdiag_list_debrid[4] == 0 else total_format % ('lime', pdiag_list_debrid[4])
+                        debrid_4k_label = total_format % ('red', pdiag_list_debrid[0]) if pdiag_list_debrid[0] == 0 else total_format % ('lime', pdiag_list_debrid[0])
+                        debrid_1080_label = total_format % ('red', pdiag_list_debrid[1]) if pdiag_list_debrid[1] == 0 else total_format % ('lime', pdiag_list_debrid[1])
+                        debrid_720_label = total_format % ('red', pdiag_list_debrid[2]) if pdiag_list_debrid[2] == 0 else total_format % ('lime', pdiag_list_debrid[2])
+                        debrid_720_label = total_format % ('red', pdiag_list_debrid[3]) if pdiag_list_debrid[3] == 0 else total_format % ('lime', pdiag_list_debrid[3])
+                        debrid_total_label = total_format % ('red', pdiag_list_debrid[4]) if pdiag_list_debrid[4] == 0 else total_format % ('lime', pdiag_list_debrid[4])
                     source_4k_label = total_format % ('red', pdiag_list[0]) if pdiag_list[0] == 0 else total_format % ('lime', pdiag_list[0])
                     source_1080_label = total_format % ('red', pdiag_list[1]) if pdiag_list[1] == 0 else total_format % ('lime', pdiag_list[1])
                     source_720_label = total_format % ('red', pdiag_list[2]) if pdiag_list[2] == 0 else total_format % ('lime', pdiag_list[2])
@@ -915,41 +994,41 @@ class sources:
                         if debrid_status:
                             if quality == 0:
                                 if not progressDialog == control.progressDialogBG:
-                                    line1 = ('%s:' + '|'.join(pdiag_format)) % (string6, d_4k_label, d_1080_label, d_720_label, d_sd_label, str(string4), d_total_label)
+                                    line1 = ('%s:' + '|'.join(pdiag_format)) % (string6, debrid_4k_label, debrid_1080_label, debrid_720_label, debrid_720_label, str(string4), debrid_total_label)
                                     line2 = ('%s:' + '|'.join(pdiag_format)) % (string7, source_4k_label, source_1080_label, source_720_label, source_sd_label, str(string4), source_total_label)
                                     print (line1 + '\n' + line2)
                                     c.log(f"[CM Debug @ 599 in sources.py] msg = {line1}\n{line2}")
                                 else:
                                     control.idle()
-                                    line1 = '|'.join(pdiag_bg_format[:-1]) % (source_4k_label, d_4k_label, source_1080_label, d_1080_label, source_720_label, d_720_label, source_sd_label, d_sd_label)
+                                    line1 = '|'.join(pdiag_bg_format[:-1]) % (source_4k_label, debrid_4k_label, source_1080_label, debrid_1080_label, source_720_label, debrid_720_label, source_sd_label, debrid_720_label)
                             elif quality == 1:
                                 if not progressDialog == control.progressDialogBG:
-                                    line1 = ('%s:' + '|'.join(pdiag_format[1:])) % (string6, d_1080_label, d_720_label, d_sd_label, str(string4), d_total_label)
+                                    line1 = ('%s:' + '|'.join(pdiag_format[1:])) % (string6, debrid_1080_label, debrid_720_label, debrid_720_label, str(string4), debrid_total_label)
                                     line2 = ('%s:' + '|'.join(pdiag_format[1:])) % (string7, source_1080_label, source_720_label, source_sd_label, str(string4), source_total_label)
                                 else:
                                     control.idle()
-                                    line1 = '|'.join(pdiag_bg_format[1:]) % (source_1080_label, d_1080_label, source_720_label, d_720_label, source_sd_label, d_sd_label, source_total_label, d_total_label)
+                                    line1 = '|'.join(pdiag_bg_format[1:]) % (source_1080_label, debrid_1080_label, source_720_label, debrid_720_label, source_sd_label, debrid_720_label, source_total_label, debrid_total_label)
                             elif quality == 2:
                                 if not progressDialog == control.progressDialogBG:
-                                    line1 = ('%s:' + '|'.join(pdiag_format[1:])) % (string6, d_1080_label, d_720_label, d_sd_label, str(string4), d_total_label)
+                                    line1 = ('%s:' + '|'.join(pdiag_format[1:])) % (string6, debrid_1080_label, debrid_720_label, debrid_720_label, str(string4), debrid_total_label)
                                     line2 = ('%s:' + '|'.join(pdiag_format[1:])) % (string7, source_1080_label, source_720_label, source_sd_label, str(string4), source_total_label)
                                 else:
                                     control.idle()
-                                    line1 = '|'.join(pdiag_bg_format[1:]) % (source_1080_label, d_1080_label, source_720_label, d_720_label, source_sd_label, d_sd_label, source_total_label, d_total_label)
+                                    line1 = '|'.join(pdiag_bg_format[1:]) % (source_1080_label, debrid_1080_label, source_720_label, debrid_720_label, source_sd_label, debrid_720_label, source_total_label, debrid_total_label)
                             elif quality == 3:
                                 if not progressDialog == control.progressDialogBG:
-                                    line1 = ('%s:' + '|'.join(pdiag_format[2:])) % (string6, d_720_label, d_sd_label, str(string4), d_total_label)
+                                    line1 = ('%s:' + '|'.join(pdiag_format[2:])) % (string6, debrid_720_label, debrid_720_label, str(string4), debrid_total_label)
                                     line2 = ('%s:' + '|'.join(pdiag_format[2:])) % (string7, source_720_label, source_sd_label, str(string4), source_total_label)
                                 else:
                                     control.idle()
-                                    line1 = '|'.join(pdiag_bg_format[2:]) % (source_720_label, d_720_label, source_sd_label, d_sd_label, source_total_label, d_total_label)
+                                    line1 = '|'.join(pdiag_bg_format[2:]) % (source_720_label, debrid_720_label, source_sd_label, debrid_720_label, source_total_label, debrid_total_label)
                             else:
                                 if not progressDialog == control.progressDialogBG:
-                                    line1 = ('%s:' + '|'.join(pdiag_format[3:])) % (string6, d_sd_label, str(string4), d_total_label)
+                                    line1 = ('%s:' + '|'.join(pdiag_format[3:])) % (string6, debrid_720_label, str(string4), debrid_total_label)
                                     line2 = ('%s:' + '|'.join(pdiag_format[3:])) % (string7, source_sd_label, str(string4), source_total_label)
                                 else:
                                     control.idle()
-                                    line1 = '|'.join(pdiag_bg_format[3:]) % (source_sd_label, d_sd_label, source_total_label, d_total_label)
+                                    line1 = '|'.join(pdiag_bg_format[3:]) % (source_sd_label, debrid_720_label, source_total_label, debrid_total_label)
                         else:
                             if quality == 0:
                                 line1 = '|'.join(pdiag_format) % (source_4k_label, source_1080_label, source_720_label, source_sd_label, str(string4), source_total_label)
@@ -1042,8 +1121,11 @@ class sources:
         c.log(f'Sources for "{title}" ({year}) took {str(int(end_time - start_time))} seconds')
         return self.sources
 
-    def getSources(self, title, year, imdb, tmdb, season, episode, tvshowtitle, premiered, quality='HD', timeout=30):
+    def getSourcesOrig(self, title, year, imdb, tmdb, season, episode, tvshowtitle, premiered, quality='HD', timeout=30):
         try:
+            start_time = time.time()
+            c.log(f"[CM Debug @ 1048 in sources.py] start_time = {start_time}")
+
 
 
             progressDialog = control.progressDialog if control.setting('progress.dialog') == '0' else control.progressDialogBG
@@ -1057,20 +1139,29 @@ class sources:
 
             progressDialog.update(0, control.lang(32600))
 
+            c.log(f"[CM Debug @ 1063 in sources.py] sourceDict = {sourceDict}")
+
+
+
+
+
+
+
+
             content = 'movie' if tvshowtitle is None else 'episode'
             if content == 'movie':
                 sourceDict = [(i[0], i[1], getattr(i[1], 'movie', None)) for i in sourceDict]
-                genres = trakt.getGenre('movie', 'imdb', imdb)
+                #genres = trakt.getGenre('movie', 'imdb', imdb)
             else:
                 sourceDict = [(i[0], i[1], getattr(i[1], 'tvshow', None)) for i in sourceDict]
-                genres = trakt.getGenre('show', 'imdb', imdb)
+                #genres = trakt.getGenre('show', 'imdb', imdb)
 
             #sourceDict = [(i[0], i[1], i[2]) for i in sourceDict if not hasattr(i[1], 'genre_filter') or not i[1].genre_filter or any(x in i[1].genre_filter for x in genres)]
 
             sourceDict = [(i[0], i[1]) for i in sourceDict if i[2] is not None]
 
             language = self.getLanguage()
-            c.log(f"[CM Debug @ 1075 in sources.py] sourceDict: {sourceDict}")
+
             sourceDict = [(i[0], i[1], i[1].language) for i in sourceDict]
             sourceDict = [(i[0], i[1]) for i in sourceDict if any(x in i[2] for x in language)]
 
@@ -1082,8 +1173,11 @@ class sources:
 
             sourceDict = [(i[0], i[1], i[1].priority) for i in sourceDict]
 
-            random.shuffle(sourceDict)
+
+            #random.shuffle(sourceDict)
             sourceDict = sorted(sourceDict, key=lambda i: i[2])
+            for i in sourceDict:
+                c.log(f"[CM Debug @ 1089 in sources.py] i[0] = {i[0]} | i[1] = {type(i[1])} | i[2] = {type(i[2])} with val = {repr(i[2])}", 1)
 
             threads = []
 
@@ -1091,12 +1185,19 @@ class sources:
                 title = self.getTitle(title)
                 localtitle = self.getLocalTitle(title, imdb, tmdb, content)
                 aliases = self.getAliasTitles(imdb, localtitle, content)
+
+                if not c.orion_disabled:
+                    threads.append(workers.Thread(self.getOrionMovieSource, title, localtitle, aliases, year, imdb, tmdb))
+
                 for i in sourceDict:
                     threads.append(workers.Thread(self.getMovieSource, title, localtitle, aliases, year, imdb, i[0], i[1]))
             else:
                 tvshowtitle = self.getTitle(tvshowtitle)
                 localtvshowtitle = self.getLocalTitle(tvshowtitle, imdb, tmdb, content)
                 aliases = self.getAliasTitles(imdb, localtvshowtitle, content)
+
+                if not c.orion_disabled:
+                    threads.append(workers.Thread(self.getOrionTVShowSource(title, tvshowtitle, aliases, year, imdb, tmdb, season, episode)))
 
                 for i in sourceDict:
                     threads.append(workers.Thread(self.getEpisodeSource, title, year, imdb, tmdb, season, episode, tvshowtitle, localtvshowtitle, aliases, premiered, i[0], i[1]))
@@ -1176,6 +1277,7 @@ class sources:
                         #c.log(f"[CM Debug @ 1180 in sources.py] e = {repr(e)}")
 
                     if len(self.sources) > 0:
+                        source_4k = source_1080 = source_720 = source_sd = 0  # Initialize variables to 0
                         if quality == 0:
                             source_4k = len([e for e in self.sources if e['quality'] == '4K' and e['debridonly'] is False])
                             source_1080 = len([e for e in self.sources if e['quality'] in ['1440p','1080p'] and e['debridonly'] is False])
@@ -1225,11 +1327,11 @@ class sources:
                             d_total = d_source_4k + d_source_1080 + d_source_720 + d_source_sd
 
                         if debrid_status:
-                            d_4k_label = total_format % ('red', d_source_4k) if d_source_4k == 0 else total_format % ('lime', d_source_4k)
-                            d_1080_label = total_format % ('red', d_source_1080) if d_source_1080 == 0 else total_format % ('lime', d_source_1080)
-                            d_720_label = total_format % ('red', d_source_720) if d_source_720 == 0 else total_format % ('lime', d_source_720)
-                            d_sd_label = total_format % ('red', d_source_sd) if d_source_sd == 0 else total_format % ('lime', d_source_sd)
-                            d_total_label = total_format % ('red', d_total) if d_total == 0 else total_format % ('lime', d_total)
+                            debrid_4k_label = total_format % ('red', d_source_4k) if d_source_4k == 0 else total_format % ('lime', d_source_4k)
+                            debrid_1080_label = total_format % ('red', d_source_1080) if d_source_1080 == 0 else total_format % ('lime', d_source_1080)
+                            debrid_720_label = total_format % ('red', d_source_720) if d_source_720 == 0 else total_format % ('lime', d_source_720)
+                            debrid_720_label = total_format % ('red', d_source_sd) if d_source_sd == 0 else total_format % ('lime', d_source_sd)
+                            debrid_total_label = total_format % ('red', d_total) if d_total == 0 else total_format % ('lime', d_total)
                         source_4k_label = total_format % ('red', source_4k) if source_4k == 0 else total_format % ('lime', source_4k)
                         source_1080_label = total_format % ('red', source_1080) if source_1080 == 0 else total_format % ('lime', source_1080)
                         source_720_label = total_format % ('red', source_720) if source_720 == 0 else total_format % ('lime', source_720)
@@ -1248,40 +1350,40 @@ class sources:
                             if debrid_status:
                                 if quality == 0:
                                     if not progressDialog == control.progressDialogBG:
-                                        line1 = ('%s:' + '|'.join(pdiag_format)) % (string6, d_4k_label, d_1080_label, d_720_label, d_sd_label, str(string4), d_total_label)
+                                        line1 = ('%s:' + '|'.join(pdiag_format)) % (string6, debrid_4k_label, debrid_1080_label, debrid_720_label, debrid_720_label, str(string4), debrid_total_label)
                                         line2 = ('%s:' + '|'.join(pdiag_format)) % (string7, source_4k_label, source_1080_label, source_720_label, source_sd_label, str(string4), source_total_label)
                                         #print (line1 + '\n' + line2)
                                     else:
                                         control.idle()
-                                        line1 = '|'.join(pdiag_bg_format[:-1]) % (source_4k_label, d_4k_label, source_1080_label, d_1080_label, source_720_label, d_720_label, source_sd_label, d_sd_label)
+                                        line1 = '|'.join(pdiag_bg_format[:-1]) % (source_4k_label, debrid_4k_label, source_1080_label, debrid_1080_label, source_720_label, debrid_720_label, source_sd_label, debrid_720_label)
                                 elif quality == 1:
                                     if not progressDialog == control.progressDialogBG:
-                                        line1 = ('%s:' + '|'.join(pdiag_format[1:])) % (string6, d_1080_label, d_720_label, d_sd_label, str(string4), d_total_label)
+                                        line1 = ('%s:' + '|'.join(pdiag_format[1:])) % (string6, debrid_1080_label, debrid_720_label, debrid_720_label, str(string4), debrid_total_label)
                                         line2 = ('%s:' + '|'.join(pdiag_format[1:])) % (string7, source_1080_label, source_720_label, source_sd_label, str(string4), source_total_label)
                                     else:
                                         control.idle()
-                                        line1 = '|'.join(pdiag_bg_format[1:]) % (source_1080_label, d_1080_label, source_720_label, d_720_label, source_sd_label, d_sd_label, source_total_label, d_total_label)
+                                        line1 = '|'.join(pdiag_bg_format[1:]) % (source_1080_label, debrid_1080_label, source_720_label, debrid_720_label, source_sd_label, debrid_720_label, source_total_label, debrid_total_label)
                                 elif quality == 2:
                                     if not progressDialog == control.progressDialogBG:
-                                        line1 = ('%s:' + '|'.join(pdiag_format[1:])) % (string6, d_1080_label, d_720_label, d_sd_label, str(string4), d_total_label)
+                                        line1 = ('%s:' + '|'.join(pdiag_format[1:])) % (string6, debrid_1080_label, debrid_720_label, debrid_720_label, str(string4), debrid_total_label)
                                         line2 = ('%s:' + '|'.join(pdiag_format[1:])) % (string7, source_1080_label, source_720_label, source_sd_label, str(string4), source_total_label)
                                     else:
                                         control.idle()
-                                        line1 = '|'.join(pdiag_bg_format[1:]) % (source_1080_label, d_1080_label, source_720_label, d_720_label, source_sd_label, d_sd_label, source_total_label, d_total_label)
+                                        line1 = '|'.join(pdiag_bg_format[1:]) % (source_1080_label, debrid_1080_label, source_720_label, debrid_720_label, source_sd_label, debrid_720_label, source_total_label, debrid_total_label)
                                 elif quality == 3:
                                     if not progressDialog == control.progressDialogBG:
-                                        line1 = ('%s:' + '|'.join(pdiag_format[2:])) % (string6, d_720_label, d_sd_label, str(string4), d_total_label)
+                                        line1 = ('%s:' + '|'.join(pdiag_format[2:])) % (string6, debrid_720_label, debrid_720_label, str(string4), debrid_total_label)
                                         line2 = ('%s:' + '|'.join(pdiag_format[2:])) % (string7, source_720_label, source_sd_label, str(string4), source_total_label)
                                     else:
                                         control.idle()
-                                        line1 = '|'.join(pdiag_bg_format[2:]) % (source_720_label, d_720_label, source_sd_label, d_sd_label, source_total_label, d_total_label)
+                                        line1 = '|'.join(pdiag_bg_format[2:]) % (source_720_label, debrid_720_label, source_sd_label, debrid_720_label, source_total_label, debrid_total_label)
                                 else:
                                     if not progressDialog == control.progressDialogBG:
-                                        line1 = ('%s:' + '|'.join(pdiag_format[3:])) % (string6, d_sd_label, str(string4), d_total_label)
+                                        line1 = ('%s:' + '|'.join(pdiag_format[3:])) % (string6, debrid_720_label, str(string4), debrid_total_label)
                                         line2 = ('%s:' + '|'.join(pdiag_format[3:])) % (string7, source_sd_label, str(string4), source_total_label)
                                     else:
                                         control.idle()
-                                        line1 = '|'.join(pdiag_bg_format[3:]) % (source_sd_label, d_sd_label, source_total_label, d_total_label)
+                                        line1 = '|'.join(pdiag_bg_format[3:]) % (source_sd_label, debrid_720_label, source_total_label, debrid_total_label)
                             else:
                                 if quality == 0:
                                     line1 = '|'.join(pdiag_format) % (source_4k_label, source_1080_label, source_720_label, source_sd_label, str(string4), source_total_label)
@@ -1316,7 +1418,7 @@ class sources:
                                 percent = int(100 * float(i) / (2 * timeout) + 0.5)
                                 progressDialog.update(max(1, percent), line1 + '\n' + line2)
                         except Exception as e:
-                            c.log(f'Exception Raised: {e}', 1)
+                            c.log(f'[CM DEBUG @ 1573 in sources.py]Exception Raised: {e}', 1)
                     else:
                         try:
                             #@todo fix for double duty mainleft and info
@@ -1368,6 +1470,317 @@ class sources:
             failure = traceback.format_exc()
             c.log(f'[CM Debug @ 1362 in sources.py]Traceback:: {failure}')
             c.log(f'[CM Debug @ 1362 in sources.py]Exception raised. Error = {e}')
+            pass
+
+
+
+    def getSources(self, title, year, imdb, tmdb, season, episode, tvshowtitle, premiered, quality='HD', timeout=30):
+        try:
+            self.start = time.time()
+            #string1 = control.lang(32404)
+            #string2 = control.lang(32405)
+            string3 = control.lang(32406)
+            string4 = control.lang(32601)
+            #string5 = control.lang(32602)
+            string6 = control.lang(32606)
+            string7 = control.lang(32607)
+
+            progressDialog = control.progressDialog if control.setting('progress.dialog') == '0' else control.progressDialogBG
+            progressDialog.create(control.addonInfo('name'), '')
+            progressDialog.update(0)
+
+            self.prepareSources()
+            sourceDict = self.sourceDict
+            progressDialog.update(0, control.lang(32600))
+
+            sourceDict, content = self.filter_sourceDict(tvshowtitle, sourceDict)
+            threads = []
+            mainsourceDict, sourcelabelDict = self.get_movie_episode_sources(title, year, imdb, tmdb, season, episode, tvshowtitle, premiered, sourceDict, content, threads)
+
+            timeout = int(control.setting('scrapers.timeout.1')) or 30
+
+            #fixed oh 27-4-2021
+            quality = int(control.setting('hosts.quality')) or 0
+            debrid_only = control.setting('debrid.only') or 'false'
+
+            line1 = line2 = line3 = ""
+
+            pre_emp =  control.setting('preemptive.termination')
+            pre_emp_limit = int(control.setting('preemptive.limit'))
+
+            source_4k = d_source_4k = 0
+            source_1080 = d_source_1080 = 0
+            source_720 = d_source_720 = 0
+            source_sd = d_source_sd = 0
+
+            debrid_list = debrid.debrid_resolvers
+            debrid_status = debrid.status()
+
+            total_format = '[COLOR %s][B]%s[/B][/COLOR]'
+            pdiag_format = ' 4K: %s | 1080p: %s | 720p: %s | SD: %s | %s: %s'.split('|')
+
+            for i in range(0, timeout):
+                if str(pre_emp) == 'true':
+                    quality_sources = {
+                        0: source_4k + d_source_4k,
+                        1: source_1080 + d_source_1080,
+                        2: source_720 + d_source_720,
+                        3: source_sd + d_source_sd
+                    }
+                    if quality in quality_sources and quality_sources[quality] >= int(pre_emp_limit):
+                        c.log(f"[CM Debug @ 1530 in sources.py] quality_sources = {quality_sources} | quality = {quality} | pre_emp_limit = {pre_emp_limit}, going to break", 1)
+                        break
+
+
+                if control.monitor.abortRequested():
+                    sys.exit()
+
+                if progressDialog.iscanceled():
+                    break
+
+                if len(self.sources) > 0:
+                    debrid_4k_label, debrid_1080_label, debrid_720_label, debrid_total_label, source_4k_label, source_1080_label, source_720_label, source_sd_label, source_total_label = self.get_labels(debrid_list, debrid_status, total_format)
+
+                    if (i / 2) < timeout:
+                        try:
+                            alive_threads = [thread for thread in threads if thread.is_alive()]
+                            thread_names = [thread.getName() for thread in alive_threads]
+                            waiting_for = [sourcelabelDict[name] for name in thread_names if name in mainsourceDict]
+                            info = [sourcelabelDict[name] for name in thread_names]
+
+                            #c.log(f"[CM Debug @ 1474 in sources.py] alive_threads = {alive_threads} | thread_names = {thread_names} | waiting_for = {waiting_for} | info = {info}", 1)
+
+
+                            if debrid_status:
+                                if progressDialog == control.progressDialogBG:
+                                    control.idle()
+
+                                if quality == 0:
+                                    line1 = '|'.join(pdiag_format) % (debrid_4k_label, debrid_1080_label, debrid_720_label, debrid_720_label, str(string4), debrid_total_label)
+                                    line2 = '|'.join(pdiag_format) % (source_4k_label, source_1080_label, source_720_label, source_sd_label, str(string4), source_total_label)
+                                elif quality == 1:
+                                    line1 = '|'.join(pdiag_format[1:]) % (debrid_1080_label, debrid_720_label, debrid_720_label, str(string4), debrid_total_label)
+                                    line2 = '|'.join(pdiag_format[1:]) % (source_1080_label, source_720_label, source_sd_label, str(string4), source_total_label)
+                                elif quality == 2:
+                                    line1 = '|'.join(pdiag_format[1:]) % (debrid_1080_label, debrid_720_label, debrid_720_label, str(string4), debrid_total_label)
+                                    line2 = '|'.join(pdiag_format[1:]) % (source_1080_label, source_720_label, source_sd_label, str(string4), source_total_label)
+                                elif quality == 3:
+                                    line1 = '|'.join(pdiag_format[2:]) % (debrid_720_label, debrid_720_label, str(string4), debrid_total_label)
+                                    line2 = '|'.join(pdiag_format[2:]) % (source_720_label, source_sd_label, str(string4), source_total_label)
+                                else:
+                                    line1 = '|'.join(pdiag_format[3:]) % (debrid_720_label, str(string4), debrid_total_label)
+                                    line2 = '|'.join(pdiag_format[3:]) % (source_sd_label, str(string4), source_total_label)
+                                if c.devmode:
+                                    between = time.time() - self.start
+                                    between = f"{between:.2f}"
+                                    line4 = '[COLOR lawngreen]Devmode: ' + between + ' seconds[/COLOR]'
+                                if len(info) > 6:
+                                    line3 = string3 % (str(len(info)))
+                                elif len(info) > 0:
+                                    line3 = string3 % (', '.join(info))
+                                else:
+                                    break
+                                percent = int(100 * float(i) / timeout)
+                                if not progressDialog == control.progressDialogBG:
+                                    if c.devmode:
+                                        progressDialog.update(max(1, percent), line1 + '\n' + line2 + '\n' + line3 + '\n' + line4)
+                                    else:
+                                        progressDialog.update(max(1, percent), line1 + '\n' + line2 + '\n' + line3)
+                                else:
+                                    if c.devmode:
+                                        progressDialog.update(max(1, percent), line1 + '\n' + line3 + '\n' + line4)
+                                    else:
+                                        progressDialog.update(max(1, percent), line1 + '\n' + line3)
+                            else:
+
+                                if quality == 0:
+                                    line1 = '|'.join(pdiag_format) % (source_4k_label, source_1080_label, source_720_label, source_sd_label, str(string4), source_total_label)
+                                elif quality == 1:
+                                    line1 = '|'.join(pdiag_format[1:]) % (source_1080_label, source_720_label, source_sd_label, str(string4), source_total_label)
+                                elif quality == 2:
+                                    line1 = '|'.join(pdiag_format[1:]) % (source_1080_label, source_720_label, source_sd_label, str(string4), source_total_label)
+                                elif quality == 3:
+                                    line1 = '|'.join(pdiag_format[2:]) % (source_720_label, source_sd_label, str(string4), source_total_label)
+                                else:
+                                    line1 = '|'.join(pdiag_format[3:]) % (source_sd_label, str(string4), source_total_label)
+
+                                if len(info) > 6:
+                                    line2 = string3 % (str(len(info)))
+                                elif len(info) > 0:
+                                    line2 = string3 % (', '.join(info))
+                                else:
+                                    break
+                                percent = int(100 * float(i) / timeout)
+
+                                progressDialog.update(max(1, percent), line1 + '\n' + line2)
+                        except Exception as e:
+                            c.log(f'Exception Raised in get_sources 1: {e}', 1)
+                    else:
+                        try:
+                            waiting_sources = [sourcelabelDict[x.getName()] for x in threads if x.is_alive() and x.getName() in mainsourceDict]
+                            if i >= timeout or len(waiting_sources) == 0 or (len(self.sources) >= 100 * len(info)):
+                                break
+
+                            if waiting_sources:
+                                #line3 = 'Waiting for: %s' % (', '.join(waiting_sources))
+                                line3 = control.lang(32602) + ": " +  (', '.join(waiting_sources))
+                                percent = int(100 * float(i) / (2 * timeout) + 0.5)
+                                if not progressDialog == control.progressDialogBG:
+                                    progressDialog.update(max(1, percent), line1 + '\n' + line2 + '\n' + line3)
+                                else:
+                                    progressDialog.update(max(1, percent), line1 + '\n' + line3)
+                        except Exception as e:
+                            c.log(f'Exception Raised in get_sources 2: {e}', 1)
+                            pass
+
+
+
+                time.sleep(0.1)
+
+
+
+            try:
+                progressDialog.close()
+            except Exception as e:
+                c.log(f"[CM Debug @ 1355 in sources.py] exception raised. Error = {e}")
+
+
+            self.sourcesFilter()
+
+            return self.sources
+
+        except Exception as e:
+            import traceback
+            failure = traceback.format_exc()
+            c.log(f'[CM Debug @ 1362 in sources.py]Traceback:: {failure}')
+            c.log(f'[CM Debug @ 1362 in sources.py]Exception raised. Error = {e}')
+            pass
+
+    def get_labels(self, debrid_list, debrid_status, total_format):
+        try:
+            sources_by_quality = {
+                            '4K': len([e for e in self.sources if e['quality'] == '4K' and not e['debridonly']]),
+                            '1440': len([e for e in self.sources if e['quality'] == '1440' and not e['debridonly']]),
+                            '1080p': len([e for e in self.sources if e['quality'] in '1080p' and not e['debridonly']]),
+                            '720p': len([e for e in self.sources if e['quality'] in ['720p', 'HD'] and not e['debridonly']]),
+                            'SD': len([e for e in self.sources if e['quality'] == 'SD' and not e['debridonly']]),
+                        }
+
+            source_4k = sources_by_quality.get('4K', 0)
+            source_1080 = sources_by_quality.get('1080p', 0)
+            source_720 = sources_by_quality.get('720p', 0)
+            source_sd = sources_by_quality.get('SD', 0)
+
+            total = source_4k + source_1080 + source_720 + source_sd
+
+            if debrid_status:
+                debrid_source_counts = {
+                                '4K': sum(1 for s in self.sources if s['quality'] in ['4K', '4k'] and any(d.valid_url(s['url'], s['source']) for d in debrid_list)),
+                                '1080p': sum(1 for s in self.sources if s['quality'] in ['1440p', '1080p'] and any(d.valid_url(s['url'], s['source']) for d in debrid_list)),
+                                '720p': sum(1 for s in self.sources if s['quality'] in ['720p', 'HD'] and any(d.valid_url(s['url'], s['source']) for d in debrid_list)),
+                                'SD': sum(1 for s in self.sources if s['quality'] == 'SD' and any(d.valid_url(s['url'], s['source']) for d in debrid_list))
+                            }
+
+                debrid_source_4k = debrid_source_counts.get('4K', 0)
+                debrid_source_1080 = debrid_source_counts.get('1080p', 0)
+                debrid_source_720 = debrid_source_counts.get('720p', 0)
+                debrid_source_sd = debrid_source_counts.get('SD', 0)
+                debrid_total = debrid_source_4k + debrid_source_1080 + debrid_source_720 + debrid_source_sd
+
+            debrid_4k_label = total_format % ('red', debrid_source_4k) if debrid_source_4k == 0 else total_format % ('lime', debrid_source_4k)
+            debrid_1080_label = total_format % ('red', debrid_source_1080) if debrid_source_1080 == 0 else total_format % ('lime', debrid_source_1080)
+            debrid_720_label = total_format % ('red', debrid_source_720) if debrid_source_720 == 0 else total_format % ('lime', debrid_source_720)
+            debrid_720_label = total_format % ('red', debrid_source_sd) if debrid_source_sd == 0 else total_format % ('lime', debrid_source_sd)
+            debrid_total_label = total_format % ('red', debrid_total) if debrid_total == 0 else total_format % ('lime', debrid_total)
+
+            source_4k_label = total_format % ('red', source_4k) if source_4k == 0 else total_format % ('lime', source_4k)
+            source_1080_label = total_format % ('red', source_1080) if source_1080 == 0 else total_format % ('lime', source_1080)
+            source_720_label = total_format % ('red', source_720) if source_720 == 0 else total_format % ('lime', source_720)
+            source_sd_label = total_format % ('red', source_sd) if source_sd == 0 else total_format % ('lime', source_sd)
+            source_total_label = total_format % ('red', total) if total == 0 else total_format % ('lime', total)
+        except Exception as e:
+            c.log(f"[CM Debug @ 1573 in sources.py] exception raised. Error = {e}")
+            pass
+        return debrid_4k_label,debrid_1080_label,debrid_720_label,debrid_total_label,source_4k_label,source_1080_label,source_720_label,source_sd_label,source_total_label
+
+    def filter_sourceDict(self, tvshowtitle, sourceDict):
+        try:
+            content = 'movie' if tvshowtitle is None else 'episode'
+            if content == 'movie':
+                sourceDict = [(i[0], i[1], getattr(i[1], 'movie', None)) for i in sourceDict]
+                    #genres = trakt.getGenre('movie', 'imdb', imdb)
+            else:
+                sourceDict = [(i[0], i[1], getattr(i[1], 'tvshow', None)) for i in sourceDict]
+                    #genres = trakt.getGenre('show', 'imdb', imdb)
+
+                #sourceDict = [(i[0], i[1], i[2]) for i in sourceDict if not hasattr(i[1], 'genre_filter') or not i[1].genre_filter or any(x in i[1].genre_filter for x in genres)]
+
+            sourceDict = [(i[0], i[1]) for i in sourceDict if i[2] is not None]
+
+            language = self.getLanguage()
+
+            sourceDict = [(i[0], i[1], i[1].language) for i in sourceDict]
+            sourceDict = [(i[0], i[1]) for i in sourceDict if any(x in i[2] for x in language)]
+
+            try:
+                sourceDict = [(i[0], i[1], control.setting('provider.' + i[0])) for i in sourceDict]
+            except Exception:
+                sourceDict = [(i[0], i[1], 'true') for i in sourceDict]
+            sourceDict = [(i[0], i[1]) for i in sourceDict if not i[2] == 'false']
+
+            sourceDict = [(i[0], i[1], i[1].priority) for i in sourceDict]
+
+
+                #random.shuffle(sourceDict)
+            sourceDict = sorted(sourceDict, key=lambda i: i[2])
+            #for i in sourceDict:
+                #c.log(f"[CM Debug @ 1089 in sources.py] i[0] = {i[0]} | i[1] = {type(i[1])} | i[2] = {type(i[2])} with val = {repr(i[2])}", 1)
+            return sourceDict,content
+        except Exception as e:
+            import traceback
+            failure = traceback.format_exc()
+            c.log(f'[CM Debug @ 1705 in sources.py]Traceback:: {failure}')
+            c.log(f'[CM Debug @ 1705 in sources.py]Exception raised. Error = {e}')
+            pass
+
+    def get_movie_episode_sources(self, title, year, imdb, tmdb, season, episode, tvshowtitle, premiered, sourceDict, content, threads):
+        try:
+            if content == 'movie':
+                title = self.getTitle(title)
+                localtitle = self.getLocalTitle(title, imdb, tmdb, content)
+                aliases = self.getAliasTitles(imdb, localtitle, content)
+
+                if not c.orion_disabled:
+                    threads.append(workers.Thread(self.getOrionMovieSource, title, localtitle, aliases, year, imdb, tmdb))
+
+                for i in sourceDict:
+                    threads.append(workers.Thread(self.getMovieSource, title, localtitle, aliases, year, imdb, i[0], i[1]))
+            else:
+                tvshowtitle = self.getTitle(tvshowtitle)
+                localtvshowtitle = self.getLocalTitle(tvshowtitle, imdb, tmdb, content)
+                aliases = self.getAliasTitles(imdb, localtvshowtitle, content)
+
+                if not c.orion_disabled:
+                    threads.append(workers.Thread(self.getOrionTVShowSource(title, tvshowtitle, aliases, year, imdb, tmdb, season, episode)))
+
+                for i in sourceDict:
+                    threads.append(workers.Thread(self.getEpisodeSource, title, year, imdb, tmdb, season, episode, tvshowtitle, localtvshowtitle, aliases, premiered, i[0], i[1]))
+
+
+            s = [i[0] + (i[1],) for i in zip(sourceDict, threads)]
+            s = [(i[3].getName(), i[0], i[2]) for i in s]
+
+            mainsourceDict = [i[0] for i in s if i[2] == 0]
+            sourcelabelDict = dict([(i[0], i[1].upper()) for i in s])
+
+            [i.start() for i in threads]
+
+            return mainsourceDict,sourcelabelDict
+        except Exception as e:
+            import traceback
+            failure = traceback.format_exc()
+            c.log(f'[CM Debug @ 1740 in sources.py]Traceback:: {failure}')
+            c.log(f'[CM Debug @ 1740 in sources.py]Exception raised. Error = {e}')
             pass
 
     #checked OH - 26-04-2021
@@ -1438,10 +1851,10 @@ class sources:
             dbcur.execute(f"SELECT * FROM rel_src WHERE source = '{source}' AND imdb_id = '{imdb}' AND season = '' AND episode = ''")
             match = dbcur.fetchone()
             t1 = int(re.sub('[^0-9]', '', str(match[5])))
-            c.log(f"[CM Debug @ 1441 in sources.py] time 1 = {t1}")
+            #c.log(f"[CM Debug @ 1441 in sources.py] time 1 = {t1}")
             t2 = int(datetime.datetime.now().strftime("%Y%m%d%H%M"))
-            c.log(f"[CM Debug @ 1443 in sources.py] time 2 = {t2}")
-            update = abs(t2 - t1) > 60
+            #c.log(f"[CM Debug @ 1443 in sources.py] time 2 = {t2}")
+            update = abs(t2 - t1) > 3600
             if update is False:
                 sources = eval(c.ensure_str(match[4]))
                 c.log(f"[CM Debug @ 1445 in sources.py] sources = {repr(sources)}")
@@ -1456,26 +1869,6 @@ class sources:
             url = eval(c.ensure_str(url[4]))
         except Exception:
             pass
-
-
-        try:
-            # !Orion, self.oa = OrionApi
-            # TODO: check  for validity of user
-            # TODO: check limit in get_movie. get_movie returns, without limit alle results for a movie.
-            # TODO: so a user with a "free" or even a "modest" premium account would have his daily limit reached with
-            # TODO: this (or 1) call.
-            sources = []
-            data = oa.get_movie(imdb, limit=25)
-            c.log(f"[CM Debug @ 1469 in sources.py] data = {repr(data)}")
-            sources = oa.do_orion_scrape(data, 'movie')
-            self.sources.extend(sources) if sources else []
-        except Exception as e:
-            import traceback
-            failure = traceback.format_exc()
-            c.log(f'[CM Debug @ 1472 in sources.py]Traceback:: {failure}')
-            c.log(f'[CM Debug @ 1473 in sources.py]Exception raised. Error = {e}')
-            pass
-
 
         try:
             if url is None:
@@ -1516,9 +1909,107 @@ class sources:
             #pass
 
 
+    # !Orion, self.oa = OrionApi
+    # TODO: check  for validity of user
+    # TODO: check limit in get_movie. get_movie returns, without limit alle results for a movie.
+    # TODO: so a user with a "free" or even a "modest" premium account would have his daily limit reached with
+    # TODO: this (or 1) call.
+    def getOrionMovieSource(self, title, localtitle, aliases, year, imdb, tmdb):
 
 
 
+
+        dbcon = database.connect(self.sourceFile)
+        dbcur = dbcon.cursor()
+
+        try:
+            dbcur.execute(f"SELECT * FROM rel_url WHERE source = 'Orion' AND imdb_id = '{imdb}'")
+            row = dbcur.fetchone()
+            hosts = eval(c.ensure_str(row[4]))
+            t1 = int(re.sub('[^0-9]', '', str(row[5])))
+            t2 = int(datetime.datetime.now().strftime("%Y%m%d%H%M"))
+            update = abs(t2 - t1) > 3600
+            if update is False:
+                return self.sources.extend(hosts)
+        except Exception:
+            pass
+
+        #we have no cached orion data of this movie
+        try:
+            if update or hosts is None:
+                sources = []
+                data = oa.get_movie(imdb, limit=250)
+                sources = oa.do_orion_scrape(data, 'movie')
+                if sources:
+                    dbcur.execute(f"DELETE FROM rel_url WHERE source = 'Orion' AND imdb_id = '{imdb}'")
+                    dbcur.execute("INSERT INTO rel_url Values (?, ?, ?, ?, ?)", ('Orion', imdb, '', '', repr(sources)))
+                    dbcon.commit()
+                return self.sources.extend(sources) if sources else []
+        except Exception as e:
+            import traceback
+            failure = traceback.format_exc()
+            c.log(f'[CM Debug @ 1546 in sources.py]Traceback:: {failure}')
+            c.log(f'[CM Debug @ 1547 in sources.py]Exception raised. Error = {e}')
+            pass
+
+    # !Orion, self.oa = OrionApi
+    # TODO: check  for validity of user
+    # TODO: check limit in get_movie. get_movie returns, without limit alle results for a movie.
+    # TODO: so a user with a "free" or even a "modest" premium account would have his daily limit reached with
+    # TODO: this (or 1) call.
+    def getOrionTVShowSource(self, title, localtitle, aliases, year, imdb, tmdb, season, episode):
+
+        dbcon = database.connect(self.sourceFile)
+        dbcur = dbcon.cursor()
+
+        update = False
+        hosts = None
+
+
+        try:
+            dbcur.execute(f"SELECT * FROM rel_url WHERE source = 'Orion' AND imdb_id = '{imdb}' AND season = '{season}' AND episode = '{episode}'")
+            row = dbcur.fetchone()
+            if not row:
+                update is True
+                raise Exception()
+            hosts = eval(c.ensure_str(row[4]))
+            t1 = int(re.sub('[^0-9]', '', str(row[5])))
+            t2 = int(datetime.datetime.now().strftime("%Y%m%d%H%M"))
+            update = abs(t2 - t1) > 3600
+            if update is False:
+                return self.sources.extend(hosts)
+        except Exception as e:
+            import traceback
+            failure = traceback.format_exc()
+            c.log(f'[CM Debug @ 1582 in sources.py]Traceback:: {failure}')
+            c.log(f'[CM Debug @ 1583 in sources.py]Exception raised. Error = {e}')
+            pass
+        #except Exception as e:
+            #c.log(f"[CM Debug @ 1573 in sources.py] Exception Raised. Error = {e}", 1)
+            #pass
+
+        #we have no cached orion data of this movie
+        try:
+            if update or hosts is None:
+                sources = []
+                data = oa.get_movie(imdb, limit=250)
+                sources = oa.do_orion_scrape(data, 'episode')
+
+
+                if sources:
+                    c.log(f"[CM Debug @ 1596 in sources.py]sources = {repr(sources)}")
+                    sql_delete = f"DELETE FROM rel_url WHERE source = 'Orion' AND imdb_id = '{imdb}' AND season = '{season}' AND episode = '{episode}'"
+                    c.log(f"[CM Debug @ 1601 in sources.py] sql = {sql_delete}")
+                    dbcur.execute(sql_delete)
+                    dbcur.execute("INSERT INTO rel_url Values (?, ?, ?, ?, ?)", ('Orion', imdb, season, episode, repr(sources)))
+                    dbcon.commit()
+                return self.sources.extend(sources) if sources else []
+        except Exception as e:
+            import traceback
+            failure = traceback.format_exc()
+            c.log(f'[CM Debug @ 1587 in sources.py]Traceback:: {failure}')
+            c.log(f'[CM Debug @ 1588 in sources.py]Exception raised. Error = {e}')
+            pass
 
 
 
@@ -1537,7 +2028,7 @@ class sources:
             match = dbcur.fetchone()
             t1 = int(re.sub('[^0-9]', '', str(match[5])))
             t2 = int(datetime.datetime.now().strftime("%Y%m%d%H%M"))
-            update = abs(t2 - t1) > 60
+            update = abs(t2 - t1) > 3600
             if update is False:
                 sources = eval(c.ensure_str(match[4]))
                 return self.sources.extend(sources)
@@ -1587,6 +2078,26 @@ class sources:
         except Exception:
             pass
 
+
+        #try:
+            # !Orion, self.oa = OrionApi
+            # TODO: check  for validity of user
+            # TODO: check limit in get_movie. get_movie returns, without limit alle results for a movie.
+            # TODO: so a user with a "free" or even a "modest" premium account would have his daily limit reached with
+            # TODO: this (or 1) call.
+            #sources = []
+            #data = oa.get_episode(imdb, tmdb, title, season, episode, limit=25)
+            #sources = oa.do_orion_scrape(data, 'movie')
+            #self.sources.extend(sources) if sources else []
+        #except Exception as e:
+            #import traceback
+            #failure = traceback.format_exc()
+            #c.log(f'[CM Debug @ 1472 in sources.py]Traceback:: {failure}')
+            #c.log(f'[CM Debug @ 1473 in sources.py]Exception raised. Error = {e}')
+            #pass
+
+
+
         try:
             sources = []
             sources = call.sources(ep_url, self.hostDict, self.hostprDict)
@@ -1632,21 +2143,28 @@ class sources:
         except Exception:
             pass
 
-    def uniqueSourcesGen(self, sources):
-        uniqueURLs = set()
+    def unique_sources(self, sources):
+        """Yield unique sources from a list of sources based on URL.
+
+        This function takes a list of sources and checks if the URL is unique.
+        If the URL is unique, it yields the source. If the URL is not unique, it
+        ignores the source.
+
+        Args:
+            sources (list): A list of sources.
+
+        Yields:
+            dict: A unique source.
+        """
+        unique_urls = set()
         for source in sources:
             url = source.get('url')
-            if isinstance(url, six.string_types):
-                if 'magnet:' in url:
+            if isinstance(url, str):
+                if url.startswith('magnet:'):
                     url = url[:60]
-                    #url = re.findall(u'btih:(\w{40})', url)[0]
-                if url not in uniqueURLs:
-                    uniqueURLs.add(url)
-                    yield source # Yield the unique source.
-                else:
-                    pass # Ignore duped sources.
-            else:
-                yield source # Always yield non-string url sources.
+                if url not in unique_urls:
+                    unique_urls.add(url)
+                    yield source  # Yield the unique source.
 
     def sourcesProcessTorrents2(self, torrent_sources):
         """Process torrent sources by checking for cached hashes.
@@ -1793,7 +2311,7 @@ class sources:
         # Filter out duplicate links
         if control.setting('remove.dups') == 'true':
             initial_count = len(self.sources)
-            self.sources = list(self.uniqueSourcesGen(self.sources))
+            self.sources = list(self.unique_sources(self.sources))
             duplicates_removed = initial_count - len(self.sources)
             control.infoDialog(control.lang(32089).format(duplicates_removed), icon='main_classy.png', time=4000)
 
@@ -1934,7 +2452,7 @@ class sources:
         try:
             if control.setting('remove.dups') == 'true':
                 stotal = len(self.sources)
-                self.sources = list(self.uniqueSourcesGen(self.sources))
+                self.sources = list(self.unique_sources(self.sources))
                 dupes = str(stotal - len(self.sources))
                 control.infoDialog(control.lang(32089).format(dupes), icon='INFO')
             else:
@@ -2145,6 +2663,7 @@ class sources:
 
 
         self.sources = [i for i in self.sources if 'label' or 'multiline_label' in i['label']]
+        #c.log(f"[CM Debug @ 2605 in sources.py] sources = {self.sources}")
 
         return self.sources
 
@@ -2319,7 +2838,7 @@ class sources:
             except Exception:
                 pass
             del progressDialog
-            c.log(f'Error {e}', 1)
+            c.log(f'[CM Debug @ 2422 in sources.py]Error {e}', 1)
 
     def sourcesDirect(self, items):
         """

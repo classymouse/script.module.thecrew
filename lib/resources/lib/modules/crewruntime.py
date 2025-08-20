@@ -23,7 +23,6 @@ import json
 import base64
 import datetime
 from io import open
-#import traceback
 from inspect import getframeinfo, stack
 
 import xbmc
@@ -33,7 +32,8 @@ import xbmcgui
 import xbmcplugin
 
 from . import keys
-from orion import *
+
+
 
 
 
@@ -103,6 +103,9 @@ class CrewRuntime:
         self._theme = ''
         self.art = ''
 
+        self.cores = 0
+        self.max_threads = 0
+
         self.initialize_all()
 
     def __del__(self):
@@ -136,9 +139,14 @@ class CrewRuntime:
 
         self.kodiversion = self._get_kodi_version(as_string=True, as_full=True)
         self.int_kodiversion = self._get_kodi_version(as_string=False, as_full=False)
+        self.pyversion = self.get_python_version(as_string=True)
+        self.int_pyversion = self.get_python_version(as_string=False)
         self.has_silent_boot = self._has_silent_boot()
-        self.devmode = self.get_setting('dev_pw') == self.ensure_text(base64.b64decode(b'dGhlY3Jldw=='))
         self.artworkPath = self.get_artwork_path()
+        self.cores = os.cpu_count() or 1
+
+        self.devmode = self.get_setting('dev_pw') == self.ensure_text(base64.b64decode(b'dGhlY3Jldw=='))
+        self.is_orion_disabled = self.orion_disabled()
 
 
         self._theme = self.appearance()
@@ -149,8 +157,38 @@ class CrewRuntime:
         self.set_imagesizes()
         self.check_orion()
 
+    def get_max_threads(self,total_items: int, default_cap: int = 50) -> int:
+        """Determine an appropriate number of threads for concurrent tasks."""
+        try:
 
+            user_defined = int(self.get_setting('max.threads') or 0)
+        except Exception:
+            user_defined = 0
+
+        cpu_cores = os.cpu_count() or 1
+        thread_count = user_defined if user_defined > 0 else cpu_cores * 2
+        thread_count = min(thread_count, default_cap, total_items)
+        return max(5, thread_count)
+
+    def orion_disabled(self) -> bool:
+        '''Check if Orion is disabled'''
+
+        if(self.get_setting('disable.orion') == 'true'):
+            self.log('[CM Debug @ 158 in crewRuntime] navigator.navigator (disable.orion)')
+            return True
+        return False
+    @staticmethod
     def addon_exists(script_name) -> bool:
+        """
+        Check if an add-on with the given script name is installed and enabled.
+
+        Args:
+            script_name (str): The name of the script or add-on to check.
+
+        Returns:
+            bool: True if the add-on is installed and enabled, False otherwise.
+        """
+
         if not script_name:
             return False
         return xbmc.getCondVisibility(f'System.HasAddon({script_name})') == 1
@@ -163,24 +201,36 @@ class CrewRuntime:
             self.log('User enabled silent boot option')
         else:
             self.log('User disabled silent boot option')
-    def get_artwork_path(self) -> str:
+
+    @staticmethod
+    def get_artwork_path() -> str:
+        """Returns the path to the script.thecrew.artwork addon's resources directory"""
         return xbmcaddon.Addon('script.thecrew.artwork').getAddonInfo('path')
+
+
 
     def _get_current_platform(self):
 
         platform_name = platform.uname()
         _system = platform_name[0]
-        # _sysname = platform_name[1]
-        # _sysrelease = platform_name[2]
+        _sysname = platform_name[1]
+        _sysrelease = platform_name[2]
         _sysversion = platform_name[3]
-        # _sysmachine = platform_name[4]
-        # _sysprocessor = platform_name[5]
+        _sysmachine = platform_name[4]
+        _sysprocessor = platform_name[5]
         is_64bits = sys.maxsize > 2**32
-        # pf = platform.python_version() # pylint disable=snake-case
+        pf = platform.python_version() # pylint disable=snake-case
+
+        #self.log(f"[CM Debug @ 190 in crewruntime.py] _system = {_system} | _sysversion = {_sysversion} | _sysmachine = {_sysmachine} | _sysrelease = {_sysrelease} with type = {type(_sysrelease)} | sysrelease 11?: {_system == 'Windows' and int(_sysversion.split('.')[-1]) > 22000} | pf = {pf}")
+
+        if _system == 'Windows' and int(_sysversion.split('.')[-1]) > 22000:
+            _sysrelease = '11'
+
+        #self.log(f"[CM Debug @ 195 in crewruntime.py]] _system = {_system} | _sysversion = {int(_sysversion.split('.')[-1])} | _sysrelease = {_sysrelease} ", )
 
         _64bits = '64bits' if is_64bits else '32bits'
 
-        return f"{_system} {_sysversion} ({_64bits})"
+        return f"{_system} {_sysrelease} v.{_sysversion} ({_64bits})"
 
     def _get_kodi_version(self, as_string=False, as_full=False):
         version_raw = xbmc.getInfoLabel("System.BuildVersion").split(" ")
@@ -201,14 +251,32 @@ class CrewRuntime:
 
         return int(version)
 
+    def get_python_version(self, as_string=False, as_full=False):
+        """
+        Get the python version
+
+        :param as_string: bool Return the python version as a string
+        :param as_full: bool Return the full python version string
+        :return: str or int
+        """
+        version = platform.python_version_tuple()
+
+        if as_string and as_full:
+            return sys.version
+
+        if as_string:
+            return '.'.join(version[0:3])
+
+        return float('.'.join(version[0:2]))
+
+
+
     def log(self, msg, trace=0):
         '''
         General new log messages
         '''
-        #logdebug = xbmc.LOGDEBUG
-        begincolor = begininfocolor = endcolor = ''
-        debug_prefix = f' DEBUG {begincolor}[{self.name} {self.pluginversion} | {self.moduleversion} | {self.kodiversion} | {self.platform}]{endcolor}'
-        info_prefix = f' INFO {begininfocolor}[{self.name} {self.pluginversion}/{self.moduleversion}]{endcolor}'
+        debug_prefix = f' DEBUG [{self.name} {self.pluginversion} | {self.moduleversion} | {self.pyversion} | {self.kodiversion} | {self.platform}]'
+        info_prefix = f' INFO [{self.name} {self.pluginversion}/{self.moduleversion} | {self.pyversion}]'
 
         log_path = xbmcvfs.translatePath('special://logpath')
         filename = 'the_crew.log'
@@ -236,8 +304,16 @@ class CrewRuntime:
 
                 if not os.path.exists(log_file):
                     _file = open(log_file, 'a', encoding="utf8")
-                    line = 'Classy started this file\n'
-                    _file.write(line.rstrip('\r\n') + '\n')
+                    s = [
+                        "====================================================================\n",
+                        "Log File The Crew | plugin: v." + self.pluginversion + " | module: v." + self.moduleversion + " | Kodi: v." + self.kodiversion + "\n",
+                        "Created: " + str(datetime.datetime.now().strftime("%d-%m-%Y %H:%M:%S")) + "\n",
+                        "=================================================================cm=\n\n\n"
+                        ]
+
+                    with open(log_file, "w") as f:
+                        f.writelines(s)
+
                 with open(log_file, 'a', encoding="utf8") as _file:
                     now = datetime.datetime.now()
                     _dt = now.strftime("%Y-%m-%d %H:%M:%S")
@@ -259,13 +335,14 @@ class CrewRuntime:
             scraper (str): The name of the scraper where the error occurred.
             trace (int, optional): If set to 1, includes traceback information. Defaults to 0.
         """
-        msg = f'Scraper: {scraper} | {msg}'
+        msg = f'\n============================================================\nScraper Error in scraper: {scraper}\n============================================================\n{msg}'
         self.log(msg, trace)
 
     def in_addon(self) -> bool:
         '''
         returns bool if we are inside addon
         '''
+        # self.log('[CM Debug @ 158 in crewRuntime] navigator.navigator (in_addon), self.container.pluginname = ' + xbmc.getInfoLabel('Container.PluginName'))
         return xbmc.getInfoLabel('Container.PluginName') == "plugin.video.thecrew"
 
     def get_setting(self, setting) -> str:
@@ -294,15 +371,31 @@ class CrewRuntime:
         return re.sub(clean, '', text)
 
     def ensure_str(self, s, encoding='utf-8', errors='strict') -> str:
-        # Als de invoer een bytes-object is, decodeer het naar een string
-        if isinstance(s, bytes):
-            return s.decode(encoding, errors)
-        # Als de invoer al een string is, geef het terug
-        elif isinstance(s, str):
-            return s
-        # Voor andere typen, converteer naar string met str()
-        else:
-            return str(s)
+        try:
+            # Als de invoer een bytes-object is, decodeer het naar een string
+            if isinstance(s, bytes):
+                return s.decode(encoding, errors)
+            # Als de invoer al een string is, geef het terug
+            elif isinstance(s, str):
+                return s
+            # Voor andere typen, converteer naar string met str()
+            else:
+                return str(s)
+        except UnicodeDecodeError as e:
+            # Handle the case where decoding fails
+            if errors == 'strict':
+                raise
+            elif errors == 'ignore':
+                return ''  # Return empty on ignore
+            elif errors == 'replace':
+                return s.decode(encoding, 'replace')
+            else:
+                raise ValueError(f"Unknown error handling option: {errors}") from e
+        except ValueError as e:
+            log(f'[CM Debug @ 318 in crewruntime.py]ValueError: {e}')
+        except Exception as e:
+            raise ValueError(f"Failed to ensure string: {e}")
+
 
 
     def ensure_text(self, input_value, errors='strict') -> str:
@@ -381,9 +474,10 @@ class CrewRuntime:
         return email[:2] + '*' * (len(email) - 4) + email[-2:]
 
     def is_orion_installed(self):# -> Any:
-        return xbmc.getCondVisibility('System.HasAddon(script.module.orion)')
-
-
+        if xbmc.getCondVisibility('System.HasAddon(script.module.orion)'):
+            from orion import Orion
+            return True
+        return False
 
     def decode(self,data, encoding='utf-8') -> str:
 
@@ -478,6 +572,8 @@ class CrewRuntime:
             True if the current window is a widget listing, else False.
         """
         plugin_name = xbmc.getInfoLabel('Container.PluginName')
+        b = 'plugin' not in plugin_name
+        # self.log(f'[CM Debug @ 158 in crewRuntime] (is_widget_listing), plugin_name =  {plugin_name}, result = {b}')
         return 'plugin' not in plugin_name
 
 
@@ -610,6 +706,12 @@ class CrewRuntime:
 
         if string in ['0', None]:
             return []
+        if(isinstance(string, list)):
+            return string
+        elif(isinstance(string, tuple)):
+            return list(string)
+        elif(isinstance(string, str)):
+            string = string.strip()
         lst = string.split('/')
         lst = [s.strip() for s in lst]
         lst = [self.capitalize_word(s) for s in lst]
@@ -624,7 +726,7 @@ class CrewRuntime:
 
             tmdb_id = str(tmdb_id)
             indices = [index for index, value in enumerate(indicator_list) if value[0] == tmdb_id]
-            self.log(f'[CM Debug @ 587 in crewruntime.py]indices = {indices}')
+            #self.log(f'[CM Debug @ 587 in crewruntime.py]indices = {indices}')
 
             return indices[0] if indices else -1
         except Exception as e:
@@ -693,10 +795,6 @@ class CrewRuntime:
         elif icon.endswith('.png'):
             icon = os.path.join(self.art, icon)
         xbmcgui.Dialog().notification(heading, message, icon, time, sound=sound)
-
-
-
-
 
 
 c = CrewRuntime()

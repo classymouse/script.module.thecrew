@@ -294,7 +294,7 @@ def tagdataClean(tagdata): # Filter out non-existing in litItem.
         'tvshowtitle','premiered','status','set','setoverview','tag','imdbnumber',
         'code','aired','credits','lastplayed','album','artist','votes','path',
         'trailer','dateadded','mediatype','dbid'
-        ]
+        ] #, 'resume_point', 'offset'
 
     if 'votes' in tagdata:
         tagdata['votes'] = str(tagdata['votes']).replace(",", "")

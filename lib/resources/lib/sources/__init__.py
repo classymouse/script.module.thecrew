@@ -1,32 +1,20 @@
 # -*- coding: utf-8 -*-
 
 '''
-    Genesis Add-on
-    Copyright (C) 2015 lambda
-
-    -Mofidied by The Crew
-    -Copyright (C) 2019 lambda
-
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+********************************************************cm*
+* The Crewy Add-on
+*
+* @file __init__.py
+* @package script.module.thecrew
+*
+* @copyright (c) 2025, The Crew
+* @license GNU General Public License, version 3 (GPL-3.0)
+*
+********************************************************cm*
 '''
 
 import pkgutil
 import os.path
-import importlib
-import xbmc
-import xbmcaddon
 
 from ..modules.crewruntime import c
 
@@ -42,26 +30,16 @@ def sources():
                     continue
 
                 try:
-                    module = loader.find_module(module_name).load_module(module_name)
+                    module = loader.find_spec(module_name).loader.load_module(module_name)
                     sourceDict.append((module_name, module.source()))
-                    #c.log(f"[CM Debug @ 47 in __init__.py] loading modules into sourcedict: {module_name}")
+                except AttributeError:
+                    module = loader.find_spec(module_name).loader.load_module(module_name)
                 except (ImportError, AttributeError) as e:
-                    #c.log(f'Could not load "{module_name}": {e}', 1)
+                    c.log(f'Could not load "{module_name}": {e}', 1)
                     pass
-
-        #cm try to load cocoscrapers
-        try:
-            if xbmc.getCondVisibility('System.HasAddon(script.module.cocoscrapers)'):
-                cocopath = xbmcaddon.Addon('script.module.cocoscrapers').getAddonInfo('path')
-                #c.log(f"[CM Debug @ 54 in __init__.py] CocoScrapers path: {cocopath}")
-                #sys.path.append(cocopath)
-        except Exception as e:
-            #c.log(f"[CM Debug @ 57 in __init__.py] Could not load cocoscrapers: {e}", 1)
-            pass
 
         return sourceDict
     except (ImportError, ModuleNotFoundError) as e:
-        # handle the exception
         c.log(f'Could not load sources: {e}', 1)
         return []
 

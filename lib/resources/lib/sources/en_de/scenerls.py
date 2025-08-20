@@ -97,16 +97,16 @@ class source:
                 r = client.request(url)
                 r = ensure_text(r, errors='replace')
 
-                posts = client.parseDOM(r, 'div', attrs={'class': 'post'})
+                posts = client.parseDom(r, 'div', attrs={'class': 'post'})
 
                 items = []
 
                 for post in posts:
                     try:
-                        u = client.parseDOM(post, "div", attrs={"class": "postContent"})
+                        u = client.parseDom(post, "div", attrs={"class": "postContent"})
                         size = re.findall('((?:\d+\,\d+\.\d+|\d+\.\d+|\d+\,\d+|\d+)\s*(?:GiB|MiB|GB|MB))', u[0])[0]
-                        u = client.parseDOM(u, "h2")
-                        u = client.parseDOM(u, 'a', ret='href')
+                        u = client.parseDom(u, "h2")
+                        u = client.parseDom(u, 'a', ret='href')
                         u = [(i.strip('/').split('/')[-1], i, size) for i in u]
                         items += u
                     except:
@@ -155,5 +155,3 @@ class source:
 
     def resolve(self, url):
         return url
-
-

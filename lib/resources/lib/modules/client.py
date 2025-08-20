@@ -24,25 +24,34 @@ import base64
 #import traceback
 
 import json
+
 import six
 #from six.moves import range as x_range
 
 from . import cache
 from . import dom_parser
-from . import log_utils
+
 from . import control
 from . import hunter
 from .crewruntime import c
 
 
+
+
 try:
     from http import cookiejar as cookielib
+    from http.client import HTTPMessage
     from html import unescape
+
     import urllib.request as urllib2
-    from io import StringIO
-    from urllib.parse import urlparse, urljoin, quote, urlencode, quote_plus, unquote
+    from urllib.request import HTTPRedirectHandler
+    from urllib.request import Request as URLRequest
+    from urllib.parse import urlparse, urljoin, urlencode, quote_plus, unquote
     from urllib.response import addinfourl
     from urllib.error import HTTPError
+
+    from io import StringIO
+
 except ImportError as e:
     c.log(f"[CM Debug @ 36 in client.py] importerror in client.py. Error = {e}")
 
@@ -150,7 +159,9 @@ def request(url, close=True, redirect=True, error=False, verify=True, proxy=None
         except Exception:
             headers = {}
 
-        if 'User-Agent' in headers:
+
+        user_agent = headers.get('User-Agent') if headers else None
+        if user_agent is not None:
             pass
         elif mobile is not True:
             #headers['User-Agent'] = agent()
@@ -158,20 +169,44 @@ def request(url, close=True, redirect=True, error=False, verify=True, proxy=None
         else:
             headers['User-Agent'] = cache.get(randommobileagent, 12)
 
-        if 'Referer' in headers:
+
+        #if 'User-Agent' in headers:
+            #pass
+        #elif mobile is not True:
+            #headers['User-Agent'] = agent()
+            #headers['User-Agent'] = cache.get(randomagent, 12)
+        #else:
+            #headers['User-Agent'] = cache.get(randommobileagent, 12)
+
+        if headers is not None and 'Referer' in headers:
             pass
         elif referer is None:
             headers['Referer'] = '%s://%s/' % (urlparse(url).scheme, urlparse(url).netloc)
         else:
             headers['Referer'] = referer
 
-        if not 'Accept-Language' in headers:
-            headers['Accept-Language'] = 'en-US'
+        #if 'Referer' in headers:
+        #    pass
+        #elif referer is None:
+        #    headers['Referer'] = '%s://%s/' % (urlparse(url).scheme, urlparse(url).netloc)
+        #else:
+        #    headers['Referer'] = referer
 
-        if 'X-Requested-With' in headers:
+        if headers is not None:
+            headers.setdefault('Accept-Language', 'en-US')
+        #if 'Accept-Language' not in headers:
+        #    headers['Accept-Language'] = 'en-US'
+
+
+        if headers is not None and 'X-Requested-With' in headers:
             pass
         elif XHR is True:
             headers['X-Requested-With'] = 'XMLHttpRequest'
+
+        #if 'X-Requested-With' in headers:
+        #    pass
+        #elif XHR is True:
+        #    headers['X-Requested-With'] = 'XMLHttpRequest'
 
         if 'Cookie' in headers:
             pass
@@ -185,15 +220,16 @@ def request(url, close=True, redirect=True, error=False, verify=True, proxy=None
 
         if redirect is False:
 
-            class NoRedirectHandler(urllib2.HTTPRedirectHandler):
 
-                def http_error_302(self, reqst, fp, code, msg, head):
 
-                    infourl = addinfourl(fp, head, reqst.get_full_url())
-                    infourl.status = code
-                    infourl.code = code
+            class NoRedirectHandler(HTTPRedirectHandler):
+                def http_error_302(self, req: URLRequest, fp, code: int, msg: str, headers: HTTPMessage) -> addinfourl:
+                    response = addinfourl(fp, headers, req.get_full_url())
+                    #response.status = code
+                    #response.code = code
 
-                    return infourl
+                    response.set_code(code)  # Use set_code instead of assigning to status
+                    return response
 
                 http_error_300 = http_error_302
                 http_error_301 = http_error_302

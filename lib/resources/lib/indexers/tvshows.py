@@ -20,6 +20,7 @@ import sys
 import re
 import datetime
 import json
+import concurrent.futures
 
 import sqlite3 as database
 from urllib.parse import quote, quote_plus, parse_qsl, urlparse, urlsplit, urlencode
@@ -61,7 +62,7 @@ class tvshows:
 
         self.imdb_link = 'https://www.imdb.com'
         self.trakt_link = 'https://api.trakt.tv'
-        #self.tvmaze_link = 'https://www.tvmaze.com'
+        self.tvmaze_link = 'https://www.tvmaze.com'
         self.tmdb_link = 'https://api.themoviedb.org/3'
         self.logo_link = 'https://i.imgur.com/'
         self.logo_link = 'https://image.tmdb.org/t/p/original'
@@ -109,7 +110,7 @@ class tvshows:
         self.lang = control.apiLanguage()['tmdb'] or 'en'
 
         self.search_link = f'{self.trakt_link}/search/show?limit=20&page=1&query=%s'
-        #self.tvmaze_info_link = 'https://api.tvmaze.com/shows/%s'
+        self.tvmaze_info_link = 'https://api.tvmaze.com/shows/%s'
         self.fanart_tv_art_link = 'http://webservice.fanart.tv/v3/tv/%s'
         self.fanart_tv_level_link = 'http://webservice.fanart.tv/v3/level'
 
@@ -144,7 +145,7 @@ class tvshows:
         self.rating_link = f'{self.tmdb_link}/discover/tv?api_key={self.tmdb_user}&include_adult=false&include_null_first_air_dates=false&language=en-US&with_origin_country=US|UK|AU&with_original_language=en&sort_by=vote_average.desc&vote_count.gte=200&page=1'
         self.views_link = f'{self.tmdb_link}/discover/tv?api_key={self.tmdb_user}&include_adult=false&include_null_first_air_dates=false&language=en-US&with_origin_country=US|UK|AU&with_original_language=en&sort_by=vote_count.desc&vote_count.gte=1500&page=1'
         self.language_link = f'{self.tmdb_link}/discover/tv?api_key={self.tmdb_user}&include_adult=false&include_video=false&sort_by=popularity.desc&with_original_language=%s&page=1'
-        self.active_link = f'{self.tmdb_link}/discover/tv?api_key=self.tmdb_user{self.tmdb_user}&include_adult=false&include_null_first_air_dates=false&language=en-US&sort_by=popularity.desc&with_origin_country=US|UK|AU&with_original_language=en&with_status=0|2&page=1'
+        self.active_link = f'{self.tmdb_link}/discover/tv?api_key={self.tmdb_user}&include_adult=false&include_null_first_air_dates=false&language=en-US&sort_by=popularity.desc&with_origin_country=US|UK|AU&with_original_language=en&with_status=0|2&page=1'
         self.tmdb_api_link = f'{self.tmdb_link}/tv/%s?api_key={self.tmdb_user}&language={self.lang}&append_to_response=aggregate_credits,content_ratings,external_ids'
         self.tmdb_networks_link = f'{self.tmdb_link}/discover/tv?api_key={self.tmdb_user}&sort_by=first_air_date.desc&with_networks=%s&page=1'
         self.tmdb_networks_link_no_unaired = f'{self.tmdb_link}/discover/tv?api_key={self.tmdb_user}&first_air_date.lte={self.today_date}&sort_by=first_air_date.desc&with_networks=%s&page=1'
@@ -172,7 +173,10 @@ class tvshows:
             if 'trakt' in url and '/search' in url:
                 pass
             else:
-                url = getattr(self, f'{url}_link')
+                if url.startswith('http'):
+                    pass
+                else:
+                    url = getattr(self, f'{url}_link')
             c.log(f"[CM Debug @ 172 in tvshows.py] url = {url}")
 
             ####cm#
@@ -206,7 +210,7 @@ class tvshows:
 
             elif u in self.trakt_link:
                 #self.list = cache.get(self.trakt_list, 24, url, self.trakt_user)
-                self.list = cache.get(self.trakt_list, 0, url, self.trakt_user)
+                self.list = cache.get(self.trakt_list, 4, url, self.trakt_user)
 
             #elif u in self.imdb_link and ('/user/' in url or '/list/' in url):
             #    self.list = cache.get(self.imdb_list, 1, url)
@@ -282,7 +286,7 @@ class tvshows:
         dbcon = database.connect(control.searchFile)
         dbcur = dbcon.cursor()
 
-        navigator.navigator().addDirectoryItem(32603, 'tvSearchnew', 'search.png', 'DefaultTVShows.png')
+        navigator.navigator.addDirectoryItem(32603, 'tvSearchnew', 'search.png', 'DefaultTVShows.png')
 
         try:
             dbcur.execute("""CREATE TABLE IF NOT EXISTS tvshow (
@@ -301,7 +305,7 @@ class tvshows:
             if term not in search_terms:
                 delete_option = True
                 context_menu_items.append((32070, f'tvDeleteTerm&id={id}'))
-                navigator.navigator().addDirectoryItem(
+                navigator.navigator.addDirectoryItem(
                     term,
                     f'tvSearchterm&name={term}',
                     'search.png',
@@ -313,10 +317,9 @@ class tvshows:
         dbcur.close()
 
         if delete_option:
-            navigator.navigator().addDirectoryItem(32605, 'clearCacheSearch', 'tools.png', 'DefaultAddonProgram.png')
+            navigator.navigator.addDirectoryItem(32605, 'clearCacheSearch', 'tools.png', 'DefaultAddonProgram.png')
 
-        navigator.navigator().endDirectory()
-
+        navigator.navigator.endDirectory()
 
     def search_new(self):
         """Search for a TV show."""
@@ -342,8 +345,6 @@ class tvshows:
 
         url = self.search_link % quote_plus(clean_search_query)
         self.get(url)
-
-
 
     def search_term(self, query):
         control.idle()
@@ -455,89 +456,106 @@ class tvshows:
         return self.list
 
     def networks(self):
-        network_data = [
-            (129, "A&E", f'{self.logo_link}ptSTdU4GPNJ1M8UVEOtA0KgtuNk.png'),
-            (2, "ABC", f'{self.logo_link}an88sKsFz0KX5CQngAM95WkncX4.png'),
-            (1024, "Amazon", f'{self.logo_link}uK6yuqMkUvKhCgVJjg5JWDUoabA.png'),
-            (174, "AMC", f'{self.logo_link}alqLicR1ZMHMaZGP3xRQxn9sq7p.png'),
-            (91, "Animal Planet", f'{self.logo_link}xQ25rzpv83d74V1zpOzSHbYlwJq.png'),
-            (173, "AT-X", f'{self.logo_link}fERjndErEpveJmQZccJbJDi93rj.png'),
-            (493, "BBC America", f'{self.logo_link}8Js4sUaxjE3RSxJcOCDjfXvhZqz.png'),
-            (4, "BBC One", f'{self.logo_link}uJjcCg3O4DMEjM0xtno9OWFciRP.png'),
-            (332, "BBC Two", f'{self.logo_link}7HVPn1p2w1nC5oRKBehXVHpss7e.png'),
-            (3, "BBC Three", f'{self.logo_link}s22fRhj8xFPbiexrJwiAOcDEIrS.png'),
-            (100, "BBC Four", f'{self.logo_link}AgsOSxGvfxIonhPgrfkWCmsOKfA.png'),
-            (24, "BET", f'{self.logo_link}gaouRlJrfZlEA5EPHhO5qqZ1Fgu.png'),
-            (74, "Bravo", f'{self.logo_link}wX5HsfS47u6UUCSpYXqaQ1x2qdu.png'),
-            (56, "Cartoon Network", f'{self.logo_link}c5OC6oVCg6QP4eqzW6XIq17CQjI.png'),
-            (201, "CBC", f'{self.logo_link}qNooLje0YQh1y3y9LUM2Y5QCtiF.png'),
-            (16, "CBS", f'{self.logo_link}wju8KhOUsR5y4bH9p3Jc50hhaLO.png'),
-            (26, "Channel 4", f'{self.logo_link}zCUWm0Xb6AnjUbxzjL5OkzmHhd7.png'),
-            (99, "Channel 5", f'{self.logo_link}bMuKs6xuhI0GHSsq4WWd9FsntUN.png'),
-            (47, "Comedy Central", f'{self.logo_link}6ooPjtXufjsoskdJqj6pxuvHEno.png'),
-            (2548, "CBC", f'{self.logo_link}qe2RYSTCxbPh3jCaM1tk9E4uJZ6.png'),
-            (403, "CTV", f'{self.logo_link}volHUxY1MHjSPI4ju7j36EdhR2m.png'),
-            (928, "Crackle", f'{self.logo_link}bR8S6Fjv3VGtEKyKF5lvvRJ5xfw.png'),
-            (71, "The CW", f'{self.logo_link}ge9hzeaU7nMtQ4PjkFlc68dGAJ9.png'),
-            (1049, "CW seed", f'{self.logo_link}wwo3PZyBpHL3Wz8eg4cr3kqVZQY.png'),
-            (64, "Discovery", f'{self.logo_link}8qkdZlbrTSVfkJ73DjOBrwYtMSC.png'),
-            (4883, "discovery+", f'{self.logo_link}iKvdFk5lpbvs4g0vd6yVUcV36i3.png'),
-            (244, "Discovery ID", f'{self.logo_link}yfkdPLHjsed7vwUNuh20eMuDiDO.png'),
-            (2739, "Disney+", f'{self.logo_link}PQxvkeK8cTtD7vjataBsNpjbJ5.png'),
-            (54, "Disney Channel", f'{self.logo_link}gvhBea9OGqChmGKHa5CntbmsDBp.png'),
-            (44, "Disney XD", f'{self.logo_link}nKM9EnV7jTpt3MKRbhBusJ03lAY.png'),
-            (2087, "Discovery Channel", f'{self.logo_link}8qkdZlbrTSVfkJ73DjOBrwYtMSC.png'),
-            (76, "E! Entertainment", f'{self.logo_link}ptpx2Ag52sYJG6LiX9zBlnKsQOS.png'),
-            (136, "E4", f'{self.logo_link}fJPM9Rj12us4HF03N3qvakz7WuZ.png'),
-            (19, "FOX", f'{self.logo_link}1DSpHrWyOORkL9N2QHX7Adt31mQ.png'),
-            (1267, "Freeform", f'{self.logo_link}jk2Z7WH6JnHSZrxouYh4sireM3a.png'),
-            (88, "FX", f'{self.logo_link}aexGjtcs42DgRtZh7zOxayiry4J.png'),
-            (384, "Hallmark Channel", f'{self.logo_link}9JTL7HcaiVxq7M6eu5m7giFqaxR.png'),
-            (65, "History", f'{self.logo_link}9fGgdJz17aBX7dOyfHJtsozB7bf.png'),
-            (49, "HBO", f'{self.logo_link}hizvY65SpyF3BPY2qsBZMgUOxjs.png'),
-            (3186, "HBO Max", f'{self.logo_link}nmU0UMDJB3dRRQSTUqawzF2Od1a.png'),
-            (210, "HGTV", f'{self.logo_link}tzTtKdQ7vC2FkBvJDUErOhBPdKJ.png'),
-            (453, "Hulu", f'{self.logo_link}pqUTCleNUiTLAVlelGxUgWn1ELh.png'),
-            (9, "ITV", f'{self.logo_link}j3KAlTmxGDCHQZqs1A2hagzjYqu.png'),
-            (34, "Lifetime", f'{self.logo_link}kU18GafTybg4uMhkj3wvsGBgn8s.png'),
-            (33, "MTV USA", f'{self.logo_link}w4qtv7xBkSVsbOQdSzjUjlyOuSr.png'),
-            (488, "MTV UK", f'{self.logo_link}w4qtv7xBkSVsbOQdSzjUjlyOuSr.png'),
-            (43, "National Geographic", f'{self.logo_link}q9rPBG1rHbUjII1Qn98VG2v7cFa.png'),
-            (6, "NBC", f'{self.logo_link}cm111bsDVlYaC1foL0itvEI4yLG.png'),
-            (213, "Netflix", f'{self.logo_link}wwemzKWzjKYJFfCeiB57q3r4Bcm.png'),
-            (13, "Nickelodeon", f'{self.logo_link}aYkLXz4dxHgOrFNH7Jv7Cpy56Ms.png'),
-            (14, "PBS", f'{self.logo_link}hp2Fs7AIdsMlEjiDUC1V8Ows2jM.png'),
-            (67, "Showtime", f'{self.logo_link}Allse9kbjiP6ExaQrnSpIhkurEi.png'),
-            (1755, "Sky History", f'{self.logo_link}mzLlbqnnLiDIzriohlvfSbWlEfR.png'),
-            (1431, "Sky One", f'{self.logo_link}dVBHOr0nYCx9GSNesTVb1TT52Xj.png'),
-            (318, "Starz", f'{self.logo_link}GMDGZk9iDG4WDijY3VgUgJeyus.png'),
-            (270, "SundanceTV", f'{self.logo_link}xhTdszjVRy1tABMix2dffBcdDJ1.png'),
-            (77, "Syfy", f'{self.logo_link}iYfrkobwDhTOFJ4AXYPSLIEeaAT.png'),
-            (68, "TBS", f'{self.logo_link}9PYsQf3YbDUJo1rg3pgtaiOrb6s.png'),
-            (84, "TLC", f'{self.logo_link}6GRfZSrYh9D6C88n9kWlyrySB2l.png'),
-            (41, "TNT", f'{self.logo_link}6ISsKwa2XUhSC6oBtHZjYf6xFqv.png'),
-            (209, "Travel Channel", f'{self.logo_link}8SwN81R7P5vD5mhtOE0taw5mji4.png'),
-            (364, "truTV", f'{self.logo_link}c48pVcWAEYhEFXrWFsYxx343mjx.png'),
-            (30, "USA Network", f'{self.logo_link}g1e0H0Ka97IG5SyInMXdJkHGKiH.png'),
-            (158, "VH1", f'{self.logo_link}w9oUxxUiXTC1O1MzJSvsMjQbgft.png'),
-            (202, "WGN America", f'{self.logo_link}kCNFRiqVRMgNWKSWu0LzAIpy9um.png'),
-            (247, "YouTube", f'{self.logo_link}9Ga8A5QegQmiSVHp4hyusfMfpVk.png'),
-            (1436, "YouTube Premium", f'{self.logo_link}3p05CgodUb9gPayuliuhawNj1Wo.png'),
-        ]
+        try:
+            c.log("[CM Debug @ 462 in tvshows.py] inside networks")
+            network_data = [
+                (129, "A&E", f'{self.logo_link}/ptSTdU4GPNJ1M8UVEOtA0KgtuNk.png'),
+                (2, "ABC", f'{self.logo_link}/an88sKsFz0KX5CQngAM95WkncX4.png'),
+                (1024, "Amazon", f'{self.logo_link}/uK6yuqMkUvKhCgVJjg5JWDUoabA.png'),
+                (174, "AMC", f'{self.logo_link}/alqLicR1ZMHMaZGP3xRQxn9sq7p.png'),
+                (91, "Animal Planet", f'{self.logo_link}/xQ25rzpv83d74V1zpOzSHbYlwJq.png'),
+                (173, "AT-X", f'{self.logo_link}/fERjndErEpveJmQZccJbJDi93rj.png'),
+                (493, "BBC America", f'{self.logo_link}/8Js4sUaxjE3RSxJcOCDjfXvhZqz.png'),
+                (4, "BBC One", f'{self.logo_link}/uJjcCg3O4DMEjM0xtno9OWFciRP.png'),
+                (332, "BBC Two", f'{self.logo_link}/7HVPn1p2w1nC5oRKBehXVHpss7e.png'),
+                (3, "BBC Three", f'{self.logo_link}/s22fRhj8xFPbiexrJwiAOcDEIrS.png'),
+                (100, "BBC Four", f'{self.logo_link}/AgsOSxGvfxIonhPgrfkWCmsOKfA.png'),
+                (24, "BET", f'{self.logo_link}/gaouRlJrfZlEA5EPHhO5qqZ1Fgu.png'),
+                (74, "Bravo", f'{self.logo_link}/wX5HsfS47u6UUCSpYXqaQ1x2qdu.png'),
+                (56, "Cartoon Network", f'{self.logo_link}/c5OC6oVCg6QP4eqzW6XIq17CQjI.png'),
+                (201, "CBC", f'{self.logo_link}/qNooLje0YQh1y3y9LUM2Y5QCtiF.png'),
+                (16, "CBS", f'{self.logo_link}/wju8KhOUsR5y4bH9p3Jc50hhaLO.png'),
+                (26, "Channel 4", f'{self.logo_link}/zCUWm0Xb6AnjUbxzjL5OkzmHhd7.png'),
+                (99, "Channel 5", f'{self.logo_link}/bMuKs6xuhI0GHSsq4WWd9FsntUN.png'),
+                (47, "Comedy Central", f'{self.logo_link}/6ooPjtXufjsoskdJqj6pxuvHEno.png'),
+                (2548, "CBC", f'{self.logo_link}/qe2RYSTCxbPh3jCaM1tk9E4uJZ6.png'),
+                (403, "CTV", f'{self.logo_link}/volHUxY1MHjSPI4ju7j36EdhR2m.png'),
+                (928, "Crackle", f'{self.logo_link}/bR8S6Fjv3VGtEKyKF5lvvRJ5xfw.png'),
+                (71, "The CW", f'{self.logo_link}/ge9hzeaU7nMtQ4PjkFlc68dGAJ9.png'),
+                (1049, "CW seed", f'{self.logo_link}/wwo3PZyBpHL3Wz8eg4cr3kqVZQY.png'),
+                (64, "Discovery", f'{self.logo_link}/8qkdZlbrTSVfkJ73DjOBrwYtMSC.png'),
+                (4883, "discovery+", f'{self.logo_link}/iKvdFk5lpbvs4g0vd6yVUcV36i3.png'),
+                (244, "Discovery ID", f'{self.logo_link}/yfkdPLHjsed7vwUNuh20eMuDiDO.png'),
+                (2739, "Disney+", f'{self.logo_link}/PQxvkeK8cTtD7vjataBsNpjbJ5.png'),
+                (54, "Disney Channel", f'{self.logo_link}/gvhBea9OGqChmGKHa5CntbmsDBp.png'),
+                (44, "Disney XD", f'{self.logo_link}/nKM9EnV7jTpt3MKRbhBusJ03lAY.png'),
+                (2087, "Discovery Channel", f'{self.logo_link}/8qkdZlbrTSVfkJ73DjOBrwYtMSC.png'),
+                (76, "E! Entertainment", f'{self.logo_link}/ptpx2Ag52sYJG6LiX9zBlnKsQOS.png'),
+                (136, "E4", f'{self.logo_link}/fJPM9Rj12us4HF03N3qvakz7WuZ.png'),
+                (19, "FOX", f'{self.logo_link}/1DSpHrWyOORkL9N2QHX7Adt31mQ.png'),
+                (1267, "Freeform", f'{self.logo_link}/jk2Z7WH6JnHSZrxouYh4sireM3a.png'),
+                (88, "FX", f'{self.logo_link}/aexGjtcs42DgRtZh7zOxayiry4J.png'),
+                (384, "Hallmark Channel", f'{self.logo_link}/9JTL7HcaiVxq7M6eu5m7giFqaxR.png'),
+                (65, "History", f'{self.logo_link}/9fGgdJz17aBX7dOyfHJtsozB7bf.png'),
+                (49, "HBO", f'{self.logo_link}/hizvY65SpyF3BPY2qsBZMgUOxjs.png'),
+                (3186, "HBO Max", f'{self.logo_link}/nmU0UMDJB3dRRQSTUqawzF2Od1a.png'),
+                (210, "HGTV", f'{self.logo_link}/tzTtKdQ7vC2FkBvJDUErOhBPdKJ.png'),
+                (453, "Hulu", f'{self.logo_link}/pqUTCleNUiTLAVlelGxUgWn1ELh.png'),
+                (9, "ITV", f'{self.logo_link}/j3KAlTmxGDCHQZqs1A2hagzjYqu.png'),
+                (34, "Lifetime", f'{self.logo_link}/kU18GafTybg4uMhkj3wvsGBgn8s.png'),
+                (33, "MTV USA", f'{self.logo_link}/w4qtv7xBkSVsbOQdSzjUjlyOuSr.png'),
+                (488, "MTV UK", f'{self.logo_link}/w4qtv7xBkSVsbOQdSzjUjlyOuSr.png'),
+                (43, "National Geographic", f'{self.logo_link}/q9rPBG1rHbUjII1Qn98VG2v7cFa.png'),
+                (6, "NBC", f'{self.logo_link}/cm111bsDVlYaC1foL0itvEI4yLG.png'),
+                (213, "Netflix", f'{self.logo_link}/wwemzKWzjKYJFfCeiB57q3r4Bcm.png'),
+                (13, "Nickelodeon", f'{self.logo_link}/aYkLXz4dxHgOrFNH7Jv7Cpy56Ms.png'),
+                (14, "PBS", f'{self.logo_link}/hp2Fs7AIdsMlEjiDUC1V8Ows2jM.png'),
+                (67, "Showtime", f'{self.logo_link}/Allse9kbjiP6ExaQrnSpIhkurEi.png'),
+                (1755, "Sky History", f'{self.logo_link}/mzLlbqnnLiDIzriohlvfSbWlEfR.png'),
+                (1431, "Sky One", f'{self.logo_link}/dVBHOr0nYCx9GSNesTVb1TT52Xj.png'),
+                (318, "Starz", f'{self.logo_link}/GMDGZk9iDG4WDijY3VgUgJeyus.png'),
+                (270, "SundanceTV", f'{self.logo_link}/xhTdszjVRy1tABMix2dffBcdDJ1.png'),
+                (77, "Syfy", f'{self.logo_link}/iYfrkobwDhTOFJ4AXYPSLIEeaAT.png'),
+                (68, "TBS", f'{self.logo_link}/9PYsQf3YbDUJo1rg3pgtaiOrb6s.png'),
+                (84, "TLC", f'{self.logo_link}/6GRfZSrYh9D6C88n9kWlyrySB2l.png'),
+                (41, "TNT", f'{self.logo_link}/6ISsKwa2XUhSC6oBtHZjYf6xFqv.png'),
+                (209, "Travel Channel", f'{self.logo_link}/8SwN81R7P5vD5mhtOE0taw5mji4.png'),
+                (364, "truTV", f'{self.logo_link}/c48pVcWAEYhEFXrWFsYxx343mjx.png'),
+                (30, "USA Network", f'{self.logo_link}/g1e0H0Ka97IG5SyInMXdJkHGKiH.png'),
+                (158, "VH1", f'{self.logo_link}/w9oUxxUiXTC1O1MzJSvsMjQbgft.png'),
+                (202, "WGN America", f'{self.logo_link}/kCNFRiqVRMgNWKSWu0LzAIpy9um.png'),
+                (247, "YouTube", f'{self.logo_link}/9Ga8A5QegQmiSVHp4hyusfMfpVk.png'),
+                (1436, "YouTube Premium", f'{self.logo_link}/3p05CgodUb9gPayuliuhawNj1Wo.png'),
+            ]
 
-        self.list = [
-            {
-                'name': name,
-                'url': self.tmdb_networks_link % network_id,
-                'image': logo,
-                'action': 'tvshows'
-            }
-            for network_id, name, logo in network_data
-        ]
+            #for network_id, name, logo in network_data:
+            #    c.log(f"[CM Debug @ 534 in tvshows.py] network_id = {network_id} and name = {name} and logo = {logo}")
+            #    self.list.append({
+            #        'name': name,
+            #        'url': self.tmdb_networks_link % network_id,
+            #        'image': logo,
+            #        'action': 'tvshows'
+            #    })
 
-        self.addDirectory(self.list)
-        return self.list
+            self.list = [
+                {
+                    'name': name,
+                    'url': self.tmdb_networks_link % network_id,
+                    'image': logo,
+                    'action': 'tvshows'
+                }
+                for network_id, name, logo in network_data
+            ]
 
+            c.log(f"[CM Debug @ 552 in tvshows.py] list = self.list = {repr(self.list)}")
+
+            self.addDirectory(self.list)
+            #return self.list
+        except Exception as e:
+            import traceback
+            error_traceback = traceback.format_exc()
+            c.log(f'[Error in networks] Traceback: {error_traceback}')
+            c.log(f'[Error in networks] Exception: {e}')
 
     def languages(self):
         languages = [
@@ -580,10 +598,28 @@ class tvshows:
         return self.list
 
     def certifications(self):
-        certificates = ['TV-G', 'TV-PG', 'TV-14', 'TV-MA']
+        certificates = [
+            ('TV-Y', 'All Children', 'tv_y.png'),
+            ('TV-G', 'General Audiences', 'tv_g.png'),
+            ('TV-PG', 'Parental Guidance', 'tv_pg.png'),
+            ('TV-14', 'Parents Strongly Cautioned', 'tv_14.png'),
+            ('TV-MA', 'Mature Audiences', 'tv_ma.png'),
+            ]
 
-        for i in certificates:
-            self.list.append({'name': str(i), 'url': self.certification_link % str(i), 'image': 'certificates.png', 'action': 'tvshows'})
+
+        self.list = [
+                {
+                    'name': name,
+                    'url': self.certification_link % code,
+                    'image': icon,
+                    'action': 'tvshows'
+                }
+                for code, name, icon in certificates
+            ]
+
+
+        #for i in certificates:
+            #self.list.append({'name': str(i), 'url': self.certification_link % str(i), 'image': 'certificates.png', 'action': 'tvshows'})
         self.addDirectory(self.list)
         return self.list
 
@@ -697,124 +733,164 @@ class tvshows:
             c.log("[CM Debug @ 684 in tvshows.py]The listing call is from a normal screen.", 1)
 
 
-        for item in items:
-            try:
-                #title = item['title']
-                title = item.get('title', '')
-                if title != '':
-                    title = re.sub(r'\s(|[(])(UK|US|AU|\d{4})(|[)])$', '', title)
-                    title = client.replaceHTMLCodes(title)
+        def add_to_list(item):
+            c.log(f"[CM Debug @ 736 in tvshows.py] start add_to_list, title = {item['title']}")
+            #title = item['title']
+            title = item.get('title', '')
+            if title != '':
+                title = re.sub(r'\s(|[(])(UK|US|AU|\d{4})(|[)])$', '', title)
+                title = client.replaceHTMLCodes(title)
 
-                #year = item['year']
-                year = item.get('year', '0')
-                if year == '0':
-                    year = re.sub('[^0-9]', '', str(year))
+            #year = item['year']
+            year = item.get('year', '0')
+            if year == '0':
+                year = re.sub('[^0-9]', '', str(year))
 
-                #imdb = item['ids']['imdb'] or '0'
-                imdb = item.get('ids', {}).get('imdb', '0')
-                if imdb != '0':
-                    imdb = 'tt' + re.sub('[^0-9]', '', str(imdb))
-                tmdb = item.get('ids', {}).get('tmdb', '0')
-                tvdb = item.get('ids', {}).get('tvdb', '0')
+            #imdb = item['ids']['imdb'] or '0'
+            imdb = item.get('ids', {}).get('imdb', '0')
+            if imdb != '0':
+                imdb = 'tt' + re.sub('[^0-9]', '', str(imdb))
+            tmdb = item.get('ids', {}).get('tmdb', '0')
+            tvdb = item.get('ids', {}).get('tvdb', '0')
 
-                tmdb = str(tmdb)
-                tvdb = str(tvdb)
-
-
-                #tmdb = str(item['ids']['tmdb']) or '0'
-                #tvdb = str(item['ids']['tvdb']) or '0'
+            tmdb = str(tmdb)
+            tvdb = str(tvdb)
 
 
-                if tmdb in dupes:
-                    raise Exception()
-                dupes.append(tmdb)
-
-                premiered = item.get('first_aired', '0')
-
-                #try:
-                    #premiered = item['first_aired']
-                #except Exception:
-                    #premiered = '0'
-
-                if premiered != '0':
-                    premiered = re.compile(r'(\d{4}-\d{2}-\d{2})').findall(premiered)[0]
+            #tmdb = str(item['ids']['tmdb']) or '0'
+            #tvdb = str(item['ids']['tvdb']) or '0'
 
 
+            if tmdb in dupes:
+                raise Exception()
+            dupes.append(tmdb)
 
-                #studio = item['network'] or '0'
-                studio = item.get('network', '0')
+            premiered = item.get('first_aired', '0')
 
+            #try:
+                #premiered = item['first_aired']
+            #except Exception:
+                #premiered = '0'
 
-                #genre = item['genres'] or '0'
-                genre = item.get('genres', '0')
-
-                if genre != '0':
-                    genre = [i.title() for i in genre]
-                    genre = ' / '.join(genre)
-
-                #duration = str(item['runtime']) or '0'
-                duration = str(item.get('runtime', '0'))
-
-                #rating = str(item['rating']) or '0'
-                rating = str(item.get('rating', '0'))
-                if rating == '0.0':
-                    rating = '0'
-
-                #votes = str(item['votes']) or '0'
-                votes = str(item.get('votes', '0'))
+            if premiered != '0':
+                premiered = re.compile(r'(\d{4}-\d{2}-\d{2})').findall(premiered)[0]
 
 
-                if votes != '0':
-                    votes = str(format(int(votes), ',d'))
 
-                #mpaa = item['certification'] or '0'
-                mpaa = item.get('certification', '0')
-                plot = item['overview'] or 'The Crew - No plot available'
-                plot = client.replaceHTMLCodes(plot)
-
-                country = item.get('country').upper() or '0'
-
-                status = item.get('status', '0')
-                trailer = item.get('trailer', '0')
-
-                poster = fanart = '0'
-                seasons = episodes = '0'
+            #studio = item['network'] or '0'
+            studio = item.get('network', '0')
 
 
-                if tmdb != '0':
-                    url = self.tmdb_info_tvshow_link % tmdb
-                    result = self.session.get(url, timeout=10).json()
-                    #episodes = result['number_of_episodes']
-                    episodes = result.get('number_of_episodes', '0')
-                    #seasons = result['number_of_seasons']
-                    seasons = result.get('number_of_seasons', '0')
+            #genre = item['genres'] or '0'
+            genre = item.get('genres', '0')
+
+            if genre != '0':
+                genre = [i.title() for i in genre]
+                genre = ' / '.join(genre)
+
+            #duration = str(item['runtime']) or '0'
+            duration = str(item.get('runtime', '0'))
+
+            #rating = str(item['rating']) or '0'
+            rating = str(item.get('rating', '0'))
+            if rating == '0.0':
+                rating = '0'
+
+            #votes = str(item['votes']) or '0'
+            votes = str(item.get('votes', '0'))
+
+
+            if votes != '0':
+                votes = str(format(int(votes), ',d'))
+
+            #mpaa = item['certification'] or '0'
+            mpaa = item.get('certification', '0')
+            plot = item['overview'] or 'The Crew - No plot available'
+            plot = client.replaceHTMLCodes(plot)
+
+            country = item.get('country').upper() or '0'
+
+            status = item.get('status', '0')
+            trailer = item.get('trailer', '0')
+
+            poster = fanart = '0'
+            seasons = episodes = '0'
+
+
+            if tmdb != '0':
+                url = self.tmdb_info_tvshow_link % tmdb
+                result = self.session.get(url, timeout=10).json()
+                #episodes = result['number_of_episodes']
+                episodes = result.get('number_of_episodes', '0')
+                #seasons = result['number_of_seasons']
+                seasons = result.get('number_of_seasons', '0')
+                try:
+                    poster = self.tmdb_img_prelink.format('w500', result['poster_path'])
+                    fanart = self.tmdb_img_prelink.format('w1280', result['backdrop_path'])
+                except Exception:
+                    poster = '0'
+                    fanart = '0'
+
+
+
+            #self.list.append({'title': title, 'originaltitle': title, 'poster': poster,
+            #                    'fanart': fanart, 'year': year, 'premiered': premiered,
+            #                    'studio': studio, 'genre': genre, 'duration': duration,
+            #                    'rating': rating, 'votes': votes, 'mpaa': mpaa, 'plot': plot,
+            #                    'country': country, 'status': status, 'imdb': imdb, 'tvdb': tvdb,
+            #                    'seasons': seasons, 'episodes': episodes,
+            #                    'tmdb': tmdb, 'trailer': trailer, 'next': _next})
+
+            return ({'title': title, 'originaltitle': title, 'poster': poster,
+                    'fanart': fanart, 'year': year, 'premiered': premiered,
+                    'studio': studio, 'genre': genre, 'duration': duration,
+                    'rating': rating, 'votes': votes, 'mpaa': mpaa, 'plot': plot,
+                    'country': country, 'status': status, 'imdb': imdb, 'tvdb': tvdb,
+                    'seasons': seasons, 'episodes': episodes,
+                    'tmdb': tmdb, 'trailer': trailer, 'next': _next})
+
+
+
+
+
+        try:
+            max_nr = len(items)
+
+            with concurrent.futures.ThreadPoolExecutor(max_workers=max_nr) as executor:
+                futures = {executor.submit(add_to_list, item): item for item in items}
+                for future in concurrent.futures.as_completed(futures):
+                    item = futures[future]
                     try:
-                        poster = self.tmdb_img_prelink.format('w500', result['poster_path'])
-                        fanart = self.tmdb_img_prelink.format('w1280', result['backdrop_path'])
-                    except Exception:
-                        poster = '0'
-                        fanart = '0'
+                        result = future.result()
+                        self.list.append(result)
+                    except Exception as exc:
+                        c.log(f"Error processing item {item}: {exc}")
+        except Exception as e:
+            import traceback
+            failure = traceback.format_exc()
+            c.log(f'[CM Debug @ 876 in tvshows.py]Traceback:: {failure}')
+            c.log(f'[CM Debug @ 876 in tvshows.py]Exception raised. Error = {e}')
+            pass
 
 
+        #self.list = results
 
-                self.list.append({'title': title, 'originaltitle': title, 'poster': poster,
-                                    'fanart': fanart, 'year': year, 'premiered': premiered,
-                                    'studio': studio, 'genre': genre, 'duration': duration,
-                                    'rating': rating, 'votes': votes, 'mpaa': mpaa, 'plot': plot,
-                                    'country': country, 'status': status, 'imdb': imdb, 'tvdb': tvdb,
-                                    'seasons': seasons, 'episodes': episodes,
-                                    'tmdb': tmdb, 'trailer': trailer, 'next': _next})
 
-            except Exception as e:
-                import traceback
-                failure = traceback.format_exc()
-                c.log(f'[CM Debug @ 717 in tvshows.py]Traceback:: {failure}')
-                c.log(f'[CM Debug @ 717 in tvshows.py]Exception raised. Error = {e}')
-                pass
+        #for item in items:
+            #try:
+
+                #threads = workers.Thread(add_to_list(item)).start()
+                #threads.join()
+
+
+            #except Exception as e:
+                #import traceback
+                #failure = traceback.format_exc()
+                #c.log(f'[CM Debug @ 717 in tvshows.py]Traceback:: {failure}')
+                #c.log(f'[CM Debug @ 717 in tvshows.py]Exception raised. Error = {e}')
+                #pass
 
         return self.list
-
-
 
     def trakt_user_list(self, url, user):
         try:
@@ -843,7 +919,6 @@ class tvshows:
 
         self.list = sorted(self.list, key=lambda k: utils.title_key(k['name']))
         return self.list
-
 
     ####cm#
     # new def for tmdb lists
@@ -1017,10 +1092,10 @@ class tvshows:
     def tvmaze_list(self, url):
         try:
             result = client.request(url)
-            result = client.parseDOM(result, 'section', attrs={'id': 'this-seasons-shows'})
+            result = client.parseDom(result, 'section', attrs={'id': 'this-seasons-shows'})
 
-            items = client.parseDOM(result, 'div', attrs={'class': 'content auto cell'})
-            items = [client.parseDOM(i, 'a', ret='href') for i in items]
+            items = client.parseDom(result, 'div', attrs={'class': 'content auto cell'})
+            items = [client.parseDom(i, 'a', ret='href') for i in items]
             items = [i[0] for i in items if len(i) > 0]
             items = [re.findall('/(\d+)/', i) for i in items]
             items = [i[0] for i in items if len(i) > 0]
@@ -1032,8 +1107,8 @@ class tvshows:
             nextp = []
             page = int(str(url.split('&page=', 1)[1]))
             _next = '%s&page=%s' % (url.split('&page=', 1)[0], page+1)
-            last = client.parseDOM(result, 'li', attrs = {'class': 'last disabled'})
-            nextp = client.parseDOM(result, 'li', attrs = {'class': 'next'})
+            last = client.parseDom(result, 'li', attrs = {'class': 'last disabled'})
+            nextp = client.parseDom(result, 'li', attrs = {'class': 'next'})
             if last != [] or nextp == []:
                 _next = ''
         except Exception:
@@ -1188,6 +1263,7 @@ class tvshows:
                         '%Y-%m-%d'
                     ),
                 )
+            c.log(f"[CM Debug @ 1240 in tvshows.py] url = {url}")
 
             result = self.session.get(url, timeout=16).json()
             items = result['results']
@@ -1205,15 +1281,18 @@ class tvshows:
         except Exception:
             _next = ''
 
-        for item in items:
+
+            c.log(f"[CM Debug @ 1287 in tvshows.py] items = {items}")
+
+        def add_to_list(item):
             try:
+                #c.log(f"\n\n---------------------------------------------------------------------\n\n[CM Debug @ 1260 in tvshows.py] url = {url} of type {type(url)}")
+                #c.log(f"[CM Debug @ 1261 in tvshows.py] item = {item} of type {type(item)}\n\n------------------------------------------------------\n\n")
                 if '/search/' in url or 'episodes_number' not in item:
                     #cm we need to get extended result like seasons and episodes
                     #first, lets get tmdb
                     tmdb = str(item['id'])
-                    r_extended = self.session.get(
-                        self.tmdb_info_tvshow_link % tmdb, timeout=16
-                    ).json()
+                    r_extended = self.session.get(self.tmdb_info_tvshow_link % tmdb, timeout=16).json()
 
 
                     #c.log(f"[CM Debug @ 1154 in tvshows.py] r_extended = {r_extended}")
@@ -1259,18 +1338,62 @@ class tvshows:
                 else:
                     fanart = '0'
 
-                self.list.append({
+                #self.list.append({
+                #    'title': title, 'originaltitle': originaltitle, 'premiered': premiered,
+                #    'year': year, 'rating': rating, 'votes': votes, 'plot': plot,
+                #    'imdb': '0', 'tmdb': tmdb, 'tvdb': '0', 'poster': poster,
+                #    'seasons':  seasons, 'episodes': episodes,
+                #    'unaired': unaired, 'fanart': fanart, 'next': _next
+                #    })
+                return ({
                     'title': title, 'originaltitle': originaltitle, 'premiered': premiered,
                     'year': year, 'rating': rating, 'votes': votes, 'plot': plot,
                     'imdb': '0', 'tmdb': tmdb, 'tvdb': '0', 'poster': poster,
                     'seasons':  seasons, 'episodes': episodes,
                     'unaired': unaired, 'fanart': fanart, 'next': _next
                     })
-            except Exception:
+            except Exception as e:
+                import traceback
+                failure = traceback.format_exc()
+                c.log(f'[CM Debug @ 1319 in tvshows.py]Traceback:: {failure}')
+                c.log(f'[CM Debug @ 1319 in tvshows.py]Exception raised. Error = {e}')
                 pass
+            #except Exception as e:
+                #c.log(f'[CM DEBUG @ 1320 in tvshows.py] Exception raised: e = {e}')
+                #pass
+
+        try:
+
+            max_nr = len(items)
+
+            with concurrent.futures.ThreadPoolExecutor(max_workers=max_nr) as executor:
+                futures = {executor.submit(add_to_list, item): item for item in items}
+
+                for future in concurrent.futures.as_completed(futures):
+                    item = futures[future]
+                    try:
+                        result = future.result()
+                        self.list.append(result)
+                    except Exception as exc:
+                        c.log(f"Error processing item {item}: {exc}")
+        except Exception as e:
+            import traceback
+            failure = traceback.format_exc()
+            c.log(f'[CM Debug @ 1396 in tvshows.py]Traceback:: {failure}')
+            c.log(f'[CM Debug @ 1397 in tvshows.py]Exception raised. Error = {e}')
+            pass
+
+
+        #for item in items:
+            #try:
+
+                #thread = workers.Thread(add_item(item)).start()
+                #thread.join()
+            #except Exception as e:
+                #c.log(f'[CM DEBUG @ 1316 in tvshows.py] Exception raised: e = {e}')
+                #pass
 
         return self.list
-
 
     def worker(self):
         self.meta = []
@@ -1285,26 +1408,55 @@ class tvshows:
 
         self.list = metacache.fetch(self.list, self.lang, self.user)
 
-        # cm changed worker - 2024-05-14
-        for r in range(0, total, 40):
-            threads = []
-            for i in range(r, r+40):
-                if i < total:
-                    threads.append(workers.Thread(self.super_info(i)))
+        # cm changed worker - 15-04-2025
+        #for r in range(0, total, 40):
+        #    threads = []
+        #    for i in range(r, r+40):
+        #        if i < total:
+        #            threads.append(workers.Thread(self.super_info(i)))
 
         #[i.start() for i in threads]
         #[i.join() for i in threads]
 
-        for i in threads:
-            i.start()
-        for i in threads:
-            i.join()
+        try:
+            result = []
+            with concurrent.futures.ThreadPoolExecutor(max_workers=total) as executor:
+                #futures = {executor.submit(self.super_info, i): item for item in items}
+                futures = {executor.submit(self.super_info, i): i for i in range(0,total, 40)}
+
+                c.log(f"[CM Debug @ 1435 in tvshows.py] futures = {futures}")
+
+
+
+                #for future in concurrent.futures.as_completed(futures):
+                #    i = futures[future]
+                #    try:
+                #        result = future.result()
+                #        result.append(result)
+
+                #    except Exception as exc:
+                #        c.log(f"Error processing item {i}: {exc}")
+                #    c.log(f"[CM Debug @ 1443 in tvshows.py] result = {result}")
+        except Exception as e:
+            import traceback
+            failure = traceback.format_exc()
+            c.log(f'[CM Debug @ 1396 in tvshows.py]Traceback:: {failure}')
+            c.log(f'[CM Debug @ 1397 in tvshows.py]Exception raised. Error = {e}')
+            pass
+
+
+
+
+
+
+
+
+
+
+
 
         if self.meta:
             metacache.insert(self.meta)
-
-
-
 
     def super_info(self, i):
         try:
@@ -1729,7 +1881,6 @@ class tvshows:
         #except Exception as e:
             #c.log(f"Inside tvshows - superinfo - Exception raised: error = {e}")
 
-
     def tvshowDirectory(self, items):
         if items is None or len(items) == 0:
             control.idle()
@@ -1747,7 +1898,7 @@ class tvshows:
         traktCredentials = trakt.getTraktCredentialsInfo()
         indicators = playcount.get_tvshow_indicators(refresh=True) if action == 'tvshows' else playcount.get_tvshow_indicators()
         c.log(f"[CM Debug @ 1726 in tvshows.py] action = {action}")
-        c.log(f"[CM Debug @ 1681 in tvshows.py] indicators = {indicators}")
+        #c.log(f"[CM Debug @ 1681 in tvshows.py] indicators = {indicators}")
         flatten = control.setting('flatten.tvshows') or 'false'
 
         #cm - menus
@@ -1760,6 +1911,7 @@ class tvshows:
         addToLibrary = c.lang(32551)
         infoMenu = c.lang(32101)
         nextMenu = c.lang(32053)
+        playtrailermenu = c.lang(32381)
 
         for i in items:
             try:
@@ -1803,6 +1955,8 @@ class tvshows:
                     'discart': discart,
                     'landscape': landscape
                     }
+
+                #c.log(f"\n=======================================\n\n[CM Debug @ 1807 in tvshows.py]season = {i['seasons']}\n\n=======================================\n\n")
 
                 sysmeta = quote_plus(json.dumps(meta))
 
@@ -1868,13 +2022,16 @@ class tvshows:
 
                 cm = []
                 related_url = quote_plus(self.related_link % tmdb)
+                cm.append((playtrailermenu, f'RunPlugin({sysaddon}?action=trailer&name={systitle}&imdb={imdb}&tmdb={tmdb}&mediatype=tvshow&meta={sysmeta})'))
                 cm.append((findSimilar, f'Container.Update({sysaddon}?action=tvshows&url={related_url})'))
                 cm.append((playRandom, f'RunPlugin({sysaddon}?action=random&rtype=season&tvshowtitle={systitle}&imdb={imdb}&tmdb={tmdb})'))
                 cm.append((queueMenu, f'RunPlugin({sysaddon}?action=queueItem)'))
 
-                # @todo: fix watched/unwatched
-                cm.append((watchedMenu, f'RunPlugin({sysaddon}?action=tvPlaycount&name={systitle}&imdb{imdb}&tmdb={tmdb}&query=7)'))
-                cm.append((unwatchedMenu, f'RunPlugin({sysaddon}?action=tvPlaycount&name={systitle}&imdb={imdb}&tmdb={tmdb}&query=6)'))
+                # TODO: fix watched/unwatched
+                if overlay == 6:
+                    cm.append((watchedMenu, f'RunPlugin({sysaddon}?action=tvPlaycount&name={systitle}&imdb{imdb}&tmdb={tmdb}&query=7)'))
+                else:
+                    cm.append((unwatchedMenu, f'RunPlugin({sysaddon}?action=tvPlaycount&name={systitle}&imdb={imdb}&tmdb={tmdb}&query=6)'))
                 if traktCredentials is True:
                     cm.append((traktManagerMenu, f'RunPlugin({sysaddon}?action=traktManager&name={systitle}&tmdb={tmdb}&content=tvshow)'))
                 cm.append((addToLibrary, f'RunPlugin({sysaddon}?action=tvshowToLibrary&tvshowtitle={systitle}&year={year}&imdb={imdb}&tmdb={tmdb})'))
@@ -1905,7 +2062,7 @@ class tvshows:
 
                 item.setArt(art)
 
-                c.log(f"[CM Debug @ 1837 in tvshows.py] tmdb = {tmdb}")
+                #c.log(f"[CM Debug @ 1837 in tvshows.py] tmdb = {tmdb}")
                 index = c.search_tmdb_index_in_indicators(tmdb, indicators) or 0
 
                 if index == -1:
@@ -2037,6 +2194,7 @@ class tvshows:
     def addDirectory(self, items, queue=False):
         if items is None or len(items) == 0:
             control.idle()
+            c.log(f"[CM Debug @ 2053 in tvshows.py] aantal items = {len(items)}")
             # sys.exit()
             return
 
@@ -2049,6 +2207,13 @@ class tvshows:
         playRandom = control.lang(32535)
         addToLibrary = control.lang(32551)
 
+        c.log(f"[CM Debug @ 2068 in tvshows.py] items = {items}")
+        #{
+        # 'name': 'A&E',
+        # 'url': 'https://api.themoviedb.org/3/discover/tv?api_key=0049795edb57568b95240bc9e61a9dfc&sort_by=first_air_date.desc&with_networks=129&page=1',
+        # 'image': 'https://image.tmdb.org/t/p/original/ptSTdU4GPNJ1M8UVEOtA0KgtuNk.png',
+        # 'action': 'tvshows'
+        # }
         for i in items:
             try:
                 name = i['name']
@@ -2071,15 +2236,14 @@ class tvshows:
                     pass
 
                 cm = []
-                cm.append((playRandom, f'RunPlugin({sysaddon}?action=random&rtype=show&url={quote_plus(i["context"])})'))
+                if 'context' in i:
+                    cm.append((playRandom, f'RunPlugin({sysaddon}?action=random&rtype=show&url={quote_plus(i["context"])})'))
 
                 if queue is True:
                     cm.append((queueMenu, f'RunPlugin({sysaddon}?action=queueItem)'))
 
-                try:
+                if 'context' in i:
                     cm.append((addToLibrary, f'RunPlugin({sysaddon}?action=tvshowsToLibrary&url={quote_plus(i["context"])})'))
-                except Exception:
-                    pass
 
                 try:
                     item = control.item(label=name, offscreen=True)
@@ -2092,8 +2256,15 @@ class tvshows:
                 item.addContextMenuItems(cm)
 
                 control.addItem(handle=syshandle, url=url, listitem=item, isFolder=True)
-            except Exception:
+            except Exception as e:
+                import traceback
+                failure = traceback.format_exc()
+                c.log(f'[CM Debug @ 2116 in tvshows.py]Traceback:: {failure}')
+                c.log(f'[CM Debug @ 2116 in tvshows.py]Exception raised. Error = {e}')
                 pass
+            #except Exception:
 
-        control.content(syshandle, '')
+                #pass
+
+        control.content(syshandle, 'tvshows')
         control.directory(syshandle, cacheToDisc=True)

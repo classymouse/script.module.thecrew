@@ -83,7 +83,7 @@ CLIENT_ID = '482f9db52ee2611099ce3aa1abf9b0f7ed893c6d3c6b5face95164eac7b01f71'
 CLIENT_SECRET = '80a2729728b53ba1cc38137b22f21f34d590edd35454466c4b8920956513d967'
 REDIRECT_URI = 'urn:ietf:wg:oauth:2.0:oob'
 
-trakt_user = control.setting('trakt.user').strip()
+TRAKTUSER = control.setting('trakt.user').strip()
 session = requests.Session()
 retries = Retry(total=3, backoff_factor=0.5)
 session.mount(BASE_URL, HTTPAdapter(max_retries=retries))
@@ -95,8 +95,21 @@ def get_trakt(url, post=None):
     Make a request to the Trakt API
     """
     try:
-        url = urljoin(BASE_URL, url)
+        c.log(f"[CM Debug @ 88 in trakt.py] url = {url} | post = {post}")
+        if not url.startswith('http'):
+            c.log(f"[CM Debug @ 91 in trakt.py] url does not start with http, joining with BASE_URL")
+            #
+            url = urljoin(BASE_URL, url)
+            c.log(f"[CM Debug @ 94 in trakt.py] url after join = {url}")
+        elif(url.find('api.trakt.tv/')):
+            #! we have already an api url
+            pass
+        else:
+            u = url.split('/', 3)[3]
+            url = urljoin(BASE_URL, u) if len(u) > 0 else urljoin(BASE_URL, '/')
+        c.log(f"[CM Debug @ 99 in trakt.py] url = {url}")
         post = json.dumps(post) if post else None
+        c.log(f"[CM Debug @ 101 in trakt.py] post = {post}")
         headers = {
             'Content-Type': 'application/json',
             'trakt-api-key': CLIENT_ID,
@@ -110,9 +123,11 @@ def get_trakt(url, post=None):
                     #requests.post(url, data=post, headers=headers, timeout=30)
         response = session.get(url, headers=headers, timeout=30) if not post else\
                     session.post(url, data=post, headers=headers, timeout=30)
+        c.log(f"[CM Debug @ 109 in trakt.py] response = {response}")
 
         response.encoding = 'utf-8'
         status_code = str(response.status_code)
+        c.log(f"[CM Debug @ 113 in trakt.py] status_code = {status_code}")
 
         if not response:
             status_code = str(response.status_code)
@@ -142,7 +157,7 @@ def msg_handler(url, response, status_code, post, headers):
                 'refresh_token': control.setting('trakt.refresh')
             }
             response = requests.post(oauth, data=json.dumps(opost), headers=headers, timeout=30).json()
-            #c.log(f"[CM Debug @ 148 in trakt.py] response = {response}")
+            c.log(f"[CM Debug @ 160 in trakt.py] response of type {type(response)}\n\n{response}")
             token, refresh = response['access_token'], response['refresh_token']
             control.setSetting(id='trakt.token', value=token)
             control.setSetting(id='trakt.refresh', value=refresh)
@@ -188,7 +203,59 @@ def msg_handler(url, response, status_code, post, headers):
 
 
 def getTraktAsJson(url, post=None):
+    """
+    Make a request to the Trakt API and return the response as a JSON string.
+
+    Args:
+        url (str): The endpoint URL to make the Trakt API request.
+        post (dict, optional): The data to post to the API if making a POST request. Defaults to None.
+
+    Returns:
+        str: The JSON response from the API as a string. The response is sorted if the headers contain
+        'X-Sort-By' and 'X-Sort-How'. Returns None if there is an error or if the API response is None.
+
+    Logs:
+        Exceptions and errors encountered during the API call and JSON conversion are logged.
+    """
+
     try:
+        if post is not None:
+            result = get_trakt(url, post)
+        elif isinstance(url, str):
+            result = get_trakt(url)
+        else:
+            result = get_trakt(url, post)
+
+        if result is not None:
+            r, res_headers = result
+            r = utils.json_loads_as_str(r)
+            if 'X-Sort-By' in res_headers and 'X-Sort-How' in res_headers:
+                r = sort_list(res_headers['X-Sort-By'], res_headers['X-Sort-How'], r)
+            return r
+        else:
+            # Handle the case where get_trakt returns None
+            c.log('getTraktAsJson Error: get_trakt returned None')
+            return None
+    except Exception as e:
+        import traceback
+        failure = traceback.format_exc()
+        c.log(f'[CM Debug @ 225 in trakt.py]Traceback:: {failure}')
+        c.log(f'[CM Debug @ 225 in trakt.py]Exception raised. Error = {e}')
+        pass
+    #except Exception as e:
+        #c.log('getTraktAsJson Error: ' + str(e))
+        #pass
+
+
+
+
+
+def getTraktAsJsonDisabled(url, post=None):
+    try:
+        if post is not None:
+            r, res_headers = get_trakt(url, post)
+        elif isinstance(url, str):
+            r, res_headers = get_trakt(url)
         r, res_headers = get_trakt(url, post)
         r = utils.json_loads_as_str(r)
         if 'X-Sort-By' in res_headers and 'X-Sort-How' in res_headers:
@@ -198,7 +265,7 @@ def getTraktAsJson(url, post=None):
         c.log('getTraktAsJson Error: ' + str(e))
         pass
 
-def authTrakt():
+def auth_trakt():
     try:
         if getTraktCredentialsInfo() is True:
             if control.yesnoDialog(control.lang(32511) + '[CR]' + control.lang(32512), heading='Trakt'):
@@ -208,6 +275,7 @@ def authTrakt():
             raise Exception()
 
         result = getTraktAsJson('/oauth/device/code', {'client_id': CLIENT_ID})
+        c.log(f"[CM Debug @ 278 in trakt.py] result of authTrakt is of type {type(result)}\n\nresult = {result}")
         verification_url = control.lang(32513) % result['verification_url']
         user_code = control.lang(32514) % result['user_code']
         expires_in = int(result['expires_in'])
@@ -254,6 +322,7 @@ def authTrakt():
                 }
 
         result = client.request(urljoin(BASE_URL, '/users/me'), headers=headers)
+        c.log(f"[CM Debug @ 310 in trakt.py] result of new auth was {result} of type {type(result)}")
         result = utils.json_loads_as_str(result)
 
         user = result['username']
@@ -267,7 +336,7 @@ def authTrakt():
         control.openSettings('3.1')
 
 def getTraktCredentialsInfo():
-    user = trakt_user
+    user = TRAKTUSER
     token = control.setting('trakt.token')
     refresh = control.setting('trakt.refresh')
     if (user == '' or token == '' or refresh == ''):
@@ -380,7 +449,21 @@ def slug(title):
     title = re.sub('-{2,}', '-', title)
     return title.rstrip('-')
 
-def sort_list(sort_key, sort_direction, list_data):
+def sort_list(sort_key, sort_direction, list_data) -> list:
+    """
+    Sort a list of trakt items based on the given key and direction.
+
+    Args:
+        sort_key (str): The key to sort the list by. Options are:
+            'rank', 'added', 'title', 'released', 'runtime', 'popularity',
+            'percentage', 'votes'.
+        sort_direction (str): The direction to sort the list. Options are:
+            'asc' or 'desc'.
+        list_data (list): The list of trakt items to sort.
+
+    Returns:
+        list: The sorted list of trakt items.
+    """
     reverse = False if sort_direction == 'asc' else True
     if sort_key == 'rank':
         return sorted(list_data, key=lambda x: x['rank'], reverse=reverse)
@@ -456,11 +539,11 @@ def getWatchedActivity():
     #    pass
 
 def cachesyncMovies(timeout=0):
-    indicators = cache.get(syncMovies, timeout, trakt_user)
+    indicators = cache.get(syncMovies, timeout, TRAKTUSER)
     return indicators
 
 def timeoutsyncMovies():
-    timeout = cache.timeout(syncMovies, trakt_user)
+    timeout = cache.timeout(syncMovies, TRAKTUSER)
     return timeout
 
 def syncMovies(user):
@@ -485,7 +568,7 @@ def cachesyncTVShows(timeout=0):
 
 
 def timeoutsyncTVShows():
-    timeout = cache.timeout(syncTVShows, trakt_user)
+    timeout = cache.timeout(syncTVShows, TRAKTUSER)
     #c.log(f"[CM Debug @ 499 in trakt.py] timeout = {timeout}")
     if not timeout:
         timeout = 0
@@ -494,7 +577,7 @@ def timeoutsyncTVShows():
 def syncTVShows(user):
     try:
         if not getTraktCredentialsInfo():
-            #c.log("[CM Debug @ 474 in trakt.py] getTraktCredentialsInfo is false")
+            c.log("[CM Debug @ 474 in trakt.py] getTraktCredentialsInfo is false")
             return
         #c.log("[CM Debug @ 475 in trakt.py] getTraktCredentialsInfo is true")
         watched_shows = getTraktAsJson('/users/me/watched/shows?extended=full')
@@ -547,32 +630,57 @@ def syncTraktStatus(silent=False):
     except:
         control.infoDialog('Trakt sync failed')
 
-def markMovieAsWatched(imdb):
+##########################################
+# Movies
+##########################################
+def markMovieAsWatched(key, media_id):
     if not imdb.startswith('tt'):
         imdb = 'tt' + imdb
-    return get_trakt('/sync/history', {"movies": [{"ids": {"imdb": imdb}}]})[0]
+    return get_trakt('/sync/history', {"movies": [{"ids": {key: media_id}}]})[0]
 
-def markMovieAsNotWatched(imdb):
+def markMovieAsNotWatched(key, media_id):
     if not imdb.startswith('tt'):
         imdb = 'tt' + imdb
-    return get_trakt('/sync/history/remove', {"movies": [{"ids": {"imdb": imdb}}]})[0]
+    return get_trakt('/sync/history/remove', {"movies": [{"ids": {key: media_id}}]})[0]
 
-def markTVShowAsWatched(imdb):
-    return get_trakt('/sync/history', {"shows": [{"ids": {"imdb": imdb}}]})[0]
 
-def markTVShowAsNotWatched(imdb):
-    return get_trakt('/sync/history/remove', {"shows": [{"ids": {"imdb": imdb}}]})[0]
+###########################################
+# TV Shows
+###########################################
+def markTVShowAsNotWatched(key, media_id):
+    return get_trakt('/sync/history/remove', {"shows": [{"ids": {key: media_id}}]})[0]
 
-def markEpisodeAsWatched(imdb, season, episode):
-    #season, episode = int('%01d' % int(season)), int('%01d' % int(episode))
-    season, episode = int(f'{season:01d}'), int(f'{episode:01d}')
-    return get_trakt('/sync/history', {"shows": [{"seasons": [{"episodes": [{"number": episode}], "number": season}], "ids": {"imdb": imdb}}]})[0]
+def markTVShowAsWatched(key, media_id):
+    return get_trakt('/sync/history/', {"shows": [{"ids": {key: media_id}}]})[0]
 
-def markEpisodeAsNotWatched(imdb, season, episode):
-    #season, episode = int('%01d' % int(season)), int('%01d' % int(episode))
-    season, episode = int(f'{season:01d}'), int(f'{episode:01d}')
-    return get_trakt('/sync/history/remove', {"shows": [{"seasons": [{"episodes": [{"number": episode}], "number": season}], "ids": {"imdb": imdb}}]})[0]
 
+#############################################
+# Seasons
+#############################################
+def markSeasonAsWatched(key, media_id, season):
+    c.log(f"[CM Debug @ 578 in trakt.py] season not watched = {season} with key = {key} and media_id = {media_id}")
+    return get_trakt('/sync/history', {"shows": [{"seasons": [{"number": int(season)}], "ids": {key:  media_id}}]})[0]
+
+def markSeasonAsNotWatched(key, media_id, season):
+    return get_trakt('/sync/history/remove', {"shows": [{"seasons": [{"number": int(season)}], "ids": {key: media_id}}]})[0]
+
+#############################################
+# Episodes
+#############################################
+def markEpisodeAsWatched(key, media_id, season, episode):
+    season, episode = int('%01d' % int(season)), int('%01d' % int(episode))
+    #season, episode = int(f'{season:01d}'), int(f'{episode:01d}')
+    return get_trakt('/sync/history', {"shows": [{"seasons": [{"episodes": [{"number": episode}], "number": season}], "ids": {key: media_id}}]})[0]
+
+def markEpisodeAsNotWatched(key, media_id, season, episode):
+    season, episode = int('%01d' % int(season)), int('%01d' % int(episode))
+    season, episode = int(f'{int(season):01d}'), int(f'{int(episode):01d}')
+    return get_trakt('/sync/history/remove', {"shows": [{"seasons": [{"episodes": [{"number": episode}], "number": season}], "ids": {key: media_id}}]})[0]
+
+
+##############################################
+# Scrobble
+##############################################
 def scrobbleMovie(imdb, watched_percent, action):
     try:
         if not imdb.startswith('tt'):
@@ -592,10 +700,35 @@ def scrobbleMovie(imdb, watched_percent, action):
 
 
 def scrobbleEpisode(imdb, season, episode, watched_percent, action):
-    if not imdb.startswith('tt'):
-        imdb = 'tt' + imdb
-    season, episode = int('%01d' % int(season)), int('%01d' % int(episode))
-    return get_trakt(f'/scrobble/{action}', {"show": {"ids": {"imdb": imdb}}, "episode": {"season": season, "number": episode}, "progress": watched_percent})[0]
+    try:
+        if not imdb.startswith('tt'):
+            imdb = 'tt' + imdb
+
+
+        season, episode = int('%01d' % int(season)), int('%01d' % int(episode))
+        #return get_trakt(f'/scrobble/{action}', {"show": {"ids": {"imdb": imdb}}, "episode": {"season": season, "number": episode}, "progress": watched_percent})[0]
+
+
+        season, episode = int('%01d' % int(season)), int('%01d' % int(episode))
+        c.log(f"[CM Debug @ 631 in trakt.py]inside trakt.scrobbleEpisode | imdb = {imdb} | season = {season} | episode = {episode} | watched_percent = {watched_percent} | action = {action}")
+        r = get_trakt(f'/scrobble/{action}', {"show": {"ids": {"imdb": imdb}}, "episode": {"season": season, "number": episode}, "progress": watched_percent})
+        update_progress(imdb=imdb, season=season, episode=episode, progress=watched_percent)
+        c.log(f"[CM Debug @ 522 in trakt.py] r = {r}")
+        #return get_trakt(f'/scrobble/{action}', {"show": {"ids": {"imdb": imdb}}, "episode": {"season": season, "number": episode}, "progress": watched_percent})[0]
+        return r
+    except Exception as e:
+        import traceback
+        failure = traceback.format_exc()
+        c.log(f'[CM Debug @ 535 in trakt.py]Traceback:: {failure}')
+        c.log(f'[CM Debug @ 535 in trakt.py]Exception raised. Error = {e}')
+        pass
+
+
+
+
+
+
+
 
 
 def getMovieTranslation(_id, lang, full=False):
@@ -768,61 +901,11 @@ sql_dict = {
 }
 
 def syncTrakt():
+
     c.infoDialog('Syncing with Trakt', 'Please wait', icon='main_classy.png', sound=False)
     try:
         fill_progress_table()
-
-        #_types = ['movies', 'shows']
-        _types = ['shows']
-
-        i_movies, i_tvshows = [], []
-
-        for _type in _types:
-            endpoint = f'sync/watched/{_type}'
-            result = getTraktAsJson(endpoint)
-            #c.log(f"[CM Debug @ 827 in trakt.py] result = {result}")
-            if result:
-                if _type == 'movies':
-                    indicators = [i['movie']['ids']['tmdb'] for i in result]
-                    c.log(f"[CM Debug @ 831 in trakt.py] indicators = {indicators}")
-                #else:
-                    #indicators = [(show['show']['ids']['tmdb'], show['show']['aired_episodes'], [(s['number'], e['number']) for s in show['seasons'] for e in s['episodes']]) for show in result]
-                    #c.log(f"[CM Debug @ 834 in trakt.py] indicator shows = {indicators}")
-                if not table_exists('trakt_watched'):
-                    create_table('trakt_watched')
-
-
-                dbcon = get_connection(control.traktsyncFile, return_as_dict=True)
-                dbcur = get_connection_cursor(dbcon)
-
-                for item in result:
-
-                    if _type == 'movies':
-                        media_type = 'movie'
-                        trakt_id = item.get('movie').get('ids').get('trakt')
-                        tvdb_id = item.get('movie').get('ids').get('tvdb') or 0
-                        imdb_id = item.get('movie').get('ids').get('imdb')
-                        tmdb_id = item.get('movie').get('ids').get('tmdb')
-                        seasons = 0
-                        episode = 0
-                        last_watched_at = item.get('last_watched_at')
-                        title = item.get('movie').get('title')
-                        dbcur.execute(sql_dict['sql_insert_trakt_watched'], (media_type, trakt_id, tvdb_id, imdb_id, tmdb_id, seasons, episode, last_watched_at, title))
-                    else:
-                        media_type = 'show'
-                        trakt_id = item.get('show').get('ids').get('trakt')
-                        tvdb_id = item.get('show').get('ids').get('tvdb') or 0
-                        imdb_id = item.get('show').get('ids').get('imdb')
-                        tmdb_id = item.get('show').get('ids').get('tmdb')
-                        seasons = item.get('show').get('seasons')
-                        episode = '0'
-                        last_watched_at = item.get('last_watched_at')
-                        title = item.get('show').get('title')
-                        dbcur.execute(sql_dict['sql_insert_trakt_watched'], (media_type, trakt_id, tvdb_id, imdb_id, tmdb_id, seasons, episode, last_watched_at, title))
-
-                dbcon.commit()
-                dbcur.close()
-                dbcon.close()
+        fill_trakt_watched()
 
         #endpoint = 'sync/watched/movies'
 
@@ -899,19 +982,32 @@ def fill_progress_table():
             insert_trakt_progress(media_type, trakt, imdb, tmdb, tvdb, showtrakt, showimdb, showtmdb, showtvdb, season, episode, resume_point, curr_time, last_played, resume_id, tvshowtitle, title, year)
     return
 
-def update_progress(imdb=0, trakt=0, tmdb=0, progress=0) -> None:
+def update_progress(imdb=0, trakt=0, tmdb=0, season=0, episode=0, progress=0) -> None:
     try:
-        sql = f'UPDATE progress SET  resume_point = {progress} WHERE '
+        sql = f'UPDATE progress SET resume_point = {progress} WHERE '
         sql_add = []
 
-        if imdb != 0:
-            sql_add.append(f"imdb = '{imdb}'")
+        if season != 0 and episode != 0:
+            if imdb != 0:
+                sql_add.append(f"showimdb = '{imdb}'")
 
-        if trakt != 0:
-            sql_add.append(f"trakt = {trakt}")
+            if trakt != 0:
+                sql_add.append(f"showtrakt = {trakt}")
 
-        if tmdb != 0:
-            sql_add.append(f"trakt = {tmdb}")
+            if tmdb != 0:
+                sql_add.append(f"showtmdb = {tmdb}")
+
+            sql_add.append(f"season = {season} and episode = {episode}")
+        else:
+            if imdb != 0:
+                sql_add.append(f"imdb = '{imdb}'")
+
+            if trakt != 0:
+                sql_add.append(f"trakt = {trakt}")
+
+            if tmdb != 0:
+                sql_add.append(f"tmdb = {tmdb}")
+
 
         sql_complete= sql +  ' and '.join(sql_add)
         c.log(f"[CM Debug @ 918 in trakt.py] sql = {sql_complete}")
@@ -934,9 +1030,127 @@ def update_progress(imdb=0, trakt=0, tmdb=0, progress=0) -> None:
     #    c.log(f"[CM Debug @ 926 in trakt.py] Exception raised. Error = {e}")
     #    return
 
+def fill_trakt_watched():
+    try:
+        _types = ['movies', 'shows']
+
+        for _type in _types:
+            endpoint = f'sync/watched/{_type}'
+            result = getTraktAsJson(endpoint)
+
+            if result:
+                #if _type == 'movies':
+                    #indicators = [item['movie']['ids']['tmdb'] for item in result]
+                #else:
+                    #indicators = [(item['show']['ids']['tmdb'], item['show']['aired_episodes'], [(s['number'], e['number']) for s in item['seasons'] for e in s['episodes']]) for item in result]
+
+                if not table_exists('trakt_watched'):
+                    create_table('trakt_watched')
+
+                dbcon = get_connection(control.traktsyncFile, return_as_dict=True)
+                dbcur = get_connection_cursor(dbcon)
+
+                for item in result:
+                    media_type = _type
+                    if media_type == 'movies':
+                        media_type = 'movie'
+                    if media_type == 'shows':
+                        media_type = 'show'
+                    trakt_id = item[media_type]['ids']['trakt']
+                    tvdb_id = item[media_type]['ids'].get('tvdb', 0)
+                    imdb_id = item[media_type]['ids'].get('imdb')
+                    tmdb_id = item[media_type]['ids'].get('tmdb')
+                    title = item[media_type]['title']
+
+                    if media_type == 'movie':
+                        seasons = 0
+                        episode = 0
+                        last_watched_at = item['last_watched_at']
+                        dbcur.execute(sql_dict['sql_insert_trakt_watched'], (media_type, trakt_id, tvdb_id, imdb_id, tmdb_id, seasons, episode, last_watched_at, title))
+                    else:
+                        for season in item['seasons']:
+                            season_nr = season['number']
+                            for episodes in season['episodes']:
+                                episode_nr = episodes['number']
+                                last_watched_at = episodes['last_watched_at']
+                                dbcur.execute(sql_dict['sql_insert_trakt_watched'], (media_type, trakt_id, tvdb_id, imdb_id, tmdb_id, season_nr, episode_nr, last_watched_at, title))
+
+                dbcon.commit()
+                dbcur.close()
+                dbcon.close()
+
+    except Exception as e:
+        import traceback
+        failure = traceback.format_exc()
+        c.log(f'[CM Debug @ 966 in trakt.py] Traceback:: {failure}')
+        c.log(f'[CM Debug @ 967 in trakt.py] Exception raised. Error = {e}')
+        pass
 
 
+def fill_trakt_watched_orig():
+    try:
 
+        _types = ['movies', 'shows']
+        #_types = ['shows']
+
+        for _type in _types:
+            c.log(f"[CM Debug @ 927 in trakt.py]type = {_type} with type = {type(_type)}")
+            endpoint = f'sync/watched/{_type}'
+            result = getTraktAsJson(endpoint)
+            #c.log(f"[CM Debug @ 827 in trakt.py] result = {result}")
+            if result:
+                if _type == 'movies':
+                    indicators = [i['movie']['ids']['tmdb'] for i in result]
+                    c.log(f"[CM Debug @ 831 in trakt.py] indicators = {indicators}")
+                #else:
+                    #indicators = [(show['show']['ids']['tmdb'], show['show']['aired_episodes'], [(s['number'], e['number']) for s in show['seasons'] for e in s['episodes']]) for show in result]
+                    #c.log(f"[CM Debug @ 834 in trakt.py] indicator shows = {indicators}")
+                if not table_exists('trakt_watched'):
+                    create_table('trakt_watched')
+
+
+                dbcon = get_connection(control.traktsyncFile, return_as_dict=True)
+                dbcur = get_connection_cursor(dbcon)
+
+                for item in result:
+                    media_type = _type
+                    trakt_id = item.get(_type).get('ids').get('trakt')
+                    tvdb_id = item.get(_type).get('ids').get('tvdb') or 0
+                    imdb_id = item.get(_type).get('ids').get('imdb')
+                    tmdb_id = item.get(_type).get('ids').get('tmdb')
+                    title = item.get(_type).get('title')
+
+
+                    if _type == 'movies':
+                        seasons = 0
+                        episode = 0
+                        last_watched_at = item.get('last_watched_at')
+                        dbcur.execute(sql_dict['sql_insert_trakt_watched'], (media_type, trakt_id, tvdb_id, imdb_id, tmdb_id, seasons, episode, last_watched_at, title))
+                    else:
+                        seasons = item.get('seasons')
+                        c.log(f"[CM Debug @ 959 in trakt.py] seasons = {seasons}")
+                        for season in seasons:
+                            season_nr = season.get('number')
+                            c.log(f"[CM Debug @ 961 in trakt.py] season = {season_nr}")
+                            for episodes in season:
+                                episode_nr = episodes.get('number')
+                                c.log(f"[CM Debug @ 964 in trakt.py] episode_nr = {episode_nr}")
+                                for item in episodes.get('episodes'):
+                                    c.log(f"[CM Debug @ 965 in trakt.py] item = {item}")
+                                    last_watched_at = item.get('last_watched_at')
+                                    c.log(f"[CM Debug @ 858 in trakt.py]===> last_watched = {last_watched_at}")
+                                    dbcur.execute(sql_dict['sql_insert_trakt_watched'], (media_type, trakt_id, tvdb_id, imdb_id, tmdb_id, season_nr, episode_nr, last_watched_at, title))
+
+                dbcon.commit()
+                dbcur.close()
+                dbcon.close()
+
+    except Exception as e:
+        import traceback
+        failure = traceback.format_exc()
+        c.log(f'[CM Debug @ 980 in trakt.py] Traceback:: {failure}')
+        c.log(f'[CM Debug @ 981 in trakt.py] Exception raised. Error = {e}')
+        pass
 
 
 
@@ -976,12 +1190,10 @@ def update_service(_all, _crew):
     except Exception as e:
         c.log(f"[CM Debug @ 831 in trakt.py] Exception raised. Error = {e}")
 
-#   insert_trakt_progress(media_type, trakt, imdb, tmdb, tvdb, showtrakt, showimdb, showtmdb, showtvdb, season, episode, resume_point, curr_time, last_played, resume_id, tvshowtitle, title, year)
 
 def insert_trakt_progress(media_type, trakt, imdb, tmdb, tvdb, showtrakt, showimdb, showtmdb, showtvdb, season, episode, resume_point, curr_time, last_played, resume_id, tvshowtitle, title, year):
     dbcon = get_connection(control.traktsyncFile, return_as_dict=True)
     dbcur = get_connection_cursor(dbcon)
-    #'INSERT OR REPLACE INTO progress (media_type, trakt, imdb, tmdb, tvdb, showtrakt, showimdb, showtmdb, showtvdb, season, episode, resume_point, curr_time, last_played, resume_id, tvshowtitle, title, year) VALUES (?,?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?, ?, ?, ?, ?) '
     sql = sql_dict['sql_insert_trakt_progress']
     dbcur.execute(sql, (media_type, trakt, imdb, tmdb, tvdb, showtrakt, showimdb, showtmdb, showtvdb, season, episode, resume_point, curr_time, last_played, resume_id, tvshowtitle, title, year))
     dbcon.commit()
@@ -1190,15 +1402,17 @@ def create_trakt_tables(last_activities):
             val = last_activities[key]
             if isinstance(last_activities[key], str):
 
-                sql = "CREATE TABLE IF NOT EXISTS service(setting TEXT, value TEXT, UNIQUE(setting));"
-                dbcur.execute(sql)
+                if not table_exists('service'):
+                    sql = "CREATE TABLE IF NOT EXISTS service(setting TEXT, value TEXT, UNIQUE(setting));"
+                    dbcur.execute(sql)
 
                 sql = f"INSERT OR REPLACE INTO service Values ('{key}', '{val}')"
                 dbcur.execute(sql)
 
             elif isinstance(last_activities[key], dict):
-                sql = f"CREATE TABLE IF NOT EXISTS '{name}' (setting TEXT, value TEXT, UNIQUE(setting));"
-                dbcur.execute(sql)
+                if not table_exists(name):
+                    sql = f"CREATE TABLE IF NOT EXISTS '{name}' (setting TEXT, value TEXT, UNIQUE(setting));"
+                    dbcur.execute(sql)
 
                 for k in val:
                     sql = f"INSERT OR REPLACE INTO '{name}' Values ('{k}', '{val[k]}')"
@@ -1227,27 +1441,39 @@ def create_table(name='', query = ''):
         if f'sql_create_{name}' in sql_dict:
 
             sql = sql_dict[f'sql_create_{name}']
-            dbcur.execute(sql)
+            if dbcur:
+                dbcur.execute(sql)
+            c.log(f"[CM Debug @ 1444 in trakt.py] sql = {sql}")
         elif query:
             if query.lower().startswith('create table'):
-                dbcur.execute(query)
+                if dbcur:
+                    dbcur.execute(query)
             else:
                 c.log(f"Trying to use invalid query in trakt::create_table, query = {query}, returning")
-                #no return here, let finally gracefully close the connection
+
+        #no return here, gracefully close the connection
+
+        if dbcon:
+            dbcon.commit()
+            dbcon.close()
+
     except OperationalError as e:
-        c.log(f"[CM Debug @ 1238 in trakt.py] SQL Operational Error: {e}")
+        import traceback
+        failure = traceback.format_exc()
+        c.log(f'[CM Debug @ 1463 in trakt.py]Traceback:: {failure}')
+        c.log(f'[CM Debug @ 1464 in trakt.py]Exception raised. Error = {e}')
+        c.log(f"[CM Debug @ 1465 in trakt.py] SQL Operational Error: {e}")
+
     except Exception as e:
         import traceback
         failure = traceback.format_exc()
         c.log(f'[CM Debug @ 987 in trakt.py]Traceback:: {failure}')
         c.log(f'[CM Debug @ 988 in trakt.py]Exception raised. Error = {e}')
-        pass
-    finally:
-        dbcon.commit()
-        dbcon.close()
 
 
-def get_trakt_collection(media_type="all"):
+
+
+def get_trakt_collection(media_type="all") -> None:
     try:
         do_commit = False
 
@@ -1394,8 +1620,8 @@ def table_exists(table_name) -> bool:
             return True
 
     except Exception as e:
-
         c.log(f'Exception raised in tables_exists. Error = {e}')
+        return False
 
 
 def insert_collection(collection, mediatype):
@@ -1450,7 +1676,7 @@ def insert_collection(collection, mediatype):
         c.log(f'[CM Debug @ 839 in trakt.py]Exception raised. Error = {e}')
         pass
 
-
+# TODO needs to be implemented
 def sync_collection(collection):
     try:
         c.log(f"[CM Debug @ 833 in trakt.py] collection = {collection}")
@@ -1483,11 +1709,11 @@ def get_trakt_progress(media_type: str, trakt_id: int = 0) -> list:
         if trakt_id:
             sql += f" AND trakt_id = {trakt_id}"
 
-        c.log(f"[CM Debug @ 1237 in trakt.py] sql is of type: {type(sql)} and = {sql}")
-        #dbcur.execute(sql, tuple(params))
+        c.log(f"[CM Debug @ 1616 in trakt.py] sql is of type: {type(sql)} and = {sql}")
+
 
         dbcur.execute(sql)
-        c.log(f"[CM Debug @ 1238 in trakt.py] sql is of type: {type(sql)} and = {sql}")
+        c.log(f"[CM Debug @ 1620 in trakt.py] sql is of type: {type(sql)} and = {sql}")
         return dbcur.fetchall()
     except Exception as e:
         import traceback

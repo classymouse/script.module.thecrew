@@ -24,7 +24,7 @@ class source:
     def __init__(self):
         self.priority = 1
         self.language = ['en']
-        self.domains = ['rlsbb.com', 'rlsbb.ru', 'rlsbb.to', 'proxybb.com' , 'ReleaseBB.net']
+        self.domains = ['rlsbb.com', 'rlsbb.ru', 'rlsbb.to', 'rlsbb.cc']
         self.base_link = 'https://rlsbb.in/'
         self.old_base_link = 'http://old3.rlsbb.in/'
         self.search_base_link = 'http://search.rlsbb.in/'
@@ -65,6 +65,7 @@ class source:
         try:
             sources = []
             scraper = cfscrape.create_scraper()
+            c.log(f"[CM Debug @ 68 in rlsbb.py] url = {url}")
 
             if url is None:
                 return sources
@@ -92,14 +93,14 @@ class source:
             url = _base_link + query
 
             r = scraper.get(url).content
-            c.log(f"[RLSBB Debug @ 83 in rlsbb.py] r: {r}")
+            #c.log(f"[RLSBB Debug @ 83 in rlsbb.py] r: {r}")
             r = c.ensure_text(r, errors='replace')
 
             if r is None and 'tvshowtitle' in data:
                 season = re.search('S(.*?)E', hdlr)
                 season = season.group(1)
                 query = title
-                query = re.sub('(\\\|/| -|:|;|\*|\?|"|\'|<|>|\|)', '', query)
+                query = re.sub(r'(\\\|/| -|:|;|\*|\?|"|\'|<|>|\|)', '', query)
                 query = query + "-S" + season
                 query = query.replace("&", "and")
                 query = query.replace("  ", " ")
@@ -124,12 +125,12 @@ class source:
                     r = scraper.get(url).content
                     r = c.ensure_text(r, errors='replace')
 
-                posts = client.parseDOM(r, "div", attrs={"class": "content"})
+                posts = client.parseDom(r, "div", attrs={"class": "content"})
                 #hostDict = hostprDict + hostDict
                 items = []
                 for post in posts:
                     try:
-                        u = client.parseDOM(post, 'a', ret='href')
+                        u = client.parseDom(post, 'a', ret='href')
                         for i in u:
                             try:
                                 name = str(i)

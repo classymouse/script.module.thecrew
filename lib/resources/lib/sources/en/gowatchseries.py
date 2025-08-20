@@ -103,7 +103,7 @@ class source:
             if len(r) < 20:
                 r = client.request(query2, headers=headers, XHR=True)
             r = json.loads(r)['content']
-            r = zip( client.parseDOM( r, 'a', ret='href'), client.parseDOM(r, 'a'))
+            r = zip( client.parseDom( r, 'a', ret='href'), client.parseDom(r, 'a'))
 
             if 'tvshowtitle' in data:
                 cltitle = cleantitle.get(title + 'season' + season)
@@ -122,13 +122,13 @@ class source:
             r = client.request(vurl, headers=headers)
             headers['Referer'] = vurl
 
-            slinks = client.parseDOM(r, 'div', attrs={'class': 'anime_muti_link'})
-            slinks = client.parseDOM(slinks, 'li', ret='data-video')
+            slinks = client.parseDom(r, 'div', attrs={'class': 'anime_muti_link'})
+            slinks = client.parseDom(slinks, 'li', ret='data-video')
             if len(slinks) == 0 and vurl2 is not None:
                 r = client.request(vurl2, headers=headers)
                 headers['Referer'] = vurl2
-                slinks = client.parseDOM(r, 'div', attrs={'class': 'anime_muti_link'})
-                slinks = client.parseDOM(slinks, 'li', ret='data-video')
+                slinks = client.parseDom(r, 'div', attrs={'class': 'anime_muti_link'})
+                slinks = client.parseDom(slinks, 'li', ret='data-video')
             slinks = [slink if slink.startswith('http') else 'https:{0}'.format(slink) for slink in slinks]
 
             _slinks = []

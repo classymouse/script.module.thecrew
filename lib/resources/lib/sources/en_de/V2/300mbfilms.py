@@ -152,14 +152,14 @@ class source:
                 return
 
             r = client.request(url)
-            r = client.parseDOM(r, 'div', attrs={'class': 'entry'})
-            r = client.parseDOM(r, 'a', ret='href')
+            r = client.parseDom(r, 'div', attrs={'class': 'entry'})
+            r = client.parseDom(r, 'a', ret='href')
             r1 = [i for i in r if 'money' in i][0]
             r = client.request(r1)
-            r = client.parseDOM(r, 'div', attrs={'id': 'post-\d+'})[0]
+            r = client.parseDom(r, 'div', attrs={'id': 'post-\d+'})[0]
 
             if 'enter the password' in r:
-                plink = client.parseDOM(r, 'form', ret='action')[0]
+                plink = client.parseDom(r, 'form', ret='action')[0]
 
                 post = {'post_password': '300mbfilms', 'Submit': 'Submit'}
                 send_post = client.request(plink, post=post, output='cookie')
@@ -168,7 +168,7 @@ class source:
                 link = client.request(r1)
 
             link = re.findall('<strong>Single(.+?)</tr', link, re.DOTALL)[0]
-            link = client.parseDOM(link, 'a', ret='href')
+            link = client.parseDom(link, 'a', ret='href')
             for i in link:
                 if 'earn-money-onlines.info' in i:
                     trim = i.replace('protector1.php', 'protector.php')

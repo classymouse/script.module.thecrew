@@ -27,7 +27,7 @@ import xbmcaddon
 import xbmcvfs
 import math
 
-from orion import *
+from orion import Orion
 from .crewruntime import c
 from . import keys
 from . import control
@@ -86,16 +86,62 @@ class orionApi:
         return True
 
     # ! TODO change limit
-    def get_movie(self,imdb, limit=25) -> dict:
+    def get_movie(self,imdb, limit=250) -> dict:
         results = self.orion.streams(type = Orion.TypeMovie, idImdb = imdb, limitCount = limit)
         return results
 
+    def get_episode(self,imdb=0, tmdb=0, title ='', season = 0, episode = 0, limit=250) -> dict:
+
+        if imdb == 0:
+            results = self.orion.streams(type = Orion.TypeShow, idTmdb = tmdb, numberSeason = season, numberEpisode = episode, limitCount = limit)
+        elif tmdb != 0:
+            results = self.orion.streams(type = Orion.TypeShow, idImdb = imdb, numberSeason = season, numberEpisode = episode, limitCount = limit)
+        elif title != '':
+            results = self.orion.streams(type = Orion.TypeShow, query = title, limitCount = limit)
+        else:
+            return None
+        return results
 
     def do_orion_scrape(self, data, _type='movie'):
         try:
             sources = []
-            c.log(f"[CM Debug @ 98 in orion_api.py] len data = {len(data)} data = {repr(data)}")
+            if data is not None:
+                for item in data:
+                    c.log(f"\n\n\n===================================================================\nORION DATA\n===============================================\n\n[CM Debug @ 98 in orion_api.py] len data = {len(data)}\n\n data = {repr(item)}\n\n\n")
             if _type == 'movie':
+                for i, item in enumerate(data):
+                    #c.log(f"[CM Debug @ 110 in orion_api.py] type item = (type) {type(item)}")
+                    links = item.get("links", [])
+                    url = ''
+                    for link in links:
+                        if link.startswith("magnet:") and url == '':
+                            url = link
+                        else:
+                            continue
+
+                    fileinfo = item.get("file")
+                    name = fileinfo.get("name")
+                    size = fileinfo.get("size")
+                    hash = fileinfo.get("hash")
+                    pack = fileinfo.get("pack")
+
+                    quality, info = source_utils.get_release_quality(name)
+
+                    try:
+                        dsize, isize = source_utils.file_size(size)
+                        c.log(f"[CM Debug @ 132 in orion_api.py] dsize = {dsize}")
+                    except:
+                        dsize, isize = 0.0, ''
+
+                    info.insert(0, isize)
+                    sources.append({'provider' : 'Orion', 'source': 'Torrent', 'quality': quality, 'language': 'en', 'url': url, 'info': info,'direct': False, 'debridonly': True, 'size': dsize, 'name': name})
+
+
+                #c.log(f"[CM Debug @ 146 in orion_api.py] sources = {sources}")
+
+                return sources
+            else:
+                c.log(f"[CM Debug @ 142 in orion_api.py] len data = {len(data)} data = {repr(data)}")
                 for i, item in enumerate(data):
                     #c.log(f"[CM Debug @ 110 in orion_api.py] type item = (type) {type(item)}")
                     links = item.get("links", [])
@@ -108,26 +154,23 @@ class orionApi:
 
                     fileinfo = item.get("file",)
                     c.log(f"[CM Debug @ 111 in orion_api.py] fileinfo = {fileinfo}")
+
                     name = fileinfo.get("name",)
                     size = fileinfo.get("size")
-                    #hash = fileinfo.get("hash")
+                    hash = fileinfo.get("hash")
                     pack = fileinfo.get("pack")
 
                     quality, info = source_utils.get_release_quality(name)
 
                     try:
                         dsize, isize = source_utils._size(size)
+                        c.log(f"[CM Debug @ 164 in orion_api.py] dsize = {dsize} isize = {isize}")
                     except:
-                        dsize, isize = 0.0, ''
+                        dsize, isize = 0.0, '*'
 
                     info.insert(0, isize)
                     sources.append({'provider' : 'Orion', 'source': 'Torrent', 'quality': quality, 'language': 'en', 'url': url, 'info': info,'direct': False, 'debridonly': True, 'size': dsize, 'name': name})
 
-
-                #c.log(f"[CM Debug @ 146 in orion_api.py] sources = {sources}")
-
-                return sources
-            else:
                 c.log(f"[CM Debug @ 139 in orion_api.py] something wron: type={_type}")
         except Exception as e:
             import traceback

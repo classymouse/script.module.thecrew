@@ -27,6 +27,7 @@ def get(title):
         return
     try:
         # cm = changed 2024/11/10
+        # cm = changed 2025/06/11
         # cm - try to convert to string
         # I can't think of a reason when this is necessary, even a title like "4400", "187" or
         # "1999" are returned as a string, and are valid titles
@@ -36,9 +37,9 @@ def get(title):
         pass
     title = re.sub(r'&#(\d+);', '', title) # removes all references like &#1234;
     title = re.sub(r'(&#[0-9]+)([^;^0-9]+)', '\\1;\\2', title) # fixes incomplete references to &#1234;x by adding a semicolon
-    title = title.replace(r'&quot;', '\"').replace(r'&amp;', '&').replace(r'–', '-').replace(r'!', '') # replaces some html entities with their character equivalents
-
+    title = title.replace(r'&quot;', r'\"').replace(r'&amp;', 'and').replace(r'&', 'and').replace(r'–', '-').replace(r'!', '') # replaces some html entities with their character equivalents
     title = re.sub(r'\n|([\[\].+?\[\]])|([(].+?[)])|\s(vs|v[.])\s|(:|;|-|–|"|,|\'|\_|\.|\?)|\s', '', title).lower()
+
     return title
 
 

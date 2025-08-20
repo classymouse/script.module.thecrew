@@ -85,7 +85,7 @@ class source:
 
             try:
                 r = client.request(url)
-                posts = client.parseDOM(r, 'div', attrs={'class': 'tgxtable'})
+                posts = client.parseDom(r, 'div', attrs={'class': 'tgxtable'})
                 for post in posts:
                     link = re.findall('a href="(magnet:.+?)"', post, re.DOTALL)
                     try:

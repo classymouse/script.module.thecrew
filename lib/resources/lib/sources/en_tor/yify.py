@@ -1,40 +1,53 @@
 # -*- coding: utf-8 -*-
 
 '''
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+********************************************************cm*
+* The Crew Add-on
+*
+* @file yify.py
+* @package script.module.thecrew
+*
+* @copyright (c) 2025, The Crew
+* @license GNU General Public License, version 3 (GPL-3.0)
+*
+********************************************************cm*
 '''
 
-
 import re
-import traceback
 
-from resources.lib.modules import cleantitle, client, control, debrid, log_utils, source_utils
+from urllib.parse import urlencode, quote, parse_qs, urljoin
 
-try: from urlparse import parse_qs, urljoin
-except ImportError: from urllib.parse import parse_qs, urljoin
-try: from urllib import urlencode, quote_plus, quote
-except ImportError: from urllib.parse import urlencode, quote_plus, quote
+from resources.lib.modules import cleantitle
+from resources.lib.modules import client
+from resources.lib.modules import cache
+from resources.lib.modules import control
+from resources.lib.modules import debrid
+from resources.lib.modules import source_utils
+from resources.lib.modules.crewruntime import c
+
 
 
 class source:
     def __init__(self):
         self.priority = 1
         self.language = ['en']
-        self.domains = ['yts.am']
-        self.base_link = 'https://yts.mx/' # cm - blocked
+        self.domains = ['yts.am', 'yts.hn','yts.rs', 'yts-official.mx']
+        self.base_link = None
         self.search_link = '/browse-movies/%s'
         self.min_seeders = int(control.setting('torrent.min.seeders'))
+
+
+
+    @property
+    def base_link(self):
+        if not self._base_link:
+            #self._base_link = cache.get(self.__get_base_url, 120, 'https://%s' % self.domains[0])
+            self._base_link = cache.get(self.__get_base_url, 0, 'https://%s' % self.domains[0])
+        return self._base_link
+
+    @base_link.setter
+    def base_link(self, value):
+        self._base_link = value
 
     def movie(self, imdb, title, localtitle, aliases, year):
         if debrid.status(True) is False:
@@ -51,6 +64,8 @@ class source:
         try:
             sources = []
 
+            c.log(f"[CM Debug @ 67 in yify.py] url = {url}")
+
             if url is None:
                 return sources
 
@@ -61,10 +76,11 @@ class source:
 
             url = self.search_link % quote(query)
             url = urljoin(self.base_link, url)
+            c.log(f"[CM Debug @ 79 in yify.py] url = {url}")
             html = client.request(url)
 
             try:
-                results = client.parseDOM(html, 'div', attrs={'class': 'row'})[2]
+                results = client.parseDom(html, 'div', attrs={'class': 'row'})[2]
             except Exception:
                 return sources
 
@@ -87,7 +103,7 @@ class source:
 
                     response = client.request(link)
                     try:
-                        entries = client.parseDOM(response, 'div', attrs={'class': 'modal-torrent'})
+                        entries = client.parseDom(response, 'div', attrs={'class': 'modal-torrent'})
                         for torrent in entries:
                             link, name = re.findall('href="magnet:(.+?)" class="magnet-download download-torrent magnet" title="(.+?)"', torrent, re.DOTALL)[0]
                             link = 'magnet:%s' % link
@@ -110,8 +126,29 @@ class source:
                     continue
 
             return sources
-        except Exception:
+        except Exception as e:
+            c.log(f"[CM Debug @ 127 in yify.py] Exception in sources: {e}", 1)
             return sources
+
+
+
+
+    def __get_base_url(self, fallback):
+        try:
+            for domain in self.domains:
+                try:
+                    url = 'https://%s' % domain
+                    result = client.request(url, timeout=7)
+                    result = c.ensure_text(result, errors='ignore')
+                    search_n = re.findall('<title>(.+?)</title>', result, re.DOTALL)[0]
+                    if result and '1337x' in search_n:
+                        return url
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        return fallback
 
     def resolve(self, url):
         return url

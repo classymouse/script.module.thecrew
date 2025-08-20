@@ -7,10 +7,8 @@ import ssl
 
 from requests.adapters import HTTPAdapter
 from requests.sessions import Session
-try:
-    from requests_toolbelt.utils import dump
-except:
-    import dump
+from . import dump
+
 
 # ------------------------------------------------------------------------------- #
 

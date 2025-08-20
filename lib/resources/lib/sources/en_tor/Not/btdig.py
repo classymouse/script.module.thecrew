@@ -97,20 +97,20 @@ class source:
             #r = requests.get(url).content
             r = scraper.get(url).content
             r = ensure_text(r, errors='replace').replace('&nbsp;', ' ')
-            r = client.parseDOM(r, 'div', attrs={'style': 'display:table;width:100%;text-align:left'})
-            posts = client.parseDOM(r, 'div', attrs={'class': 'one_result'})
+            r = client.parseDom(r, 'div', attrs={'style': 'display:table;width:100%;text-align:left'})
+            posts = client.parseDom(r, 'div', attrs={'class': 'one_result'})
             #log_utils.log('posts_is: '+str(posts))
             for post in posts:
 
-                links = client.parseDOM(post, 'div', attrs={'class': 'fa fa-magnet'})[0]
-                url = client.parseDOM(links, 'a', ret='href')[0]
+                links = client.parseDom(post, 'div', attrs={'class': 'fa fa-magnet'})[0]
+                url = client.parseDom(links, 'a', ret='href')[0]
                 url = client.replaceHTMLCodes(url).split('&tr=')[0]
                 name = url.split('&dn=')[1]
                 if not query in cleantitle.get_title(name): continue
 
                 quality, info = source_utils.get_release_quality(name, url)
                 try:
-                    size = client.parseDOM(post, 'span', attrs={'class': 'torrent_size'})[0]
+                    size = client.parseDom(post, 'span', attrs={'class': 'torrent_size'})[0]
                     dsize, isize = source_utils._size(size)
                 except:
                     dsize, isize = 0.0, ''

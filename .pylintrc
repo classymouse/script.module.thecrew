@@ -1,0 +1,36 @@
+[MASTER]
+ignore=venv,build,.git
+extension-pkg-whitelist=xbmc,xbmcvfs,xbmcaddon,xbmcgui,xbmcplugin
+
+[MESSAGES CONTROL]
+disable=
+    C0114, # missing-module-docstring
+    C0115, # missing-class-docstring
+    C0116, # missing-function-docstring
+    R0903, # too-few-public-methods
+    R0201, # method could be a function
+    W0611, # unused-import
+    W0612, # unused-variable
+    W0702, # bare-except
+    W0621, # redefined-outer-name
+
+[FORMAT]
+max-line-length=120
+indent-string='    '
+
+[REPORTS]
+output-format=colorized
+reports=no
+
+[TYPECHECK]
+generated-members=xbmc.*,xbmcvfs.*,xbmcaddon.*,xbmcgui.*,xbmcplugin.*
+
+[DESIGN]
+max-args=10
+max-locals=30
+max-branches=20
+max-statements=100
+max-parents=7
+max-attributes=20
+min-public-methods=0
+max-public-methods=50

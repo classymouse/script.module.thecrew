@@ -90,6 +90,14 @@ def get_fanart_tv_art(tvdb, imdb = '0', lang='en', mediatype='tv'):
         try:
             items = art.get(key, [])
             sorted_items = sorted(items, key=lambda x: (x.get('lang') != lang, x.get('lang') != 'en', x.get('lang') not in ['00', '']))
+            result = sorted_items[0] if sorted_items else {}
+
+            if isinstance(result, dict):
+                return result.get('url', '0')
+            elif isinstance(result, str):
+                return result
+            else:
+                return '0'
             return sorted_items[0].get('url', '0') if sorted_items else '0'
         except Exception:
             return '0'
@@ -148,13 +156,12 @@ def get_fanart_tv_art(tvdb, imdb = '0', lang='en', mediatype='tv'):
     else:
         return zero_str
 
-
     if mediatype == 'tv':
         return {
             'poster': poster, 'fanart': fanart, 'banner': banner, 'landscape': landscape,
             'clearlogo': clearlogo, 'clearart': clearart
             } #poster, fanart, banner, landscape, clearlogo, clearart
-    else:
+    if mediatype == 'movie':
         return {
             'poster': poster, 'fanart': fanart, 'banner': banner, 'landscape': landscape,
             'clearlogo': clearlogo, 'clearart': clearart, 'discart': discart
@@ -191,7 +198,6 @@ def get_cached_fanart(tvdb, imdb, url, headers, timeout=30):
                     #return response
                     return txt
                 else:
-                    c.log(f"[CM Debug @ 181 in fanart.py] response.status_code = {response.status_code}, close db, return None")
                     dbcon.close()
                     return None
     except Exception as e:

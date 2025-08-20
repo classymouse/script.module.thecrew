@@ -13,28 +13,33 @@
  *
  ********************************************************cm*
 '''
+import sys
+import re
+import datetime
+import json
 
-from resources.lib.modules import cleangenre
-from resources.lib.modules import control
-from resources.lib.modules import client
-from resources.lib.modules import metacache
-from resources.lib.modules import workers
-from resources.lib.modules import trakt
+from urllib.parse import parse_qsl, quote_plus
 
-import sys,re,datetime
-import simplejson as json
+from ..modules import cleangenre
+from ..modules import control
+from ..modules import client
+from ..modules import metacache
+from ..modules import workers
+from ..modules import trakt
+from ..modules.crewruntime import c
 
-import six
-from six.moves import urllib_parse
-params = dict(urllib_parse.parse_qsl(sys.argv[2].replace('?',''))) if len(sys.argv) > 1 else dict()
+
+
+params = dict(parse_qsl(sys.argv[2].replace('?',''))) if len(sys.argv) > 1 else dict()
 
 action = params.get('action')
 
 class channels:
     def __init__(self):
-        self.list = [] ; self.items = []
+        self.list = []
+        self.items = []
 
-        self.uk_datetime = self.uk_datetime()
+        self.uk_datetime = self.get_uk_datetime()
         self.systime = (self.uk_datetime).strftime('%Y%m%d%H%M%S%f')
         self.tm_img_link = 'https://image.tmdb.org/t/p/w%s%s'
         self.lang = control.apiLanguage()['trakt']
@@ -64,19 +69,23 @@ class channels:
         ]
 
         threads = []
-        for i in channels: threads.append(workers.Thread(self.sky_list, i[0], i[1], i[2]))
+        for i in channels:
+            threads.append(workers.Thread(self.sky_list, i[0], i[1], i[2]))
         [i.start() for i in threads]
         [i.join() for i in threads]
 
         threads = []
-        for i in list(range(0, len(self.items))): threads.append(workers.Thread(self.items_list, self.items[i]))
+        threads = [workers.Thread(self.items_list, item) for item in self.items]
+
         [i.start() for i in threads]
         [i.join() for i in threads]
 
         self.list = metacache.local(self.list, self.tm_img_link, 'poster2', 'fanart')
 
-        try: self.list = sorted(self.list, key=lambda k: k['num'])
-        except: pass
+        try:
+            self.list = sorted(self.list, key=lambda k: k['num'])
+        except:
+            pass
 
         self.channelDirectory(self.list)
         return self.list
@@ -91,14 +100,14 @@ class channels:
             try:
                 year = result['listings'][id][0]['d']
                 year = re.findall('[(](\d{4})[)]', year)[0].strip()
-                year = six.ensure_str(year)
+                year = str(year)
             except:
                 year = ''
 
             title = result['listings'][id][0]['t']
-            title = title.replace('(%s)' % year, '').strip()
+            title = title.replace(f'({year})', '').strip()
             title = client.replaceHTMLCodes(title)
-            title = six.ensure_str(title)
+            title = str(title)
 
             self.items.append((title, year, channel, num))
         except:
@@ -107,13 +116,27 @@ class channels:
 
     def items_list(self, i):
         try:
-            item = trakt.SearchAll(i[0], i[1], True)[0]
+            search_results = trakt.SearchAll(i[0], i[1], True)
+            if search_results is not None and len(search_results) > 0:
+                item = search_results[0]
+            else:
+                return
 
-            content = item.get('movie')
-            if not content: content = item.get('show')
-            item = content
+            # Ensure item is a dict before calling get
+            if isinstance(item, list) and len(item) > 0:
+                item = item[0]
+            if isinstance(item, str):
+                # If item is a string, skip processing
+                return
+            if not isinstance(item, dict):
+                return
 
-            title = item.get('title')
+            content = item.get('movie') if isinstance(item, dict) else None
+            if not content:
+                content = item.get('show') if isinstance(item, dict) else None
+            item = content if content else item
+
+            title = item.get('title') if isinstance(item, dict) else ''
             title = client.replaceHTMLCodes(title)
 
             originaltitle = title
@@ -127,25 +150,30 @@ class channels:
             tmdb = str(item.get('ids', {}).get('tmdb', 0))
 
             premiered = item.get('released', '0')
-            try: premiered = re.compile('(\d{4}-\d{2}-\d{2})').findall(premiered)[0]
-            except: premiered = '0'
+            try:
+                premiered_str = str(premiered)
+                premiered = re.compile(r'(\d{4}-\d{2}-\d{2})').findall(premiered_str)[0]
+            except:
+                premiered = '0'
 
             genre = item.get('genres', [])
             genre = [x.title() for x in genre]
             genre = ' / '.join(genre).strip()
-            if not genre: genre = '0'
+            if not genre:
+                genre = '0'
 
             duration = str(item.get('Runtime', 0))
 
-            rating = item.get('rating', '0')
-            if not rating or rating == '0.0': rating = '0'
+            rating = str(item.get('rating', '0'))
+            if rating == '0.0':
+                rating = '0'
 
-            votes = item.get('votes', '0')
-            try: votes = str(format(int(votes), ',d'))
-            except: pass
+            votes = str(int(item.get('votes', 0)))
+            votes = f'{int(votes):,}'
 
             mpaa = item.get('certification', '0')
-            if not mpaa: mpaa = '0'
+            if not mpaa:
+                mpaa = '0'
 
             tagline = item.get('tagline', '0')
 
@@ -154,15 +182,20 @@ class channels:
             people = trakt.getPeople(imdb, 'movies')
 
             director = writer = ''
-            if 'crew' in people and 'directing' in people['crew']:
-                director = ', '.join([director['person']['name'] for director in people['crew']['directing'] if director['job'].lower() == 'director'])
-            if 'crew' in people and 'writing' in people['crew']:
-                writer = ', '.join([writer['person']['name'] for writer in people['crew']['writing'] if writer['job'].lower() in ['writer', 'screenplay', 'author']])
 
-            cast = []
-            for person in people.get('cast', []):
-                cast.append({'name': person['person']['name'], 'role': person['character']})
-            cast = [(person['name'], person['role']) for person in cast]
+            if people is not None:
+                if isinstance(people, dict) and 'crew' in people and isinstance(people['crew'], dict) and 'directing' in people['crew']:
+                    director = ', '.join([director['person']['name'] for director in people['crew']['directing'] if director['job'].lower() == 'director'])
+                if isinstance(people, dict) and 'crew' in people and isinstance(people['crew'], dict) and 'writing' in people['crew']:
+                    writer = ', '.join([writer['person']['name'] for writer in people['crew']['writing'] if writer['job'].lower() in ['writer', 'screenplay', 'author']])
+
+                cast = []
+                for person in people.get('cast', []):
+                    cast.append({
+                        'name': person.get('person', ''),
+                        'role': person.get('role', '')
+                        })
+                cast = [(person['name'], person['role']) for person in cast]
 
             try:
                 if self.lang == 'en' or self.lang not in item.get('available_translations', [self.lang]): raise Exception()
@@ -180,7 +213,7 @@ class channels:
             pass
 
 
-    def uk_datetime(self):
+    def get_uk_datetime(self):
         dt = datetime.datetime.utcnow()
         d = datetime.datetime(dt.year, 4, 1)
         dston = d - datetime.timedelta(days=d.weekday() + 1)
@@ -193,7 +226,9 @@ class channels:
 
 #TC 2/01/19 started
     def channelDirectory(self, items):
-        if items == None or len(items) == 0: control.idle() ; sys.exit()
+        if items is None or len(items) == 0:
+            control.idle()
+            sys.exit()
 
         sysaddon = sys.argv[0]
 
@@ -203,28 +238,27 @@ class channels:
 
         addonFanart, settingFanart = control.addonFanart(), control.setting('fanart')
 
-        try: isOld = False ; control.item().getArt('type')
-        except: isOld = True
+        try:
+            isOld = False
+            control.item().getArt('type')
+        except:
+            isOld = True
 
         isPlayable = 'true' if not 'plugin' in control.infoLabel('Container.PluginName') else 'false'
-
-        playbackMenu = six.ensure_str(control.lang(32063)) if control.setting('hosts.mode') == '2' else six.ensure_str(control.lang(32064))
-
-        queueMenu = six.ensure_str(control.lang(32065))
-
-        refreshMenu = six.ensure_str(control.lang(32072))
-
-        infoMenu = six.ensure_str(control.lang(32101))
+        playbackMenu = str(control.lang(32063)) if control.setting('hosts.mode') == '2' else str(control.lang(32064))
+        queueMenu = str(control.lang(32065))
+        refreshMenu = str(control.lang(32072))
+        infoMenu = str(control.lang(32101))
 
 
         for i in items:
             try:
                 label = '[B]%s[/B] : %s (%s)' % (i['channel'].upper(), i['title'], i['year'])
-                sysname = urllib_parse.quote_plus('%s (%s)' % (i['title'], i['year']))
-                systitle = urllib_parse.quote_plus(i['title'])
+                sysname = quote_plus('%s (%s)' % (i['title'], i['year']))
+                systitle = quote_plus(i['title'])
                 imdb, tmdb, year = i['imdb'], i['tmdb'], i['year']
 
-                meta = dict((k,v) for k, v in six.iteritems(i) if not v == '0')
+                meta = dict((k,v) for k, v in i.items() if not v == '0')
                 meta.update({'code': imdb})
                 meta.update({'imdb_id': imdb})
                 meta.update({'tmdb_id': tmdb})
@@ -235,25 +269,21 @@ class channels:
                 try: meta.update({'genre': cleangenre.lang(meta['genre'], self.lang)})
                 except: pass
 
-                sysmeta = urllib_parse.quote_plus(json.dumps(meta))
+                sysmeta = quote_plus(json.dumps(meta))
 
 
                 url = '%s?action=play&title=%s&year=%s&imdb=%s&meta=%s&t=%s' % (sysaddon, systitle, year, imdb, sysmeta, self.systime)
-                sysurl = urllib_parse.quote_plus(url)
+                sysurl = quote_plus(url)
 
 
                 cm = []
 
                 cm.append((queueMenu, 'RunPlugin(%s?action=queueItem)' % sysaddon))
-
                 cm.append((refreshMenu, 'RunPlugin(%s?action=refresh)' % sysaddon))
-
                 cm.append((playbackMenu, 'RunPlugin(%s?action=alterSources&url=%s&meta=%s)' % (sysaddon, sysurl, sysmeta)))
 
-                if isOld == True:
+                if isOld is True:
                     cm.append((infoMenu, 'Action(Info)'))
-
-
                 item = control.item(label=label)
 
                 art = {}
@@ -269,7 +299,7 @@ class channels:
 
                 if settingFanart == 'true' and 'fanart' in i and not i['fanart'] == '0':
                     item.setProperty('fanart', i['fanart'])
-                elif not addonFanart == None:
+                elif addonFanart is not None:
                     item.setProperty('fanart', addonFanart)
 
                 item.setArt(art)

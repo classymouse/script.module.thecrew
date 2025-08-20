@@ -22,30 +22,19 @@ def router(params):
 [cm inside router @ 23]\nparams = ' + repr(params) + '\n\
 ------------------------------------------------------------------------\n')
 
-    action = params.get('action')
-    mode = params.get('mode')
-    subid = params.get('subid')
-    name = params.get('name')
-    title = params.get('title')
-    year = params.get('year')
-    imdb = params.get('imdb')
-    tmdb = params.get('tmdb')
-    season = params.get('season')
-    episode = params.get('episode')
-    tvshowtitle = params.get('tvshowtitle')
-    premiered = params.get('premiered')
-    url = params.get('url')
-    tid = params.get('tid')
-    image = params.get('image')
-    meta = params.get('meta')
-    select = params.get('select')
-    query = params.get('query')
-    source = params.get('source')
-    content = params.get('content')
-    mediatype = params.get('mediatype')
-    _id = params.get('id')
 
-    docu_category = params.get('docuCat')
+
+    # Use tuple unpacking for faster access to params
+    action, mode, subid, name, title, year, imdb, tmdb, season, episode, tvshowtitle, premiered, url, tid, image, meta, select, query, source, content, mediatype, _id, docu_category, docu_play, windowedtrailer = (
+        params.get(key) for key in (
+            'action', 'mode', 'subid', 'name', 'title', 'year', 'imdb', 'tmdb',
+            'season', 'episode', 'tvshowtitle', 'premiered', 'url', 'tid', 'image',
+            'meta', 'select', 'query', 'source', 'content', 'mediatype', 'id', 'docuCat', 'docuPlay',
+            'windowedtrailer'
+        )
+    )
+
+
     docu_watch = params.get('docuPlay')
 
     windowedtrailer = params.get('windowedtrailer')
@@ -55,7 +44,7 @@ def router(params):
         '247movies','247tvshows','iptv','yss','weak','daddylive',
         'sportsbay','sports24','gratis','base','waste','whitehat','arconai','iptv_lodge','stratus','distro',
         'xumo','bumble','pluto','tubi','spanish','spanish2','bp','arabic','arabic2','india','chile','colombia','argentina',
-        'spain','iptv_git','cctv','titan','porn','faith','lust','greyhat','absolution','eyecandy','purplehat','retribution','kiddo',
+        'spain','iptv_git','cctv','titan','porn','faith','lust','greyhat','absolution','eyecandy','purplehat', 'classy','retribution','kiddo',
         'redhat','yellowhat','blackhat','food','ncaa','ncaab','lfl','xfl','boxing','tennis','mlb','nfl','nhl','nba',
         'ufc','fifa','wwe','motogp','f1','pga','nascar','cricket','sports_channels', 'sreplays', 'greenhat'
     }
@@ -66,12 +55,12 @@ def router(params):
         from resources.lib.indexers import navigator
         from resources.lib.modules import cache
         cache.cache_version_check()
-        navigator.navigator().root()
+        navigator.navigator.root()
 
     elif action in actionlist:
         from resources.lib.indexers import lists
-        s = 'lists.indexer().root_{}()'.format(action)
-        eval(s)
+        indexer = lists.indexer()
+        getattr(indexer, f'root_{action}')()
 
     elif action == 'greenhat':
         from resources.lib.indexers import lists
@@ -136,75 +125,75 @@ def router(params):
 
     elif action == 'bluehat':
         from resources.lib.indexers import navigator
-        navigator.navigator().bluehat()
+        navigator.navigator.bluehat()
 
     elif action == 'whitehat':
         from resources.lib.indexers import navigator
-        navigator.navigator().whitehat()
+        navigator.navigator.whitehat()
 
     elif action == 'movieNavigator':
         from resources.lib.indexers import navigator
-        navigator.navigator().movies()
+        navigator.navigator.movies()
 
     elif action == 'movieliteNavigator':
         from resources.lib.indexers import navigator
-        navigator.navigator().movies(lite=True)
+        navigator.navigator.movies(lite=True)
 
     elif action == 'mymovieNavigator':
         from resources.lib.indexers import navigator
-        navigator.navigator().mymovies()
+        navigator.navigator.mymovies()
 
     elif action == 'mymovieliteNavigator':
         from resources.lib.indexers import navigator
-        navigator.navigator().mymovies(lite=True)
+        navigator.navigator.mymovies(lite=True)
 
     elif action == 'nav_add_addons':
         from resources.lib.indexers import navigator
-        navigator.navigator().add_addons()
+        navigator.navigator.add_addons()
 
     elif action == 'tvNavigator':
         from resources.lib.indexers import navigator
-        navigator.navigator().tvshows()
+        navigator.navigator.tvshows()
 
     elif action == 'traktlist':
         from resources.lib.indexers import navigator
-        navigator.navigator().traktlist()
+        navigator.navigator.traktlist()
 
     elif action == 'imdblist':
         from resources.lib.indexers import navigator
-        navigator.navigator().imdblist()
+        navigator.navigator.imdblist()
 
     elif action == 'tmdbtvlist':
         from resources.lib.indexers import navigator
-        navigator.navigator().tmdbtvlist()
+        navigator.navigator.tmdbtvlist()
 
     elif action == 'tmdbmovieslist':
         from resources.lib.indexers import navigator
-        navigator.navigator().tmdbmovieslist()
+        navigator.navigator.tmdbmovieslist()
 
     elif action == 'tvliteNavigator':
         from resources.lib.indexers import navigator
-        navigator.navigator().tvshows(lite=True)
+        navigator.navigator.tvshows(lite=True)
 
     elif action == 'mytvNavigator':
         from resources.lib.indexers import navigator
-        navigator.navigator().mytvshows()
+        navigator.navigator.mytvshows()
 
     elif action == 'mytvliteNavigator':
         from resources.lib.indexers import navigator
-        navigator.navigator().mytvshows(lite=True)
+        navigator.navigator.mytvshows(lite=True)
 
     elif action == 'downloadNavigator':
         from resources.lib.indexers import navigator
-        navigator.navigator().downloads()
+        navigator.navigator.downloads()
 
     elif action == 'libraryNavigator':
         from resources.lib.indexers import navigator
-        navigator.navigator().library()
+        navigator.navigator.library()
 
     elif action == 'OrionNavigator':
         from resources.lib.indexers import navigator
-        navigator.navigator().orionoid()
+        navigator.navigator.orionoid()
 
     elif action == 'userdetailsOrion':
         from .orion_api import oa
@@ -223,44 +212,44 @@ def router(params):
 
     elif action == 'toolNavigator':
         from resources.lib.indexers import navigator
-        navigator.navigator().tools()
+        navigator.navigator.tools()
 
     elif action == 'developers':
         from resources.lib.indexers import navigator
-        navigator.navigator().developers()
+        navigator.navigator.developers()
 
     elif action == 'cachingTools':
         from resources.lib.indexers import navigator
-        navigator.navigator().cachingTools()
+        navigator.navigator.cachingTools()
 
     elif action == 'searchNavigator':
         from resources.lib.indexers import navigator
-        navigator.navigator().search()
+        navigator.navigator.search()
 
     elif action == 'viewsNavigator':
         from resources.lib.indexers import navigator
-        navigator.navigator().views()
+        navigator.navigator.views()
 
     elif action == 'clearCache':
         from resources.lib.indexers import navigator
-        navigator.navigator().clearCache()
+        navigator.navigator.clearCache()
 
     elif action == 'clearAllCache':
         from resources.lib.indexers import navigator
-        navigator.navigator().clearCacheAll()
+        navigator.navigator.clearCacheAll()
 
     elif action == 'clearMetaCache':
         from resources.lib.indexers import navigator
-        navigator.navigator().clearCacheMeta()
+        navigator.navigator.clearCacheMeta()
 
     elif action == 'clearCacheSearch':
         from resources.lib.indexers import navigator
-        navigator.navigator().clearCacheSearch()
+        navigator.navigator.clearCacheSearch()
 
     #CM 2021/17/7 @todo obsolete part
     elif action == 'infoCheck':
         from resources.lib.indexers import navigator
-        navigator.navigator().infoCheck('')
+        navigator.navigator.info_check('')
 
     elif action == 'movies':
         from resources.lib.indexers import movies
@@ -487,9 +476,14 @@ def router(params):
         from . import playcount
         playcount.episodes(imdb, tmdb, season, episode, query)
 
+    elif action == 'seasonPlaycount':
+        from . import playcount
+        playcount.seasons(imdb, tmdb, season, episode, query)
+
     elif action == 'tvPlaycount':
         from . import playcount
-        playcount.tvshows(name, imdb, tmdb, season, query)
+        #playcount.tvshows(name, imdb, tmdb, season, query)
+        playcount.tvshows(imdb, tmdb, query)
 
     elif action == 'trailer':
         from . import trailer
@@ -503,7 +497,7 @@ def router(params):
 
     elif action == 'authTrakt':
         from resources.lib.modules import trakt
-        trakt.authTrakt()
+        trakt.auth_trakt()
 
     elif action == 'authRD':
         from resources.lib.modules.debridapis import realdbrid
@@ -530,9 +524,8 @@ def router(params):
                 lists.player().play(url, content)
             else:
                 from resources.lib.modules import sources
-                c.log(f"[CM Debug @ 528 in crew.py] playing from sources, title = {title} | year = {year} | imdb = {imdb} | tmdb = {tmdb} | season = {season} | episode = {episode} | tvshowtitle = {tvshowtitle} | premiered = {premiered} | meta = {meta} | select = {select}")
-                sources.sources().play(
-                    title, year, imdb, tmdb, season, episode, tvshowtitle, premiered, meta, select)
+                #c.log(f"[CM Debug @ 538 in crew.py] playing from sources, title = {title} | year = {year} | imdb = {imdb} | tmdb = {tmdb} | season = {season} | episode = {episode} | tvshowtitle = {tvshowtitle} | premiered = {premiered} | meta = {meta} | select = {select}")
+                sources.sources().play(title, year, imdb, tmdb, season, episode, tvshowtitle, premiered, meta, select)
         except Exception as e:
             import traceback
             failure = traceback.format_exc()
@@ -666,31 +659,31 @@ def router(params):
 
     elif action == 'newsNavigator':
         from resources.lib.indexers import navigator
-        navigator.navigator().news()
+        navigator.navigator.news()
 
     elif action == 'collectionsNavigator':
         from resources.lib.indexers import navigator
-        navigator.navigator().collections()
+        navigator.navigator.collections()
 
     elif action == 'collectionActors':
         from resources.lib.indexers import navigator
-        navigator.navigator().collectionActors()
+        navigator.navigator.collectionActors()
 
     elif action == 'collectionBoxset':
         from resources.lib.indexers import navigator
-        navigator.navigator().collectionBoxset()
+        navigator.navigator.collectionBoxset()
 
     elif action == 'collectionBoxsetKids':
         from resources.lib.indexers import navigator
-        navigator.navigator().collectionBoxsetKids()
+        navigator.navigator.collectionBoxsetKids()
 
     elif action == 'collectionKids':
         from resources.lib.indexers import navigator
-        navigator.navigator().collectionKids()
+        navigator.navigator.collectionKids()
 
     elif action == 'collectionSuperhero':
         from resources.lib.indexers import navigator
-        navigator.navigator().collectionSuperhero()
+        navigator.navigator.collectionSuperhero()
 
     elif action == 'collections':
         from resources.lib.indexers import collections
@@ -698,11 +691,11 @@ def router(params):
 
     elif action == 'holidaysNavigator':
         from resources.lib.indexers import navigator
-        navigator.navigator().holidays()
+        navigator.navigator.holidays()
 
     elif action == 'halloweenNavigator':
         from resources.lib.indexers import navigator
-        navigator.navigator().halloween()
+        navigator.navigator.halloween()
 
     #elif action == 'bugReports':
         #from resources.lib.reports import bugreports
@@ -710,7 +703,7 @@ def router(params):
 
     elif action == 'kidsgreyNavigator':
         from resources.lib.indexers import navigator
-        navigator.navigator().kidsgrey()
+        navigator.navigator.kidsgrey()
 
     elif action == 'debridkids':
         from resources.lib.indexers import lists

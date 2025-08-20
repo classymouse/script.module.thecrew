@@ -57,12 +57,12 @@ class source:
             url = urljoin(self.base_link, self.search_link.format(query[0].lower(), cleantitle.geturl(query)))
 
             r = client.request(url)
-            r = client.parseDOM(r, 'tbody')[0]
-            posts = client.parseDOM(r, 'tr')
+            r = client.parseDom(r, 'tbody')[0]
+            posts = client.parseDom(r, 'tr')
             posts = [i for i in posts if 'magnet:' in i]
             for post in posts:
                 post = post.replace('&nbsp;', ' ')
-                name = client.parseDOM(post, 'a', ret='title')[1]
+                name = client.parseDom(post, 'a', ret='title')[1]
 
                 t = name.split(hdlr)[0]
                 if not cleantitle.get(re.sub('(|)', '', t)) == cleantitle.get(title): continue
@@ -74,7 +74,7 @@ class source:
                 if y != hdlr:
                     continue
 
-                links = client.parseDOM(post, 'a', ret='href')
+                links = client.parseDom(post, 'a', ret='href')
                 magnet = [i.replace('&amp;', '&') for i in links if 'magnet:' in i][0]
                 url = magnet.split('&tr')[0]
 

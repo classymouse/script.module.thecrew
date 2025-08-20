@@ -70,10 +70,10 @@ class source:
 
             response = requests.Session()
             r = response.get(url, headers=headers, timeout=5).text
-            r = client.parseDOM(r, 'div', attrs={'class': 'container'})[1]
-            items = client.parseDOM(r, 'div', attrs={'class': r'col-xs-12 col-sm-6 col-md-3 '})
+            r = client.parseDom(r, 'div', attrs={'class': 'container'})[1]
+            items = client.parseDom(r, 'div', attrs={'class': r'col-xs-12 col-sm-6 col-md-3 '})
             for item in items:
-                movie_url = client.parseDOM(item, 'a', ret='href')[0]
+                movie_url = client.parseDom(item, 'a', ret='href')[0]
                 movie_title = re.compile('div class="post-title">(.+?)<', re.DOTALL).findall(item)[0]
                 if cleantitle.get(title).lower() == cleantitle.get(movie_title).lower():
 

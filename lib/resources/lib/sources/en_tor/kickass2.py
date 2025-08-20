@@ -110,7 +110,7 @@ class source:
                 return sources
             html = html.replace('&nbsp;', ' ')
             try:
-                rows = client.parseDOM(html, 'tr', attrs={'id': 'torrent_latest_torrents'})
+                rows = client.parseDom(html, 'tr', attrs={'id': 'torrent_latest_torrents'})
             except Exception:
                 return sources
             if rows is None:

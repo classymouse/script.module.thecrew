@@ -43,7 +43,7 @@ class source:
             return url
         except:
             return
-            
+
     def tvshow(self, imdb, tvdb, tvshowtitle, localtvshowtitle, aliases, year):
         try:
             url = {'imdb': imdb, 'tvdb': tvdb, 'tvshowtitle': tvshowtitle, 'year': year}
@@ -69,7 +69,7 @@ class source:
 
             if url is None:
                 return sources
-            
+
             if debrid.status() is False:
                 raise Exception()
 
@@ -81,30 +81,30 @@ class source:
             hdlr = 'S%02dE%02d' % (int(data['season']), int(data['episode'])) if 'tvshowtitle' in data else data['year']
 
             hostDict = hostprDict + hostDict
-            
+
             items = [] ; urls = [] ; posts = [] ; links = []
 
             url = urljoin(self.base_link, self.search_link % data['imdb'])
             r = client.request(url)
             if 'CLcBGAs/s1600/1.jpg' in r:
-                url = client.parseDOM(r, 'a', ret='href')[0]
+                url = client.parseDom(r, 'a', ret='href')[0]
                 self.base_link = url = urljoin(url, self.search_link % data['imdb'])
                 r = client.request(url)
-            posts = client.parseDOM(r, 'article')
+            posts = client.parseDom(r, 'article')
             if not posts:
                 if 'tvshowtitle' in data:
                     url = urljoin(self.base_link, self.search_link % (cleantitle.geturl(title).replace('-','+') + '+' + hdlr))
                     r = client.request(url, headers={'User-Agent': client.agent()})
-                    posts += client.parseDOM(r, 'article')
+                    posts += client.parseDom(r, 'article')
                     url = urljoin(self.base_link, self.search_link % cleantitle.geturl(title).replace('-','+'))
                     r = client.request(url, headers={'User-Agent': client.agent()})
-                    posts += client.parseDOM(r, 'article')
+                    posts += client.parseDom(r, 'article')
 
             if not posts: return sources
             for post in posts:
                 try:
-                    t = client.parseDOM(post, 'img', ret='title')[0]
-                    u = client.parseDOM(post, 'a', ret='href')[0]
+                    t = client.parseDom(post, 'img', ret='title')[0]
+                    u = client.parseDom(post, 'a', ret='href')[0]
                     s = re.search('((?:\d+\.\d+|\d+\,\d+|\d+)\s*(?:GiB|MiB|GB|MB))', post)
                     s = s.groups()[0] if s else '0'
                     items += [(t, u, s, post)]
@@ -121,10 +121,10 @@ class source:
                         pattern = '''<p>\s*%s\s*<\/p>(.+?)<\/ul>''' % hdlr.lower()
                         r = re.search(pattern, u, flags = re.I|re.S)
                         if not r: continue
-                        links = client.parseDOM(r.groups()[0], 'a', ret='href')
+                        links = client.parseDom(r.groups()[0], 'a', ret='href')
                     else:
-                        links = client.parseDOM(u, 'a', ret='href')
-                else: links = client.parseDOM(u, 'a', ret='href')
+                        links = client.parseDom(u, 'a', ret='href')
+                else: links = client.parseDom(u, 'a', ret='href')
                 for url in links:
                     valid, host = source_utils.is_host_valid(url, hostDict)
                     if not valid: continue
@@ -142,13 +142,13 @@ class source:
                         info.append(size)
                     except:
                         pass
-                        
+
                     info = ' | '.join(info)
                     sources.append({'source': host, 'quality': quality, 'language': 'en', 'url': url, 'info': info, 'direct': False, 'debridonly': False})
 
             return sources
         except:
             return sources
-                    
+
     def resolve(self, url):
         return url

@@ -59,9 +59,11 @@ class player(xbmc.Player):
         self.DBID = None
         self.imdb = None
         self.tmdb = None
+        self.tvdb = None
         self.ids = {}
         self.offset = 0
         self.getbookmark = False
+        self.resume_point = 0
 
 
 
@@ -70,45 +72,50 @@ class player(xbmc.Player):
     def run(self, title, year, season, episode, imdb, tmdb, url, meta):#: -> Any
         try:
             control.sleep(200)
-            c.log(f"[CM Debug @ 72 in player.py] inside player.run with title = {title}, year = {year}, season = {season}, episode = {episode}, imdb = {imdb}, tmdb = {tmdb}, url = {url}, meta = {meta}")
+            c.log(f"[CM Debug @ 72 in player.py] inside player.run with title = {title}, year = {year}, season = {season}, episode = {episode}, imdb = {imdb}, tmdb = {tmdb}")
 
             self.totalTime = 0
             self.currentTime = 0
-
             self.content = 'movie' if season is None or episode is None else 'episode'
-            self.getbookmark = True if self.content in ['movie','episode'] else False
+            #self.getbookmark = True if self.content in ['movie','episode'] else False
+            self.getbookmark = True
 
             self.title = title
             self.year = year
+            # TODO: Fix this, library, needs jsonrpc call
+            self.DBID = None
 
-            self.name = quote_plus(title) + quote_plus(f' ({year})') if self.content == 'movie'\
-                else quote_plus(title) + quote_plus(f' S{int(season):02d}E{int(episode):02d}')
+            if self.content == 'movie':
+                self.name = quote_plus(title) + quote_plus(f' ({year})')
+            else:
+                self.name = quote_plus(title) + quote_plus(f' S{int(season):02d}E{int(episode):02d}')
             self.name = unquote_plus(self.name)
 
             self.season = f'{int(season):01d}' if self.content == 'episode' else None
             self.episode = f'{int(episode):01d}' if self.content == 'episode' else None
 
-            self.DBID = None
-            self.imdb = imdb if imdb is not None else '0'
-            self.tmdb = tmdb if tmdb is not None else '0'
-            #self.ids = {'imdb': self.imdb, 'tmdb': self.tmdb}
-            #self.ids = dict((k,v) for k, v in six.iteritems(self.ids) if not v == '0')
+            self.imdb = meta['imdb_id'] if imdb is None and 'imdb_id' in meta else imdb
+            self.tmdb = meta['tmdb_id'] if tmdb is None and 'tmdb_id' in meta else tmdb
+            self.tvdb = meta['tvdb_id'] if 'tvdb_id' in meta else None
+
+            self.ids = {'imdb': self.imdb, 'tmdb': self.tmdb, 'tvdb': self.tvdb}
             self.ids = dict((k,v) for k, v in self.ids.items() if not v == '0')
+
             self.duration = int(meta.get('duration', 0))
-            c.log(f"[CM Debug @ 96 in player.py] duration = {self.duration} with title = {self.title}")
 
-            c.log(f"[CM Debug @ 93 in player.py] self.content = {self.content}")
+            if 'resume_point' in meta:
+                self.resume_point = meta['resume_point']  # in %
+            elif 'offset' in meta:
+                self.offset = meta['offset'] # in seconds
+            else:
+                self.offset = bookmarks.get(self.content, imdb=self.imdb, tmdb=self.tmdb)
 
-            self.offset = bookmarks.get(self.content, imdb=self.imdb, tmdb=self.tmdb)
-            c.log(f"[CM Debug @ 102 in player.py] self.offset = {self.offset} with title = {self.title}")
-            #beware, new offset is in percentage of total playing time
-            #offset = float((self.duration * self.offset) / 100)
-            offset = float((self.duration/100) * float(self.offset))
-            self.offset = offset
+            if self.resume_point:
+                self.offset: float = (float(self.resume_point)/100) * float(self.duration)
+            else:
+                self.offset = float((self.duration/100) * float(self.offset))
 
-            c.log(f"[CM Debug @ 106 in player.py] offset = {self.offset} with title = {self.title}")
-
-            poster, thumb, fanart, clearlogo, clearart, discart, meta = self.getMeta(meta)
+            poster, thumb, fanart, clearlogo, clearart, discart, meta = self.getMetaArt(meta)
 
             item = control.item(path=url)
             if self.content == 'movie':
@@ -144,7 +151,7 @@ class player(xbmc.Player):
             #c.log(f'player_fail, error = {e}')
             #return
 
-    def getMeta(self, meta):
+    def getMetaArt(self, meta):
 
         try:
             poster = meta.get('poster')
@@ -155,6 +162,21 @@ class player(xbmc.Player):
             discart = meta.get('discart', '')
 
             return poster, thumb, fanart, clearlogo, clearart, discart, meta
+        except:
+            pass
+
+
+    def getMeta(self, meta):
+
+        try:
+            poster = meta.get('poster')
+            thumb = meta.get('thumb') or poster
+            fanart = meta.get('fanart')
+            clearlogo = meta.get('clearlogo', '')
+            clearart = meta.get('clearart', '')
+            discart = meta.get('discart', '')
+
+            #return poster, thumb, fanart, clearlogo, clearart, discart, meta
         except:
             pass
 
@@ -377,6 +399,7 @@ class player(xbmc.Player):
                     self.currentTime = self.getTime()
 
                     watcher = self.currentTime / self.totalTime >= .92
+                    c.log(f"[CM Debug @ 412 in player.py] episode watcher: {watcher}")
                     _property = control.window.getProperty(pname)
 
                     if watcher is True and not _property == '7':
@@ -439,9 +462,9 @@ class player(xbmc.Player):
                     label = f"{int(hours):02d}:{int(minutes):02d}:{int(seconds):02d}"
                     label = c.lang(32350) % label
                     if control.setting('bookmarks') == 'true' and trakt.getTraktCredentialsInfo() is True:
-                        yes = control.yesnoDialog(label + '[CR][I]Trakt sync is enabled [scrobble][/I] ', heading=c.lang(13404)) #RESUME
+                        yes = control.yesnoDialog(label + '[CR][I]Trakt sync is enabled [scrobble][/I] ', heading=c.lang(32344)) #RESUME
                     else:
-                        yes = control.yesnoDialog(label, heading=c.lang(13404))
+                        yes = control.yesnoDialog(label, heading=c.lang(32344)) #RESUME
                     if yes:
                         self.seekTime(float(self.offset))
                     if not yes:
@@ -465,36 +488,42 @@ class player(xbmc.Player):
             return
 
         if self.getbookmark is True:
+            c.log(f"[CM Debug @ 501 in player.py] reset bookmarks with action = {action}. self.currentTime = {self.currentTime}, self.totalTime = {self.totalTime}, self.content = {self.content}, self.imdb = {self.imdb}, self.season = {self.season}, self.episode = {self.episode}")
             bookmarks.reset(self.currentTime, self.totalTime, self.content, self.imdb, self.season, self.episode)
 
         if (trakt.getTraktCredentialsInfo() is True and control.setting('trakt.scrobble') == 'true'):
             if action is not None:
+                c.log(f"[CM Debug @ 506 in player.py] scrobbling to trakt: {action} with self.currentTime = {self.currentTime}, self.totalTime = {self.totalTime}, self.content = {self.content}, self.imdb = {self.imdb}, self.season = {self.season}, self.episode = {self.episode}")
                 bookmarks.set_scrobble(self.currentTime, self.totalTime, self.content, self.imdb, self.season, self.episode, action)
 
         if float(self.currentTime / self.totalTime) >= 0.92:
             self.libForPlayback()
 
-            control.refresh()
+        control.refresh()
 
 
 
     def onPlayBackResumed(self):
+        c.log(f"[CM Debug @ 517 in player.py] onPlayBackResumed with self.currentTime = {self.currentTime}, self.totalTime = {self.totalTime}")
         self.update_time('start')
 
     def onPlayBackPaused(self):
+        c.log(f"[CM Debug @ 520 in player.py] onPlayBackPaused with self.currentTime = {self.currentTime}, self.totalTime = {self.totalTime}")
         self.update_time('pause')
 
-
     def onPlayBackStopped(self):
+        c.log(f"[CM Debug @ 526 in player.py] onPlayBackStopped with self.currentTime = {self.currentTime}, self.totalTime = {self.totalTime}")
         self.update_time('stop')
 
     def onPlayBackEnded(self):
+        c.log(f"[CM Debug @ 520 in player.py] onPlayBackEnded with self.currentTime = {self.currentTime}, self.totalTime = {self.totalTime}")
         self.update_time('stop')
 
     def onPlayBackSeek(self, time, seekOffset):
+        c.log(f"[CM Debug @ 533 in player.py] onPlayBackSeek with time = {time}, seekOffset = {seekOffset}")
         secs_time = float(time/60)
         secs_seekOffset = float(seekOffset/60)
-        c.log(f"[CM Debug @ 489 in player.py] time = {time}, seekOffset = {seekOffset}")
+        c.log(f"[CM Debug @ 537 in player.py] time = {secs_time}, seekOffset = {secs_seekOffset}")
 
 
 

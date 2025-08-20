@@ -25,6 +25,7 @@ from . import utils
 from . import cache
 from . import keys
 from .crewruntime import c
+from .listitem import ListItemInfoTag
 
 
 class trailers:
@@ -156,18 +157,33 @@ class trailers:
             c.log(f"[CM Debug @ 140 in trailer.py] result = {repr(result)}")
 
             url = result['video']
+
+            c.log(f"[CM Debug @ 160 in trailer.py] url = {url}")
             #if 'youtube' in url:
                 #url = self.get_youtube_link(url)
             title = result['title']
+            c.log(f"[CM Debug @ 164 in trailer.py] title = {title}")
             plot = result['plot']
             #icon = result['video']
             poster = self.poster
             fanart = self.fanart
 
             item = control.item(label=title, path=url)
-            item.setArt({'icon': poster, 'thumb': fanart, 'poster': poster, 'fanart': fanart})
-            item.setInfo(type='video', infoLabels={'title': title, 'plot': plot})
             item.setProperty('IsPlayable', 'true')
+
+            infolabels={'title': title, 'plot': plot}
+
+            info_tag = ListItemInfoTag(item, 'video')
+            imdb = self.imdb
+            tmdb = self.tmdb
+
+            info_tag.set_info(infolabels)
+            unique_ids = {'imdb': imdb, 'tmdb': str(tmdb)}
+            info_tag.set_unique_ids(unique_ids)
+
+            item.setArt({'icon': poster, 'thumb': fanart, 'poster': poster, 'fanart': fanart})
+            #item.setInfo()
+
             control.resolve(handle=int(sys.argv[1]), succeeded=True, listitem=item)
 
             if self.windowedtrailer == 1:
@@ -180,8 +196,8 @@ class trailers:
         except Exception as e:
             import traceback
             failure = traceback.format_exc()
-            c.log(f'[CM Debug @ 163 in trailer.py]Traceback:: {failure}')
-            c.log(f'[CM Debug @ 164 in trailer.py]Exception raised. Error = {e}')
+            c.log(f'[CM Debug @ 199 in trailer.py]Traceback:: {failure}')
+            c.log(f'[CM Debug @ 200 in trailer.py]Exception raised. Error = {e}')
 
 
 

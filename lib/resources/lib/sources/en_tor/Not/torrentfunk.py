@@ -95,7 +95,7 @@ class source:
             # log_utils.log('url = %s' % url, log_utils.LOGDEBUG)
 
             r = client.request(url)
-            r = client.parseDOM(r, 'table', attrs={'class': 'tmain'})[0]
+            r = client.parseDom(r, 'table', attrs={'class': 'tmain'})[0]
             links = re.findall('<a href="(/torrent/.+?)">(.+?)<', r, re.DOTALL)
 
             threads = []
@@ -126,7 +126,7 @@ class source:
             if self.hdlr not in name:
                 return
 
-            if not url.startswith('http'): 
+            if not url.startswith('http'):
                 link = urljoin(self.base_link, url)
 
             link = client.request(link)
@@ -140,7 +140,7 @@ class source:
 
             try:
                 seeders = int(re.findall('<font color=red>(.*?)</font>.+Seeds', link, re.DOTALL)[0].replace(',', ''))
-                if self.min_seeders > seeders: 
+                if self.min_seeders > seeders:
                     return
             except:
                 pass

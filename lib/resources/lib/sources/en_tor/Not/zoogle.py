@@ -93,8 +93,8 @@ class source:
             self.hostDict = hostDict + hostprDict
             headers = {'User-Agent': client.agent()}
             r = client.request(url, headers=headers)
-            posts = client.parseDOM(r, 'table')
-            posts = client.parseDOM(posts, 'tr')
+            posts = client.parseDom(r, 'table')
+            posts = client.parseDom(posts, 'tr')
             threads = []
             for i in posts:
                 threads.append(workers.Thread(self._get_items, i))
@@ -107,8 +107,8 @@ class source:
 
     def _get_items(self, _html):
         try:
-            url = client.parseDOM(_html, 'a', attrs={'title': 'Magnet link'}, ret='href')[0]
-            name = client.parseDOM(_html, 'a')[0]
+            url = client.parseDom(_html, 'a', attrs={'title': 'Magnet link'}, ret='href')[0]
+            name = client.parseDom(_html, 'a')[0]
             name = ensure_text(name)
             name = re.sub('<.+?>', '', name)
             t = name.split(self.hdlr)[0]

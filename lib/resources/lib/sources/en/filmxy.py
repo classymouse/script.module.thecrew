@@ -71,18 +71,18 @@ class source:
             links = []
 
             try:
-                down = client.parseDOM(r, 'div', attrs={'id': 'tab-download'})[0]
-                down = client.parseDOM(down, 'a', ret='href')[0]
+                down = client.parseDom(r, 'div', attrs={'id': 'tab-download'})[0]
+                down = client.parseDom(down, 'a', ret='href')[0]
                 data = client.request(down, headers={'User-Agent': client.agent(), 'Referer': query})
-                frames = client.parseDOM(data, 'li', attrs={'class': 'signle-link'})
-                frames = [(client.parseDOM(i, 'a', ret='href')[0], client.parseDOM(i, 'span')[0]) for i in frames if i]
+                frames = client.parseDom(data, 'li', attrs={'class': 'signle-link'})
+                frames = [(client.parseDom(i, 'a', ret='href')[0], client.parseDom(i, 'span')[0]) for i in frames if i]
                 for i in frames:
                     links.append(i)
             except:
                 pass
 
             try:
-                streams = client.parseDOM(r, 'div', attrs={'id': 'tab-stream'})[0]
+                streams = client.parseDom(r, 'div', attrs={'id': 'tab-stream'})[0]
                 streams = re.findall(r'''iframe src=(.+?) frameborder''', streams.replace('&quot;', ''), re.I | re.DOTALL)
                 streams = [(i, '720p') for i in streams]
                 for i in streams:

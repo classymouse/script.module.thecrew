@@ -102,7 +102,7 @@ class source:
             html = client.request(url)
             html = html.replace('&nbsp;', ' ')
             try:
-                results = client.parseDOM(html, 'tbody')[0]
+                results = client.parseDom(html, 'tbody')[0]
             except Exception:
                 return sources
 

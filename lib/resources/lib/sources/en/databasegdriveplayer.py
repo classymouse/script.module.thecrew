@@ -57,8 +57,8 @@ class source:
                 return sources
             hostDict = hostDict + hostprDict
             html = client.request(url)
-            servers = client.parseDOM(html, 'ul', attrs={'class': 'list-server-items'})[0]
-            links = client.parseDOM(servers, 'a', ret='href')
+            servers = client.parseDom(html, 'ul', attrs={'class': 'list-server-items'})[0]
+            links = client.parseDom(servers, 'a', ret='href')
             for link in links:
                 if link.startswith('/player.php'):
                     continue
@@ -88,7 +88,7 @@ class source:
         sources = []
         try:
             html = client.request(link)
-            urls = client.parseDOM(html, 'li', ret='data-video')
+            urls = client.parseDom(html, 'li', ret='data-video')
             if urls:
                 for url in urls:
                     url = url.replace('vidcloud.icu', 'vidembed.io').replace(
@@ -103,4 +103,3 @@ class source:
         except Exception:
             #log_utils.log('vidembed', 1)
             return sources
-

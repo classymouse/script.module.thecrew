@@ -16,13 +16,15 @@
 
 import re
 
-try: from urlparse import parse_qs, urljoin
-except ImportError: from urllib.parse import parse_qs, urljoin
-try: from urllib import urlencode, quote_plus, unquote
-except ImportError: from urllib.parse import urlencode, quote_plus, unquote
+from urllib.parse import parse_qs, urljoin, urlencode, quote_plus, unquote
 
-from resources.lib.modules import cleantitle, debrid, source_utils
+from resources.lib.modules import debrid
+from resources.lib.modules import cleantitle
 from resources.lib.modules import client
+from resources.lib.modules import source_utils
+
+from resources.lib.modules.crewruntime import c
+
 
 
 class source:
@@ -61,6 +63,24 @@ class source:
         except:
             return
 
+    def extract_size(self, getsize):
+        try:
+            size = re.findall(r'((?:\d+\,\d+\.\d+|\d+\.\d+|\d+\,\d+|\d+)\s*(?:GiB|MiB|GB|MB))', getsize)[0]
+            div = 1 if size.endswith('GB') else 1024
+            size = float(re.sub(r'[^0-9|/.|/,]', '', size.replace(',', '.'))) / div
+            return '%.2f GB' % size
+        except BaseException:
+            return '0'
+
+    def process_link(self, link, data, getsize):
+
+        url = unquote(link)
+        url = url.split('url=')[1].split('&tr=')[0].replace('%28', '(').replace('%29',')')
+        quality, info = source_utils.get_release_quality(data)
+        info.append(self.extract_size(getsize))
+        info = ' | '.join(info)
+        return {'source': 'Torrent', 'quality': quality, 'language': 'en', 'url': url, 'info': info, 'direct': False, 'debridonly': True}
+
     def sources(self, url, hostDict, hostprDict):
         sources = []
         try:
@@ -84,43 +104,23 @@ class source:
             url = self.search_link % quote_plus(query)
             url = urljoin(self.base_link, url).replace('++', '+')
 
-            try:
-                r = client.request(url)
-                posts = client.parseDOM(r, 'tbody')[0]
-                posts = client.parseDOM(posts, 'tr')
-                for post in posts:
-                    links = re.compile('<a href="(/torrent_details/.+?)">\n<span>(.+?)</span>').findall(post)
-                    for link, data in links:
-                        if hdlr not in data:
-                            continue
-                        link = urljoin(self.base_link, link)
-                        if any(x in link for x in ['FRENCH', 'Ita', 'ITA', 'italian', 'Tamil', 'TRUEFRENCH', '-lat-', 'Dublado', 'Dub', 'Rus', 'Hindi']):
-                                continue
-                        link = client.request(link)
-                        getsize = re.findall('Size&nbsp;(.+?)&nbsp', link, re.DOTALL)[0]
-                        try:
-                            size = re.findall('((?:\d+\,\d+\.\d+|\d+\.\d+|\d+\,\d+|\d+)\s*(?:GiB|MiB|GB|MB))', getsize)[0]
-                            div = 1 if size.endswith('GB') else 1024
-                            size = float(re.sub(r'[^0-9|/.|/,]', '', size.replace(',', '.'))) / div
-                            size = '%.2f GB' % size
-                        except BaseException:
-                            size = '0'
-                        link = re.findall('<a href="(https:.+?)"', link, re.DOTALL)
-                        for url in link:
-                            try: url = unquote(url).decode('utf8')
-                            except: pass
-                            url = url.split('url=')[1].split('&tr=')[0].replace('%28', '(').replace('%29',')')
-                            quality, info = source_utils.get_release_quality(data)
-                            info.append(size)
-                            info = ' | '.join(info)
-                            sources.append(
-                                {'source': 'Torrent', 'quality': quality, 'language': 'en', 'url': url, 'info': info,
-                                 'direct': False, 'debridonly': True})
-            except:
-                return
-            return sources
+            r = client.request(url)
+            posts = client.parseDOM(r, 'tbody')[0]
+            posts = client.parseDOM(posts, 'tr')
+            for post in posts:
+                links = re.compile('<a href="(/torrent_details/.+?)">\n<span>(.+?)</span>').findall(post)
+                for link, data in links:
+                    if hdlr not in data:
+                        continue
+                    link = urljoin(self.base_link, link)
+                    if any(x in link for x in ['FRENCH', 'Ita', 'ITA', 'italian', 'Tamil', 'TRUEFRENCH', '-lat-', 'Dublado', 'Dub', 'Rus', 'Hindi']):
+                        continue
+                    link = client.request(link)
+                    getsize = re.findall('Size&nbsp;(.+?)&nbsp', link, re.DOTALL)[0]
+                    sources.append(self.process_link(link, data, getsize))
         except:
             return sources
+        return sources
 
     def resolve(self, url):
         return url

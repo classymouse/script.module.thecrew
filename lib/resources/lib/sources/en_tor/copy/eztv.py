@@ -91,7 +91,7 @@ class source:
             html = client.request(url)
 
             try:
-                results = client.parseDOM(html, 'table', attrs={'class': 'forum_header_border'})
+                results = client.parseDom(html, 'table', attrs={'class': 'forum_header_border'})
                 for result in results:
                     if 'magnet:' in result:
                         results = result

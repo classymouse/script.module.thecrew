@@ -64,7 +64,7 @@ class source:
             html = client.request(url)
 
             try:
-                results = client.parseDOM(html, 'div', attrs={'class': 'row'})[2]
+                results = client.parseDom(html, 'div', attrs={'class': 'row'})[2]
             except Exception:
                 return sources
 
@@ -87,7 +87,7 @@ class source:
 
                     response = client.request(link)
                     try:
-                        entries = client.parseDOM(response, 'div', attrs={'class': 'modal-torrent'})
+                        entries = client.parseDom(response, 'div', attrs={'class': 'modal-torrent'})
                         for torrent in entries:
                             link, name = re.findall('href="magnet:(.+?)" class="magnet-download download-torrent magnet" title="(.+?)"', torrent, re.DOTALL)[0]
                             link = 'magnet:%s' % link

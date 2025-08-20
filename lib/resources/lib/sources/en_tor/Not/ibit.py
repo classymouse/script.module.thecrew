@@ -86,8 +86,8 @@ class source:
 
             try:
                 r = client.request(url)
-                posts = client.parseDOM(r, 'tbody')[0]
-                posts = client.parseDOM(posts, 'tr')
+                posts = client.parseDom(r, 'tbody')[0]
+                posts = client.parseDom(posts, 'tr')
                 for post in posts:
                     links = re.findall('<a href="(/torrent/.+?)" title="(.+?)"', post, re.DOTALL)
                     for link, data in links:

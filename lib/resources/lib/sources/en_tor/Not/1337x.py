@@ -118,8 +118,8 @@ class source:
         try:
             headers = {'User-Agent': client.agent()}
             r = client.request(url, headers=headers)
-            posts = client.parseDOM(r, 'tbody')[0]
-            posts = client.parseDOM(posts, 'tr')
+            posts = client.parseDom(r, 'tbody')[0]
+            posts = client.parseDom(posts, 'tr')
             for post in posts:
                 data = dom.parse_dom(post, 'a', req='href')[1]
                 link = urljoin(self.base_link, data.attrs['href'])
@@ -155,7 +155,7 @@ class source:
             info.append(item[2])
             info = ' | '.join(info)
             data = client.request(item[1])
-            data = client.parseDOM(data, 'a', ret='href')
+            data = client.parseDom(data, 'a', ret='href')
             url = [i for i in data if 'magnet:' in i][0]
             url = url.split('&tr')[0]
 
