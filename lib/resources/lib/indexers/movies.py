@@ -22,6 +22,8 @@ import json
 
 from urllib.parse import quote_plus, parse_qsl, urlparse, urlsplit, urlencode
 import sqlite3 as database
+
+from sqlite3 import OperationalError
 #from bs4 import BeautifulSoup
 
 import concurrent.futures
@@ -106,7 +108,8 @@ class movies:
         ######
         # tmdb
         self.person_link = (f'{self.tmdb_link}search/person?api_key={self.tmdb_user}&query=%s&include_adult=false&language=en-US&page=1')
-        self.persons_link = (f'{self.tmdb_link}person/%s?api_key={self.tmdb_user}&?language=en-US')
+        self.person_search_link = (f'{self.tmdb_link}person/%s?api_key={self.tmdb_user}&?language=en-US')
+        self.persons_link = f'{self.tmdb_link}person/popular?api_key={self.tmdb_user}&language=en-US&page=1'
         self.personlist_link = (f'{self.tmdb_link}trending/person/day?api_key={self.tmdb_user}&language=en-US')
         self.personmovies_link = (f'{self.tmdb_link}person/%s/movie_credits?api_key={self.tmdb_user}&language=en-US')
 
@@ -401,21 +404,7 @@ class movies:
 
 
     def search(self):
-        """
-        Executes a search operation for TV shows.
-
-        This function connects to a database to retrieve stored search terms
-        and displays them as directory items. If there are stored search terms,
-        an additional option to clear the search cache is added. The function
-        also ensures that the necessary database table exists.
-
-        The search terms are fetched from the 'tvshow' table in descending
-        order of their ID. Each unique term is added to a navigation directory
-        with an associated context menu item to delete the term.
-
-        Raises:
-            Exception: If there is an error creating the database table.
-        """
+        """Executes a search operation for TV shows."""
 
         dbcon = database.connect(control.searchFile)
         dbcur = dbcon.cursor()
@@ -423,31 +412,39 @@ class movies:
         navigator.navigator.addDirectoryItem(32603, 'movieSearchnew', 'search.png', 'DefaultMovies.png')
 
         try:
-            dbcur.execute("""CREATE TABLE IF NOT EXISTS movies (
-                                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                                term TEXT
-                            )""")
-        except Exception:
-            pass
+            sql = "SELECT count(*) as aantal FROM sqlite_master WHERE type='table' AND name='movies'"
+            dbcur.execute(sql)
+            dbcon.commit()
+            if dbcur.fetchone()[0] == 0:
+                # table does not exist
+                sql = "CREATE TABLE movies (id INTEGER PRIMARY KEY AUTOINCREMENT, term TEXT)"
+                dbcur.execute(sql)
+            dbcon.commit()
+        except OperationalError as e:
+            c.log(f"[CM Debug @ 422 in movies.py] OperationalError in movies.search, {e}", 1)
+
 
         dbcur.execute("SELECT * FROM movies ORDER BY id DESC")
+        dbcon.commit()
+        cm = []
 
         search_terms = []
         context_menu_items = []
+        rows = dbcur.fetchall()
         delete_option = False
-        for (id, term) in dbcur.fetchall():
+        for _id, term in rows:
             if term not in search_terms:
                 delete_option = True
-                context_menu_items.append((32070, f'movieDeleteTerm&id={id}'))
+                cm = ((32070, f'movieDeleteTerm&id={_id}'))
+
                 navigator.navigator.addDirectoryItem(
-                    term,
+                    f'{term}',
                     f'movieSearchterm&name={term}',
                     'search.png',
                     'DefaultTVShows.png',
-                    context=context_menu_items
+                    context=cm,
                 )
                 search_terms.append(term)
-
         dbcur.close()
 
         if delete_option:
@@ -551,7 +548,7 @@ class movies:
 
             search_query = search_query.lower()
             clean_search_query = utils.title_key(search_query)
-            url = self.person_link % quote_plus(clean_search_query)
+            url = self.person_search_link % quote_plus(clean_search_query)
             c.log(f"[CM Debug @ 427 in movies.py] url = {url}")
             self.persons(url)
 
@@ -682,11 +679,14 @@ class movies:
         return self.list
 
     def persons(self, url):
+        c.log(f"[CM Debug @ 682 in movies.py] url = {url}")
         if url is None:
             #self.list = cache.get(self.tmdb_person_list, 24, self.personlist_link)
-            self.tmdb_person_list(self.personlist_link)
+            # self.tmdb_person_list(self.personlist_link)
+            self.tmdb_person_list(self.persons_link)
         else:
-            self.list = cache.get(self.tmdb_person_list, 1, url)
+            # self.list = cache.get(self.tmdb_person_list, 1, url)
+            self.list = cache.get(self.tmdb_person_list, 0, url)
 
         #for i in range(0, len(self.list)):
             #self.list[i].update({'action': 'movies'})
@@ -956,14 +956,6 @@ class movies:
         return self.list
 
 
-
-
-
-
-
-
-
-
     ####cm#
     # new def for tmdb lists
     def list_tmdb_list(self, url, tid=0):
@@ -1074,14 +1066,8 @@ class movies:
         return self.list
 
     def movie_progress_list(self)-> list:
-        """
-        Return a list of dictionaries containing information about the user's
-        movie progress on trakt.tv. The dictionary contains the following keys:
-        title, imdb, tmdb, tvdb, trakt, season, episode, resume_point, year
-
-        :return: A list of dictionaries containing movie progress info
-        :rtype: list
-        """
+        """Return a list of dictionaries containing information about the user's
+        movie progress on trakt.tv."""
 
         try:
             progress = trakt.get_trakt_progress('movie')
@@ -1174,6 +1160,7 @@ class movies:
             c.log(f"[CM Debug @ 972 in movies.py] item = {item}")
 
     def tmdb_list(self, url, tid=0):
+        """Retrieves and processes a list of movies from a TMDB list URL."""
         try:
             if int(tid) > 0:
                 url = url % tid
@@ -1248,7 +1235,7 @@ class movies:
                 else:
                     image = c.addon_poster
                 url = self.personmovies_link % _id
-                self.list.append({'name': name, 'url': url, 'image': image, 'poster': image})
+                self.list.append({'name': name, 'url': url, 'image': image, 'poster': image, 'thumb': image})
             except Exception:
                 pass
 

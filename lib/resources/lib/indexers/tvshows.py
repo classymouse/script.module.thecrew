@@ -23,6 +23,7 @@ import json
 import concurrent.futures
 
 import sqlite3 as database
+from sqlite3 import OperationalError
 from urllib.parse import quote, quote_plus, parse_qsl, urlparse, urlsplit, urlencode
 
 
@@ -269,21 +270,7 @@ class tvshows:
 
 #TC 2/01/19 started
     def search(self):
-        """
-        Executes a search operation for TV shows.
-
-        This function connects to a database to retrieve stored search terms
-        and displays them as directory items. If there are stored search terms,
-        an additional option to clear the search cache is added. The function
-        also ensures that the necessary database table exists.
-
-        The search terms are fetched from the 'tvshow' table in descending
-        order of their ID. Each unique term is added to a navigation directory
-        with an associated context menu item to delete the term.
-
-        Raises:
-            Exception: If there is an error creating the database table.
-        """
+        """Executes a search operation for TV shows."""
 
         dbcon = database.connect(control.searchFile)
         dbcur = dbcon.cursor()
@@ -291,28 +278,31 @@ class tvshows:
         navigator.navigator.addDirectoryItem(32603, 'tvSearchnew', 'search.png', 'DefaultTVShows.png')
 
         try:
-            dbcur.execute("""CREATE TABLE IF NOT EXISTS tvshow (
-                                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                                term TEXT
-                            )""")
-        except Exception:
-            pass
+            sql = "SELECT count(*) as aantal FROM sqlite_master WHERE type='table' AND name='tvshow'"
+            dbcur.execute(sql)
+            dbcon.commit()
+            if dbcur.fetchone()[0] == 0:
+                sql = 'CREATE TABLE tvshow (id INTEGER PRIMARY KEY AUTOINCREMENT, term TEXT)'
+            dbcur.execute(sql)
+        except OperationalError as e:
+            c.log(f"[CM Debug @ 422 in movies.py] OperationalError in movies.search, {e}", 1)
 
         dbcur.execute("SELECT * FROM tvshow ORDER BY id DESC")
 
         search_terms = []
-        context_menu_items = []
+        cm = []
         delete_option = False
-        for (id, term) in dbcur.fetchall():
+        rows = dbcur.fetchall()
+        for _id, term in rows:
             if term not in search_terms:
                 delete_option = True
-                context_menu_items.append((32070, f'tvDeleteTerm&id={id}'))
+                cm = ((32070, f'tvDeleteTerm&id={_id}'))
                 navigator.navigator.addDirectoryItem(
                     term,
                     f'tvSearchterm&name={term}',
                     'search.png',
                     'DefaultTVShows.png',
-                    context=context_menu_items
+                    context=cm
                 )
                 search_terms.append(term)
 

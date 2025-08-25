@@ -637,13 +637,12 @@ class Navigator:
             if isinstance(context, list):
                 context = context[0]
 
+            if isinstance(context[0], str):
+                cm.append((context[0], f'RunPlugin({sysaddon}?action={context[1]})'))
+            else:
+                cm.append((control.lang(context[0]), f'RunPlugin({sysaddon}?action={context[1]})'))
 
-            cm.append(
-                (
-                    control.lang(context[0]),
-                    f'RunPlugin({sysaddon}?action={context[1]})',
-                )
-            )
+
 
         item = control.item(label=name)
         item.addContextMenuItems(cm)
