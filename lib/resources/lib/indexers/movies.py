@@ -144,7 +144,7 @@ class movies:
 
 
         self.halloween_link = f'{self.tmdb_link}discover/movie?api_key={self.tmdb_user}&with_genres=27&language=en-US&sort_by=popularity.desc&page=1'
-        self.halloween_fun_link = f'{self.trakt_link}/users/istoit/lists/halloween-fun-frights?sort=rank,asc'
+        self.halloween_fun_link = f'{self.trakt_link}/users/istoit/lists/halloween-fun-frights?sort=rank,asc/items'
 
         ###cm#
         # Trakt
@@ -192,78 +192,64 @@ class movies:
 
             # Get the netloc from the url
             parsed_url_netloc = urlparse(url).netloc.lower()#.decode('utf-8')
+            c.log(f"[CM Debug @ 195 in movies.py] url = {parsed_url_netloc}")
 
             # If the url is a trakt link and onDeck is in the url
             assert self.trakt_link is not None
             if self.trakt_link in url and url == self.onDeck_link:
-                self.on_deck_list = cache.get(self.trakt_list, 720, url, self.trakt_user)
-                self.list = []
+                # self.on_deck_list = cache.get(self.trakt_list, 720, url, self.trakt_user)
+
+
                 self.list = cache.get(self.trakt_list, 0, url, self.trakt_user)
+                c.log(f"[CM Debug @ 203 in movies.py] self.list length = {len(self.list)}")
                 self.list = sorted(self.list, key=lambda k: int(k['year']), reverse=True)
-                self.list = self.list[::-1]
-            # If the url is a trakt link and collection is in the url
+
+                # self.list = self.list[::-1]
             elif 'collection' in url:
+                c.log(f"[CM Debug @ 211 in movies.py] url = {url}")
                 self.list = self.collection_list()
                 self.list = sorted(self.list, key=lambda k: int(k['year']), reverse=False)
-            # If the url is a trakt link and movieProgress is in the url
             elif 'movieProgress' in url:
                 self.list = cache.get(self.movie_progress_list, 0)
                 self.list = sorted(self.list, key=lambda k: int(k['year']), reverse=True)
 
-            # If the url is a trakt link and users is in the url
             elif parsed_url_netloc in self.trakt_link and '/users/' in url:
                 try:
-                    if url != self.trakthistory_link and '/users/me/' in url:
-                        if trakt.getActivity() > cache.timeout(self.trakt_list, url, self.trakt_user):
-                            raise Exception()
-                        self.list = cache.get(self.trakt_list, 720, url, self.trakt_user)
-                    else:
+                    if url == self.trakthistory_link:
                         raise Exception()
+                    if trakt.getActivity() > cache.timeout(self.trakt_list, url, self.trakt_user):
+                        raise Exception()
+                    self.list = cache.get(self.trakt_list, 720, url, self.trakt_user)
                 except Exception:
                     self.list = cache.get(self.trakt_list, 6, url, self.trakt_user)
                 self.list = sorted(self.list, key=lambda k: int(k['year']), reverse=True)
 
-            # If the url is a search link
             elif parsed_url_netloc in self.search_link and '/search/movie' in url:
 
                 self.list = cache.get(self.tmdb_list, 1, url)
                 self.list = sorted(self.list, key=lambda k: int(k['year']), reverse=True)
 
-            # If the url is a trakt link and sync is in the url
             elif parsed_url_netloc in self.trakt_link and '/sync/playback/' in url:
                 self.list = self.trakt_list(url, self.trakt_user)
                 self.list = sorted(self.list, key=lambda k: int(k['paused_at']), reverse=True)
 
-            # If the url is a trakt link
             elif parsed_url_netloc in self.trakt_link:
                 #self.list = cache.get(self.trakt_list, 24, url, self.trakt_user)
                 self.list = self.trakt_list(url, self.trakt_user)
                 self.list = sorted(self.list, key=lambda k: int(k['year']), reverse=True)
 
-            # If the url is an imdb link and user is in the url
-            #elif parsed_url_netloc in self.imdb_link and ('/user/' in url or '/list/' in url):
-                #self.list = cache.get(self.imdb_list, 0, url)
-
-            # If the url is an imdb link
-            #elif parsed_url_netloc in self.imdb_link:
-                #self.list = cache.get(self.imdb_list, 24, url)
-
-            # If the url is a tmdb link and tid is greater than 0
             elif parsed_url_netloc in self.tmdb_networks_link and int(tid) > 0:
                 #self.list = cache.get(self.tmdb_list, 24, url, tid)
                 self.list = self.tmdb_list(url, tid)
 
-            # If the url is a tmdb link and user is in the url
             elif parsed_url_netloc in self.tmdb_link and ('/user/' in url or '/list/' in url):
                 self.list = cache.get(self.list_tmdb_list, 0, url)
                 self.list = sorted(self.list, key=lambda k: int(k['year']), reverse=True)
 
-            # If the url is a tmdb link and credits is in the url
             elif parsed_url_netloc in self.tmdb_link and '/movie_credits' in url:
                 self.list = cache.get(self.tmdb_cast_list, 24, url)
                 self.list = sorted(self.list, key=lambda k: int(k['year']), reverse=True)
 
-            # If the url is a tmdb link
             elif parsed_url_netloc in self.tmdb_link:
                 # self.list = cache.get(self.tmdb_list, 24, url)
                 self.list = self.tmdb_list(url)
@@ -279,7 +265,13 @@ class movies:
             # Return the list
             return self.list
         except Exception as e:
-            # Log the error
+            import traceback
+            failure = traceback.format_exc()
+            c.log(f'[CM Debug @ 262 in movies.py]Traceback:: {failure}')
+            c.log(f'[CM Debug @ 262 in movies.py]Exception raised. Error = {e}')
+            pass
+        # except Exception as e:
+        #     # Log the error
             c.log(f'Exception raised in movies.get(), error = {e}', 1)
 
 
@@ -707,48 +699,60 @@ class movies:
     def userlists(self):
         try:
             userlists = []
-            if trakt.getTraktCredentialsInfo() is False:
-                raise Exception()
-            activity = trakt.getActivity()
-        except Exception:
-            pass
+            activity = 0
+            if trakt.getTraktCredentialsInfo():
+                activity = trakt.getActivity()
 
-        try:
-            if trakt.getTraktCredentialsInfo() is False:
-                raise Exception()
             try:
-                if activity > cache.timeout(self.trakt_user_list, self.traktlists_link, self.trakt_user):
+                if not trakt.getTraktCredentialsInfo():
                     raise Exception()
-                userlists += cache.get(self.trakt_user_list, 720, self.traktlists_link, self.trakt_user)
-            except Exception:
-                userlists += cache.get(self.trakt_user_list, 0, self.traktlists_link, self.trakt_user)
-        except Exception:
-            pass
-        try:
-            self.list = []
-            if self.imdb_user == '':
-                raise Exception()
-            userlists += cache.get(self.imdb_user_list, 0, self.imdblists_link)
-        except Exception:
-            pass
-        try:
-            self.list = []
-            if trakt.getTraktCredentialsInfo() is False:
-                raise Exception()
+                try:
+                    if activity > cache.timeout(self.trakt_user_list, self.traktlists_link, self.trakt_user):
+                        raise Exception()
+                    userlists += cache.get(self.trakt_user_list, 720, self.traktlists_link, self.trakt_user)
+                except Exception:
+                    c.log(f"[CM Debug @ 713 in movies.py] Fetching user lists without timeout, link = {self.traktlists_link}, user = {self.trakt_user}")
+                    userlists += cache.get(self.trakt_user_list, 0, self.traktlists_link, self.trakt_user)
+            except Exception as e:
+                import traceback
+                failure = traceback.format_exc()
+                c.log(f'[CM Debug @ 714 in movies.py]Traceback:: {failure}')
+                c.log(f'[CM Debug @ 714 in movies.py]Exception raised. Error = {e}')
+                # pass
+            # except Exception as e:
+            #     c.log(f'[CM Debug @ 740 in movies.py]Exception raised. Error = {e}')
+            #     pass
+            # try:
+            #     self.list = []
+            #     if self.imdb_user == '':
+            #         raise Exception()
+            #     userlists += cache.get(self.imdb_user_list, 0, self.imdblists_link)
+            # except Exception:
+            #     pass
             try:
-                if activity > cache.timeout(self.trakt_user_list, self.traktlikedlists_link, self.trakt_user):
+                self.list = []
+                if trakt.getTraktCredentialsInfo() is False:
                     raise Exception()
-                userlists += cache.get(self.trakt_user_list, 720, self.traktlikedlists_link, self.trakt_user)
+                try:
+                    if activity > cache.timeout(self.trakt_user_list, self.traktlikedlists_link, self.trakt_user):
+                        raise Exception()
+                    userlists += cache.get(self.trakt_user_list, 720, self.traktlikedlists_link, self.trakt_user)
+                except Exception:
+                    userlists += cache.get(self.trakt_user_list, 0, self.traktlikedlists_link, self.trakt_user)
             except Exception:
-                userlists += cache.get(self.trakt_user_list, 0, self.traktlikedlists_link, self.trakt_user)
-        except Exception:
-            pass
+                pass
 
-        self.list = userlists
-        for i in range(len(self.list)):
-            self.list[i].update({'image': 'userlists.png', 'action': 'movies'})
-        self.addDirectory(self.list, queue=True)
-        return self.list
+            self.list = userlists
+            for i in range(len(self.list)):
+                self.list[i].update({'image': 'userlists.png', 'action': 'movies'})
+            self.addDirectory(self.list, queue=True)
+            return self.list
+        except Exception as e:
+            import traceback
+            failure = traceback.format_exc()
+            c.log(f'[CM Debug @ 744 in movies.py]Traceback:: {failure}')
+            c.log(f'[CM Debug @ 744 in movies.py]Exception raised. Error = {e}')
+            pass
 
     def trakt_list(self, url, user):
         try:
@@ -769,140 +773,147 @@ class movies:
                 c.log(f"[CM Debug @ 624 in movies.py] url = {url}")
 
             result = trakt.getTraktAsJson(u)
+            # c.log(f"[CM Debug @ 762 in movies.py] result = {result}")
 
             if not result:
-                c.log(f"[CM Debug @ 628 in movies.py] No results found for URL: {u}")
+                c.log(f"[CM Debug @ 761 in movies.py] No results found for URL: {u}")
                 c.infoDialog('No results found in Trakt List', 'Message from The Crew', sound=False)
             else:
-                c.log(f"[CM Debug @ 631 in movies.py] Found {len(result)} results for URL: {u}")
+                c.log(f"[CM Debug @ 764 in movies.py] Found {len(result)} results for URL: {u}")
 
             items = []
 
 
             if result:
-                for i in result:
-                    if 'movie' in i:
-                        items.append(i['movie'])
+                items.extend(i for i in result if 'movie' in i)
 
-            if len(items) == 0:
+            # c.log(f"[CM Debug @ 767 in movies.py] items = {items}")
+
+            if not items:
                 items = result
         except Exception as e:
             import traceback
             failure = traceback.format_exc()
-            c.log(f'[CM Debug @ 582 in movies.py]Traceback:: {failure}')
-            c.log(f'[CM Debug @ 582 in movies.py]Exception raised. Error = {e}')
+            c.log(f'[CM Debug @ 779 in movies.py]Traceback:: {failure}')
+            c.log(f'[CM Debug @ 780 in movies.py]Exception raised. Error = {e}')
             return
-        #except Exception as e:
-        #    c.log(f'Exception in movies.trakt_list 0. Error = {e}')
-        #    return
+
+
+        c.log(f"[CM Debug @ 788 in movies.py] len items = {len(items)}")
 
         try:
-            query = dict(parse_qsl(urlsplit(url).query))
-            if not int(query['limit']) == len(items):
+            if 'page' in url:
+                query = dict(parse_qsl(urlsplit(url).query))
+                if int(query['limit']) != len(items or []):
+                    next_page_url = ''
+                else:
+                    query['page'] = str(int(query['page']) + 1)
+                    next_page_url = url.replace('?' + urlparse(url).query, '') + '?' + urlencode(query)
+            else:
+                next_page_url = ''
+
+
+        except Exception as e:
+            import traceback
+            failure = traceback.format_exc()
+            c.log(f'[CM Debug @ 798 in movies.py]Traceback:: {failure}')
+            c.log(f'[CM Debug @ 798 in movies.py]Exception raised. Error = {e}')
+
+
+        c.log(f"[CM Debug @ 798 in movies.py] next_page_url = {next_page_url}")
+
+        def add_item(item):
+            c.log('[CM Debug @ 777 in movies.py]Adding item to list (start)')
+            progress = item.get('progress', 0)
+
+            item = item.get('movie') if 'movie' in item else item
+            title = item.get('title')
+            title = client.replaceHTMLCodes(title)
+
+            year = item.get('year', '0')
+            year = re.sub(r'[^0-9]', '', str(year))
+
+            if int(year) > int((self.datetime).strftime('%Y')):
                 raise Exception()
+                #break
 
-            query['page'] = str(int(query['page']) + 1)
-            next_page_url = url.replace('?' + urlparse(url).query, '') + '?' + urlencode(query)
-        except Exception:
-            next_page_url = ''
-
-
-
-            def add_item(item):
-                c.log('[CM Debug @ 777 in movies.py]Adding item to list (start)')
-                title = item.get('title')
-                title = client.replaceHTMLCodes(title)
-
-                year = item.get('year', '0')
-                year = re.sub(r'[^0-9]', '', str(year))
-
-                if int(year) > int((self.datetime).strftime('%Y')):
-                    raise Exception()
-                    #break
-
-                imdb = item.get('ids', {}).get('imdb', '')
-                if not imdb:
-                    imdb = '0'
-                else:
-                    imdb = 'tt' + re.sub(r'[^0-9]', '', str(imdb))
-
-                tmdb = str(item.get('ids', {}).get('tmdb', '0'))
+            imdb = item.get('ids', {}).get('imdb', '')
+            imdb = 'tt' + re.sub(r'[^0-9]', '', str(imdb)) if imdb else '0'
+            tmdb = str(item.get('ids', {}).get('tmdb', '0'))
 
 
-                release_date = item.get('released', '')
-                if release_date:
-                    try:
-                        premiered = re.compile(r'(\d{4}-\d{2}-\d{2})').findall(release_date)[0]
-                    except Exception:
-                        premiered = '0'
-                else:
-                    premiered = '0'
-
-                genres = item.get('genres', [])
-                if genres:
-                    genres = ' / '.join([g.title() for g in genres])
-                else:
-                    genres = '0'
-
-                duration = item.get('runtime', '90')
-                if duration:
-                    duration = str(duration)
-
-                rating = item.get('rating', '0.0')
-                if rating and not rating == '0.0':
-                    rating = str(rating)
-
+            release_date = item.get('released', '')
+            if release_date:
                 try:
-                    num_votes = int(item['votes'])
-                    votes = f'{num_votes:,}'
-                except (KeyError, ValueError, TypeError):
-                    votes = '0'
+                    premiered = re.compile(r'(\d{4}-\d{2}-\d{2})').findall(release_date)[0]
+                except Exception:
+                    premiered = '0'
+            else:
+                premiered = '0'
 
-                if int(year) > int((self.datetime).strftime('%Y')):
-                    raise ValueError()
+            genres = item.get('genres', [])
+            genres = ' / '.join([g.title() for g in genres]) if genres else '0'
+            duration = item.get('runtime', '90')
+            if duration:
+                duration = str(duration)
 
-                mpaa = item.get('certification', '0')
-                overview = item.get('overview', c.lang(32623))
-                overview = client.replaceHTMLCodes(overview)
+            rating = item.get('rating', '0.0')
+            if rating and rating != '0.0':
+                rating = str(rating)
 
-                country_code = item.get('country_code', '0')
-                if country_code != '0':
-                    country_code = country_code.upper()
+            try:
+                num_votes = int(item['votes'])
+                votes = f'{num_votes:,}'
+            except (KeyError, ValueError, TypeError):
+                votes = '0'
 
-                tagline = item.get('tagline', '0')
-                if tagline != '0':
-                    tagline = client.replaceHTMLCodes(tagline)
+            if int(year) > int((self.datetime).strftime('%Y')):
+                raise ValueError()
 
-                paused_at = item.get('paused_at', '0') or '0'
-                paused_at = re.sub('[^0-9]+', '', paused_at)
+            mpaa = item.get('certification', '0')
+            overview = item.get('overview', c.lang(32623))
+            overview = client.replaceHTMLCodes(overview)
 
-                return({
-                    'title': title, 'originaltitle': title, 'year': year, 'premiered': premiered,
-                    'genre': genres, 'duration': duration, 'rating': rating, 'votes': votes,
-                    'mpaa': mpaa, 'plot': overview, 'tagline': tagline, 'imdb': imdb, 'tmdb': tmdb,
-                    'country': country_code, 'tvdb': '0', 'poster': '0', 'next': next_page_url,
-                    'paused_at': paused_at
-                    })
+            country_code = item.get('country_code', '0')
+            if country_code != '0':
+                country_code = country_code.upper()
+
+            tagline = item.get('tagline', '0')
+            if tagline != '0':
+                tagline = client.replaceHTMLCodes(tagline)
+
+            paused_at = item.get('paused_at', '0') or '0'
+            paused_at = re.sub('[^0-9]+', '', paused_at)
+
+            return({
+                'title': title, 'originaltitle': title, 'year': year, 'progress': progress, 'premiered': premiered,
+                'genre': genres, 'duration': duration, 'rating': rating, 'votes': votes,
+                'mpaa': mpaa, 'plot': overview, 'tagline': tagline, 'imdb': imdb, 'tmdb': tmdb,
+                'country': country_code, 'tvdb': '0', 'poster': '0', 'next': next_page_url,
+                'paused_at': paused_at
+                })
 
 
-                #workers.Thread(add_item(item)).start()
+
 
         if not items:
-            c.log(f'[CM Debug @ 891 in movies.py]ERROR :: trakt_list in movies. url = {url}. No items found')
+            c.log(f'[CM Debug @ 870 in movies.py]ERROR :: trakt_list in movies. url = {url}. No items found')
             return
 
         try:
             result = []
             aantal = len(items)
-            #with concurrent.futures.ThreadPoolExecutor(max_workers=c.max_threads(aantal)) as executor:
+            c.log(f"[CM Debug @ 874 in movies.py] aantal = {aantal}")
+
             with concurrent.futures.ThreadPoolExecutor(max_workers=c.get_max_threads(aantal, 50)) as executor:
-                #futures = {executor.submit(self.super_info, i): item for item in items}
                 futures = {executor.submit(add_item, item): item for item in items}
-                c.log(f"[CM Debug @ 742 in movies.py] futures = {futures}")
+
                 for future in concurrent.futures.as_completed(futures):
                     i = futures[future]
                     try:
-                        self.list.append(future.result())
+                        response = future.result()
+                        c.log(f"[CM Debug @ 886 in movies.py] response = {response}")
+                        self.list.append(response)
                     except Exception as exc:
                         c.log(f"Error processing item {i}: {exc}")
                     c.log(f"[CM Debug @ 750 in movies.py] result = {result}")
@@ -911,18 +922,10 @@ class movies:
             failure = traceback.format_exc()
             c.log(f'[CM Debug @ 755 in movies.py]Traceback:: {failure}')
             c.log(f'[CM Debug @ 756 in movies.py]Exception raised. Error = {e}')
-            pass
-
-
-
-
-
-
-
-
-
 
         return self.list
+
+
 
     def trakt_user_list(self, url, user):
         try:
@@ -939,12 +942,11 @@ class movies:
                 name = client.replaceHTMLCodes(name)
 
                 try:
-                    url = (trakt.slug(
-                        item['list']['user']['username']), item['list']['ids']['slug'])
+                    url = (trakt.slug(item['list']['user']['username']), item['list']['ids']['slug'])
                 except Exception:
                     url = ('me', item['ids']['slug'])
                 url = self.traktlist_link % url
-                url = url.encode('utf-8')
+                url = str(url)
 
                 self.list.append({'name': name, 'url': url, 'context': url})
             except Exception:
@@ -952,6 +954,15 @@ class movies:
 
         self.list = sorted(self.list, key=lambda k: utils.title_key(k['name']))
         return self.list
+
+
+
+
+
+
+
+
+
 
     ####cm#
     # new def for tmdb lists
@@ -1004,11 +1015,10 @@ class movies:
                 premiered = item['release_date'] or '0'
                 year = re.findall(r'(\d{4})', premiered)[0] or '0'
                 unaired = 'false'
-                if premiered != '0':
-                    if int(re.sub('[^0-9]', '', str(premiered))) > int(re.sub('[^0-9]', '', str(self.today_date))):
-                        unaired = 'true'
-                        if self.showunaired != 'true':
-                            raise ValueError()
+                if premiered != '0' and int(re.sub('[^0-9]', '', str(premiered))) > int(re.sub('[^0-9]', '', str(self.today_date))):
+                    unaired = 'true'
+                    if self.showunaired != 'true':
+                        raise ValueError()
 
                 plot = c.lang(32084) if'overview' not in item and not item['overview'] else item['overview']
                 #plot = c.lang(32084)
@@ -1033,10 +1043,20 @@ class movies:
         return self.list
 
     def collection_list(self):
-        collection = trakt.get_collection('movies')
+        # collection = trakt.get_collection('movies')
+        collection = trakt.get_collection('movies') or []
+        c.log(f"[CM Debug @ 1048 in movies.py] collection = {collection}")
+        if len(collection) == 0:
+            trakt.get_trakt_collection('movies')
+            collection = trakt.get_collection('movies') or []
+        if len(collection) == 0:
+            return
+
+        c.log(f"[CM Debug @ 1046 in movies.py] collection = {collection}")
 
         for item in collection:
             try:
+                c.log(f"[CM Debug @ 1059 in movies.py] item = {item}")
                 tmdb = str(item['tmdb'])
                 imdb = item['imdb']
                 _trakt = str(item['trakt'])
@@ -1050,7 +1070,6 @@ class movies:
                                 })
             except Exception as e:
                 c.log(f"Exception raised in collection_list() with e = {e}")
-                pass
 
         return self.list
 

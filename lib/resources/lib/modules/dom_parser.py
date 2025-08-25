@@ -1,38 +1,46 @@
-"""
-    Based on Parsedom for XBMC plugins
-    Copyright (C) 2010-2011 Tobias Ussing And Henrik Mosgaard Jensen
+# -*- coding: utf-8 -*-
 
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
+'''
+********************************************************cm*
+* The Crew Add-on
+*
+* @file dom_parser.py
+* @package script.module.thecrew
+*
+* Based on Parsedom for XBMC plugins
+* Copyright (C) 2010-2011 Tobias Ussing And Henrik Mosgaard Jensen
+*
+* @copyright (c) 2025, The Crew
+* @license GNU General Public License, version 3 (GPL-3.0)
+*
+********************************************************cm*
+'''
 
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
 
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-"""
 
 import re
-import six
+
 from collections import namedtuple
+
+from .crewruntime import c
+
+import six
 
 DomMatch = namedtuple('DOMMatch', ['attrs', 'content'])
 re_type = type(re.compile(''))
 
 
 def __get_dom_content(html, name, match):
-    if match.endswith('/>'): return ''
+    if match.endswith('/>'):
+        return ''
 
     # override tag name with tag from match if possible
-    tag = re.match('<([^\s/>]+)', match)
-    if tag: name = tag.group(1)
+    tag = re.match(r'<([^\s/>]+)', match)
+    if tag:
+        name = tag.group(1)
 
-    start_str = '<%s' % name
-    end_str = "</%s" % name
+    start_str = f'<{name}'
+    end_str = f"</{name}"
 
     # start/end tags without matching case cause issues
     start = html.find(match)
@@ -61,14 +69,15 @@ def __get_dom_content(html, name, match):
 
 def __get_dom_elements(item, name, attrs):
     if not attrs:
-        pattern = '(<%s(?:\s[^>]*>|/?>))' % name
+        pattern = f'(<{name}' + r'(?:\s[^>]*>|/?>))'
         this_list = re.findall(pattern, item, re.M | re.S | re.I)
     else:
         last_list = None
-        for key, value in six.iteritems(attrs):
+        for key, value in attrs.items():
             value_is_regex = isinstance(value, re_type)
-            value_is_str = isinstance(value, six.string_types)
-            pattern = '''(<{tag}[^>]*\s{key}=(?P<delim>['"])(.*?)(?P=delim)[^>]*>)'''.format(tag=name, key=key)
+            value_is_str = isinstance(value, str)
+            # pattern = '''(<{tag}[^>]*\s{key}=(?P<delim>['"])(.*?)(?P=delim)[^>]*>)'''.format(tag=name, key=key)
+            pattern = f'(<{name}[^>]*\s{key}=(?P<delim>["\'])(.*?)(?P=delim)[^>]*>)'
             re_list = re.findall(pattern, item, re.M | re.S | re.I)
             if value_is_regex:
                 this_list = [r[0] for r in re_list if re.match(value, r[2])]
@@ -79,7 +88,8 @@ def __get_dom_elements(item, name, attrs):
             if not this_list:
                 has_space = (value_is_regex and ' ' in value.pattern) or (value_is_str and ' ' in value)
                 if not has_space:
-                    pattern = '''(<{tag}[^>]*\s{key}=((?:[^\s>]|/>)*)[^>]*>)'''.format(tag=name, key=key)
+                    # pattern = '''(<{tag}[^>]*\s{key}=((?:[^\s>]|/>)*)[^>]*>)'''.format(tag=name, key=key)
+                    pattern = f'(<{name}' + r'(?:[^>]*\s{key}=((?:[^\s>]|/>)*)[^>]*>)'
                     re_list = re.findall(pattern, item, re.M | re.S | re.I)
                     if value_is_regex:
                         this_list = [r[0] for r in re_list if re.match(value, r[1])]
@@ -92,27 +102,32 @@ def __get_dom_elements(item, name, attrs):
                 last_list = [item for item in this_list if item in last_list]
         this_list = last_list
 
+    if this_list is None:
+        this_list = []
+
     return this_list
 
 
 def __get_attribs(element):
     attribs = {}
-    for match in re.finditer('''\s+(?P<key>[^=]+)=\s*(?:(?P<delim>["'])(?P<value1>.*?)(?P=delim)|(?P<value2>[^"'][^>\s]*))''', element):
+    for match in re.finditer(r'\s+(?P<key>[^=]+)=\s*(?:(?P<delim>["\'])(?P<value1>.*?)(?P=delim)|(?P<value2>[^"\'][^>\s]*))', element):
         match = match.groupdict()
         value1 = match.get('value1')
         value2 = match.get('value2')
         value = value1 if value1 is not None else value2
-        if value is None: continue
+        if value is None:
+            continue
         attribs[match['key'].lower().strip()] = value
     return attribs
 
 #TC 2/01/19 started
 def parse_dom(html, name='', attrs=None, req=False, exclude_comments=False):
-    if attrs is None: attrs = {}
+    if attrs is None:
+        attrs = {}
     name = name.strip()
-    if isinstance(html, six.text_type) or isinstance(html, DomMatch):
+    if isinstance(html, (str, DomMatch)):
         html = [html]
-    elif isinstance(html, six.binary_type):
+    elif isinstance(html, bytes):
         try:
             html = [html.decode("utf-8")]  # Replace with chardet thingy
         except:
@@ -132,7 +147,7 @@ def parse_dom(html, name='', attrs=None, req=False, exclude_comments=False):
     if req:
         if not isinstance(req, list):
             req = [req]
-        req = set([key.lower() for key in req])
+        req = set([key.lower() if isinstance(key, str) else key for key in req])
 
     all_results = []
     for item in html:
@@ -140,6 +155,8 @@ def parse_dom(html, name='', attrs=None, req=False, exclude_comments=False):
             item = item.content
 
         if exclude_comments:
+            if isinstance(item, bytes):
+                item = item.decode("utf-8", "replace")
             item = re.sub(re.compile('<!--.*?-->', re.DOTALL), '', item)
 
         results = []

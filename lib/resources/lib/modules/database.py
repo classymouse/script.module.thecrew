@@ -13,12 +13,14 @@
 ********************************************************cm*
 '''
 
-#import sqlite3
+
+
+# pylint: disable=invalid-name,broad-except, broad-exception-caught, import-error
 
 from sqlite3 import dbapi2 as db, OperationalError
 import os
 import traceback
-#import sqlite3
+
 import xbmcvfs
 import xbmcgui
 import xbmcaddon
@@ -34,7 +36,7 @@ class CMDatabase():
         self.con = None
         self.cur = None
         self.db_file = kwargs.get('db_file', None)
-        self.table = kwargs.get('table') if kwargs.get('table') else None
+        self.table = kwargs.get('table') or None
         self._get_connection()
         self._set_settings()
 

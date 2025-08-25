@@ -1110,11 +1110,15 @@ class episodes:
             pass
 
         self.list = userlists
-        #for i in range(len(self.list)):
-            #self.list[i].update({'image': 'userlists.png', 'action': 'calendar'})
+        for x, item in enumerate(self.list):
+            c.log(f"[CM Debug @ 1114 in episodes.py] item = {item} of type {type(item)}")
+            item = dict(item)
+            #item is a dictionary so adding to a dict:
+            item['image'] = 'userlists.png'
+            item['action'] = 'calendar'
+            # self.list[x].update({'image': 'userlists.png', 'action': 'calendar'})
+            # item.update({'image': 'userlists.png', 'action': 'calendar'})
 
-        for item in self.list:
-            item.update({'image': 'userlists.png', 'action': 'calendar'})
         self.addDirectory(self.list, queue=True)
         return self.list
 
@@ -2494,8 +2498,12 @@ class episodes:
                 status = item.get('status', '0')
 
                 # !cm -warning: resume_point = percentage, float!
+                if 'resume_point' in item and item['resume_point'] not in [None, '0', 0, '0.0', 0.0]:
+                    c.log(f"[CM Debug @ 2496 in episodes.py] resume_point = {item['resume_point']} of type = {type(item['resume_point'])}")
+                else:
+                    item['resume_point'] = '0.0'
+                    c.log(f"[CM Debug @ 2496 in episodes.py] newly created resume_point = {item['resume_point']} of type = {type(item['resume_point'])}")
 
-                c.log(f"[CM Debug @ 2496 in episodes.py] resume_point = {item['resume_point']} of type = {type(item['resume_point'])}")
                 res_point = meta['resume_point'] if 'resume_point' in meta else 0
 
                 c.log(f"[CM Debug @ 2497 in episodes.py] res_point = {res_point} of type = {type(res_point)}")

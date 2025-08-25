@@ -191,6 +191,10 @@ class tvshows:
             if not u:
                 raise Exception()
 
+            if u in self.trakt_link and '/collection/' in url:
+                    self.list = cache.get(self.collection_list, 0)
+                    self.list = sorted(self.list, key=lambda k: utils.title_key(k['title']))
+
             if u in self.trakt_link and '/users/' in url:
                 try:
                     c.log(f"[CM Debug @ 211 in tvshows.py] url = {url} and tid = {tid} and idx = {idx} and create_directory = {create_directory}")
@@ -204,8 +208,6 @@ class tvshows:
                     #self.list = cache.get(self.trakt_list, 1, url, self.trakt_user)
                     self.list = cache.get(self.trakt_list, 0, url, self.trakt_user)
 
-                if '/users/me/' in url and '/collection/' in url:
-                    self.list = sorted(self.list, key=lambda k: utils.title_key(k['title']))
 
 
             elif u in self.trakt_link:
@@ -919,6 +921,38 @@ class tvshows:
 
         self.list = sorted(self.list, key=lambda k: utils.title_key(k['name']))
         return self.list
+
+
+
+
+    def collection_list(self):
+        # collection = trakt.get_collection('movies')
+        collection = trakt.get_trakt_collection('shows')
+
+        c.log(f"[CM Debug @ 1046 in movies.py] collection = {collection}")
+
+        for item in collection:
+            try:
+                tmdb = str(item['tmdb'])
+
+                imdb = item['imdb']
+                _trakt = str(item['trakt'])
+                slug = item['slug']
+                title = item['Title']
+                year = str(item['Year'])
+
+                self.list.append({
+                                'title': title, 'year': year, 'imdb': imdb, 'tmdb': tmdb,
+                                'trakt': _trakt, 'slug': slug
+                                })
+            except Exception as e:
+                c.log(f"Exception raised in collection_list() with e = {e}")
+
+        return self.list
+
+
+
+
 
     ####cm#
     # new def for tmdb lists

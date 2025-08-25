@@ -13,17 +13,22 @@
  *
  ********************************************************cm*
 '''
+# pylint: disable=invalid-name,broad-except, broad-exception-caught, import-error
 
 import os
 import sys
 import base64
 from datetime import date, datetime
-from resources.lib.modules import control
-from resources.lib.modules import trakt
-from resources.lib.modules import cache
-from resources.lib.modules import views
 
-from resources.lib.modules.crewruntime import c
+
+from ..modules.listitem import ListItemInfoTag
+
+from ..modules import control
+from ..modules import trakt
+from ..modules import cache
+from ..modules import views
+
+from ..modules.crewruntime import c
 
 
 month = int(date.today().strftime('%m'))
@@ -139,7 +144,7 @@ class Navigator:
         self.endDirectory()
 
     def mymovies(self, lite=False):
-        self.accountCheck()
+        self.account_check()
 
         if traktCredentials is True:
             self.addDirectoryItem(90050, 'movies&url=onDeck','trakt.png', 'DefaultMovies.png')
@@ -207,7 +212,7 @@ class Navigator:
 
     def mytvshows(self, lite=False):
         try:
-            self.accountCheck()
+            self.account_check()
 
             if traktCredentials is True:
                 self.addDirectoryItem(90050, 'calendar&url=onDeck', 'trakt.png', 'DefaultTVShows.png')
@@ -237,30 +242,10 @@ class Navigator:
             failure = traceback.format_exc()
             c.log(f'[CM Debug @ 228 in navigator.py]Traceback:: {failure}')
             c.log(f'[CM Debug @ 228 in navigator.py]Exception raised. Error = {e}')
-            pass
+
         #except Exception as e:
             #print("ERROR")
             #c.log(f'[Exception @ 230 in navigator.py] Error: {e}')
-
-    def get_menu_enabled(self, menu_item) -> bool:
-        # if c.get_setting(menu_item) == 'false':
-        #     return False
-        c.log(f"[CM Debug @ 248 in navigator.py] inside get_menu_enabled with menu_item = {menu_item}")
-        if not DEVMODE:
-            return True
-        if menu_item in ['navi.holidays', 'navi.halloween']:
-            # chack for date
-            #navi.holidays shows only in the month of december so check if today is in december
-            #navi.halloween shows only in the month of october so check if today is in october
-            c.log(f'[CM Debug @ 239 in navigator.py] menu_item = {menu_item} with datetime.now().month = {datetime.now().month}')
-            if menu_item == 'navi.holidays':
-                if datetime.now().month == 12:
-                    return True
-            if menu_item == 'navi.halloween':
-                if datetime.now().month == 8:
-                    return True
-        return True
-
 
 
     def tools(self):
@@ -343,31 +328,48 @@ class Navigator:
             poster, banner, fanart = c.addon_poster(), c.addon_banner(), c.addon_fanart()
 
             item = control.item(label=title)
-            item.setInfo(type='Video', infoLabels={'title': title})
-            item.setArt({
-                            'icon': poster, 'thumb': poster,
-                            'poster': poster, 'banner': banner
-                        })
+
+            info_tag = ListItemInfoTag(item, 'video')
+            infoLabels={'title': title}
+            info_tag.set_info(infoLabels)
+
+            # item.setInfo(type='Video', infoLabels={'title': title})
+            item.setArt({'icon': poster, 'thumb': poster,'poster': poster, 'banner': banner})
             item.setProperty('fanart', fanart)
 
-            control.addItem(handle=int(
-                sys.argv[1]), url=url, listitem=item, isFolder=False)
+            control.addItem(handle=int(sys.argv[1]), url=url, listitem=item, isFolder=False)
             control.content(int(sys.argv[1]), content)
             control.directory(int(sys.argv[1]), cacheToDisc=True)
-
-
             views.set_view(content, {})
         except Exception:
             return
 
-    def accountCheck(self):
+
+    def get_menu_enabled(self, menu_item) -> bool:
+        # if c.get_setting(menu_item) == 'false':
+        #     return False
+        c.log(f"[CM Debug @ 248 in navigator.py] inside get_menu_enabled with menu_item = {menu_item}")
+        if not DEVMODE:
+            return True
+        if menu_item in ['navi.holidays', 'navi.halloween']:
+            # check for date
+
+            c.log(f'[CM Debug @ 239 in navigator.py] menu_item = {menu_item} with datetime.now().month = {datetime.now().month}')
+            if menu_item == 'navi.holidays'and datetime.now().month == 12:
+                return True
+            if menu_item == 'navi.halloween' and datetime.now().month == 10:
+                return True
+        return True
+
+
+    def account_check(self) -> None:
         if traktCredentials is False and imdbCredentials is False:
             control.idle()
             control.infoDialog(control.lang(32042), sound=True, icon='WARNING')
             sys.exit()
 
-
-    def info_check(self):
+#! disbaled to be removed
+    def disabled_info_check(self):
         try:
             control.infoDialog('', control.lang(32074), time=5000, sound=False)
             return '1'
@@ -419,41 +421,6 @@ class Navigator:
 
         cache.cache_clear_all()
         control.infoDialog(control.lang(32081), sound=True, icon='INFO')
-
-
-    def addDirectoryItem(self, name, query, thumb, icon, context=None, queue=False, isAction=True, isFolder=True):
-        try:
-            name = control.lang(name)
-        except Exception:
-            pass
-
-        url = f'{sysaddon}?action={query}' if isAction is True else query
-        thumb = os.path.join(art_path, thumb) if art_path is not None else icon
-
-        cm = []
-        if queue is True:
-            cm.append((queueMenu, f'RunPlugin({sysaddon}?action=queueItem)'))
-
-        if context is not None:
-            if isinstance(context, list):
-                context = context[0]
-
-
-            cm.append(
-                (
-                    control.lang(context[0]),
-                    f'RunPlugin({sysaddon}?action={context[1]})',
-                )
-            )
-
-        item = control.item(label=name)
-        item.addContextMenuItems(cm)
-        item.setArt({'icon': thumb, 'thumb': thumb, 'fanart': addon_fanart})
-
-        if addon_fanart is not None:
-            item.setProperty('fanart', addon_fanart)
-
-        control.addItem(handle=syshandle, url=url, listitem=item, isFolder=isFolder)
 
 
     def bluehat(self):
@@ -538,9 +505,7 @@ class Navigator:
         self.endDirectory()
 
     #######
-    #
     # cm - Devs only, don't run these if you don't know what you are doing!
-    #
     #######
     def developers(self):
 
@@ -565,7 +530,9 @@ class Navigator:
         #self.addDirectoryItem('Update Sizes', 'updateSizes','main_classy.png', 'main_classy.png')
 
         self.endDirectory()
-
+    #######
+    # cm - Devs only, don't run these if you don't know what you are doing!
+    #######
 
     def orionoid(self):
         self.addDirectoryItem(32128, 'userdetailsOrion', 'orion.png', 'orion.png')
@@ -584,12 +551,12 @@ class Navigator:
         self.endDirectory()
 
     def halloween(self):
-        self.addDirectoryItem(32203, 'movies&url=halloween_fun', 'halloween.png', 'halloween.png')
-        self.addDirectoryItem(32203, 'movies&url=halloween_imdb', 'halloween.png', 'halloween.png')
-        self.addDirectoryItem(32204, 'movies&url=halloween_top_100', 'halloween.png', 'halloween.png')
-        self.addDirectoryItem(32205, 'movies&url=halloween_best', 'halloween.png', 'halloween.png')
-        self.addDirectoryItem(32206, 'movies&url=halloween_great', 'halloween.png', 'halloween.png')
-        self.addDirectoryItem(32202, 'movies&url=80be23e079cfcfed1a44d4d5c629c121?', 'halloween.png', 'halloween.png')
+        self.addDirectoryItem(32203, 'movies&url=https://api.trakt.tv/users/istoit/lists/halloween-fun-frights/items?', 'halloween.png', 'halloween.png')
+        # self.addDirectoryItem(32203, 'movies&url=halloween_imdb', 'halloween.png', 'halloween.png')
+        # self.addDirectoryItem(32204, 'movies&url=halloween_top_100', 'halloween.png', 'halloween.png')
+        # self.addDirectoryItem(32205, 'movies&url=halloween_best', 'halloween.png', 'halloween.png')
+        # self.addDirectoryItem(32206, 'movies&url=halloween_great', 'halloween.png', 'halloween.png')
+        # self.addDirectoryItem(32202, 'movies&url=80be23e079cfcfed1a44d4d5c629c121?', 'halloween.png', 'halloween.png')
 
         self.endDirectory()
 
@@ -647,6 +614,46 @@ class Navigator:
         self.addDirectoryItem('[COLOR orchid]¤ [/COLOR] [B][COLOR white]Kids Songs[/COLOR][/B] [COLOR orchid] ¤[/COLOR]', 'songs', 'kids_songs.png', 'DefaultMovies.png')
 
         self.endDirectory()
+
+
+
+
+
+
+    def addDirectoryItem(self, name, query, thumb, icon, context=None, queue=False, isAction=True, isFolder=True):
+        try:
+            name = control.lang(name)
+        except Exception:
+            pass
+
+        url = f'{sysaddon}?action={query}' if isAction else query
+        thumb = os.path.join(art_path, thumb) if art_path else icon
+
+        cm = []
+        if queue:
+            cm.append((queueMenu, f'RunPlugin({sysaddon}?action=queueItem)'))
+
+        if context:
+            if isinstance(context, list):
+                context = context[0]
+
+
+            cm.append(
+                (
+                    control.lang(context[0]),
+                    f'RunPlugin({sysaddon}?action={context[1]})',
+                )
+            )
+
+        item = control.item(label=name)
+        item.addContextMenuItems(cm)
+        item.setArt({'icon': thumb, 'thumb': thumb, 'fanart': addon_fanart})
+
+        if addon_fanart:
+            item.setProperty('fanart', addon_fanart)
+
+        control.addItem(handle=syshandle, url=url, listitem=item, isFolder=isFolder)
+
 
 #cm-changed cacheToDisc v1.2.0 bool
     def endDirectory(self, cacheToDisc=True):

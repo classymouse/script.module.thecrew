@@ -28,7 +28,7 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
 import sqlite3 as database
-from sqlite3 import OperationalError
+from sqlite3 import OperationalError,Error
 
 from . import cache
 from . import cleandate
@@ -87,8 +87,7 @@ TRAKTUSER = control.setting('trakt.user').strip()
 session = requests.Session()
 retries = Retry(total=3, backoff_factor=0.5)
 session.mount(BASE_URL, HTTPAdapter(max_retries=retries))
-
-
+ # For debug purposes only
 
 def get_trakt(url, post=None):
     """
@@ -121,13 +120,10 @@ def get_trakt(url, post=None):
 
         #response = requests.get(url, headers=headers, timeout=30) if not post else\
                     #requests.post(url, data=post, headers=headers, timeout=30)
-        response = session.get(url, headers=headers, timeout=30) if not post else\
-                    session.post(url, data=post, headers=headers, timeout=30)
-        c.log(f"[CM Debug @ 109 in trakt.py] response = {response}")
+        response = session.post(url, data=post, headers=headers, timeout=30) if post else session.get(url, headers=headers, timeout=30)
 
         response.encoding = 'utf-8'
         status_code = str(response.status_code)
-        c.log(f"[CM Debug @ 113 in trakt.py] status_code = {status_code}")
 
         if not response:
             status_code = str(response.status_code)
@@ -147,23 +143,11 @@ def get_trakt(url, post=None):
 def msg_handler(url, response, status_code, post, headers):
     if status_code in ['401', '403', '405']:
         try:
-            #c.log(f"[CM Debug @ 137 in trakt.py] trakt status = {trakt_response_codes[status_code]}")
-            oauth = urljoin(BASE_URL, '/oauth/token')
-            opost = {
-                'client_id': CLIENT_ID,
-                'client_secret': CLIENT_SECRET,
-                'redirect_uri': REDIRECT_URI,
-                'grant_type': 'refresh_token',
-                'refresh_token': control.setting('trakt.refresh')
-            }
-            response = requests.post(oauth, data=json.dumps(opost), headers=headers, timeout=30).json()
-            c.log(f"[CM Debug @ 160 in trakt.py] response of type {type(response)}\n\n{response}")
-            token, refresh = response['access_token'], response['refresh_token']
-            control.setSetting(id='trakt.token', value=token)
-            control.setSetting(id='trakt.refresh', value=refresh)
-            headers['Authorization'] = f'Bearer {token}'
-            response = requests.get(url, headers=headers, timeout=30) if not post else requests.post(
-                url, data=post, headers=headers, timeout=30)
+            _extracted_refresh_token(headers, url, post)
+            # response = requests.post(url, data=post, headers=headers, timeout=30) if post else requests.get(url, headers=headers, timeout=30)
+            # response = session.post(url, data=post, headers=headers, timeout=30) if post else session.get(url, headers=headers, timeout=30)
+            get_trakt(url, post)
+
 
         except Exception as e:
             control.infoDialog(f'Unknown Trakt Error: {e}', sound=True)
@@ -173,7 +157,7 @@ def msg_handler(url, response, status_code, post, headers):
     elif not response:# or status_code.startswith('5') and not status_code.startswith('4')
         control.infoDialog(f'Trakt Server didn\'t respond, {trakt_response_codes[status_code]}', sound=True)
         return
-    elif (response and isinstance(response, str) and '<html' in response):
+    elif isinstance(response, str) and '<html' in response:
         control.infoDialog(f'A Trakt Server Problem occurred, code: {status_code}', sound=True)
         c.log(f'A Trakt Server Problem occurred, code: {status_code}')
         return
@@ -202,6 +186,26 @@ def msg_handler(url, response, status_code, post, headers):
         return
 
 
+
+def _extracted_refresh_token(headers, url, post) -> None:
+    oauth = urljoin(BASE_URL, '/oauth/token')
+    opost = {
+        'client_id': CLIENT_ID,
+        'client_secret': CLIENT_SECRET,
+        'redirect_uri': REDIRECT_URI,
+        'grant_type': 'refresh_token',
+        'refresh_token': control.setting('trakt.refresh')
+    }
+    # response = requests.post(oauth, data=json.dumps(opost), headers=headers, timeout=30).json()
+    response = session.post(oauth, data=json.dumps(opost), headers=headers, timeout=30).json()
+    c.log(f"[CM Debug @ 160 in trakt.py] response of type {type(response)}\n\n{response}")
+    token, refresh = response['access_token'], response['refresh_token']
+    control.setSetting(id='trakt.token', value=token)
+    control.setSetting(id='trakt.refresh', value=refresh)
+    headers['Authorization'] = f'Bearer {token}'
+    return
+
+
 def getTraktAsJson(url, post=None):
     """
     Make a request to the Trakt API and return the response as a JSON string.
@@ -219,29 +223,35 @@ def getTraktAsJson(url, post=None):
     """
 
     try:
-        if post is not None:
-            result = get_trakt(url, post)
-        elif isinstance(url, str):
-            result = get_trakt(url)
+        if isinstance(url, str):
+            result = get_trakt(url, post) if post else get_trakt(url)
+            # c.log(f"[CM Debug @ 224 in trakt.py] result from url = {url} is of type {type(result)}\n\nresult = {result}")
         else:
-            result = get_trakt(url, post)
-
-        if result is not None:
-            r, res_headers = result
-            r = utils.json_loads_as_str(r)
-            if 'X-Sort-By' in res_headers and 'X-Sort-How' in res_headers:
-                r = sort_list(res_headers['X-Sort-By'], res_headers['X-Sort-How'], r)
-            return r
-        else:
-            # Handle the case where get_trakt returns None
-            c.log('getTraktAsJson Error: get_trakt returned None')
+            # c.log(f"[CM Debug @ 225 in trakt.py] url is not a string: {url}")
             return None
+
+        if result:
+            return _extracted_from_getTraktAsJson(result)
+        # Handle the case where get_trakt returns None
+        c.log('getTraktAsJson Error: get_trakt returned None')
+        return None
     except Exception as e:
         import traceback
         failure = traceback.format_exc()
         c.log(f'[CM Debug @ 225 in trakt.py]Traceback:: {failure}')
         c.log(f'[CM Debug @ 225 in trakt.py]Exception raised. Error = {e}')
         pass
+
+
+
+def _extracted_from_getTraktAsJson(result):
+    resp, res_headers = result
+    # c.log(f"[CM Debug @ 230 in trakt.py] response type: {type(resp)}\n\nresponse = {resp}")
+    # resp = utils.json_loads_as_str(resp)
+    resp = json.loads(resp) if isinstance(resp, str) else resp
+    if 'X-Sort-By' in res_headers and 'X-Sort-How' in res_headers:
+        resp = sort_list(res_headers['X-Sort-By'], res_headers['X-Sort-How'], resp)
+    return resp
     #except Exception as e:
         #c.log('getTraktAsJson Error: ' + str(e))
         #pass
@@ -464,7 +474,7 @@ def sort_list(sort_key, sort_direction, list_data) -> list:
     Returns:
         list: The sorted list of trakt items.
     """
-    reverse = False if sort_direction == 'asc' else True
+    reverse = sort_direction != 'asc'
     if sort_key == 'rank':
         return sorted(list_data, key=lambda x: x['rank'], reverse=reverse)
     elif sort_key == 'added':
@@ -492,32 +502,62 @@ def released_key(item):
     else:
         return 0
 
-def getActivity():
+def getActivity() -> int:
     try:
         i = getTraktAsJson('/sync/last_activities')
 
-        activity = []
-        activity.append(i['movies']['collected_at'])
-        activity.append(i['episodes']['collected_at'])
-        activity.append(i['movies']['watchlisted_at'])
-        activity.append(i['shows']['watchlisted_at'])
-        activity.append(i['seasons']['watchlisted_at'])
-        activity.append(i['episodes']['watchlisted_at'])
-        activity.append(i['lists']['updated_at'])
-        activity.append(i['lists']['liked_at'])
+        if i and isinstance(i, dict):
+            movies = i.get('movies', {})
+            episodes = i.get('episodes', {})
+            shows = i.get('shows', {})
+            seasons = i.get('seasons', {})
+            lists = i.get('lists', {})
+
+            activity = [
+                movies.get('collected_at', 0),
+                movies.get('watchlisted_at', 0),
+                # shows.get('collected_at', 0),
+                shows.get('watchlisted_at', 0),
+                episodes.get('collected_at', 0),
+                episodes.get('watchlisted_at', 0),
+                seasons.get('watchlisted_at', 0),
+                lists.get('updated_at', 0),
+                lists.get('liked_at', 0),
+            ]
+            activity = [int(cleandate.new_iso_to_utc(i)) for i in activity]
+            activity = sorted(activity, key=int)[-1]
+
+
+            # activity = [
+            #     # i.get('movies')['collected_at'],
+            #     # i["movies"]["collected_at"],
+            #     # i['episodes']['collected_at'],
+            #     # i['movies']['watchlisted_at'],
+            #     # i['shows']['watchlisted_at'],
+            #     *(
+            #         i['seasons']['watchlisted_at'],
+            #         # i['episodes']['watchlisted_at'],
+            #         i['lists']['updated_at'],
+            #         i['lists']['liked_at'],
+            #     ),
+            # ]
         #activity = [int(cleandate.iso_to_utc(i)) for i in activity]
-        activity = [cleandate.new_iso_to_utc(i) for i in activity]
-        activity = sorted(activity, key=int)[-1]
+            # activity = [cleandate.new_iso_to_utc(i) for i in activity]
+            # activity = sorted(activity, key=int)[-1]
+        else:
+            activity = 0
+
+        c.log(f"[CM Debug @ 551 in trakt.py] activity = {activity}")
 
         return activity
-    except:
-        pass
+    except ValueError:
+        return 0
 
 def getWatchedActivity():
     try:
         i = getTraktAsJson('/sync/last_activities')
 
-        #c.log(f"[CM Debug @ 425 in trakt.py] i = {i}")
+        c.log(f"[CM Debug @ 425 in trakt.py] i = {i}")
 
         activity = []
         activity.append(i['movies']['watched_at'])
@@ -873,7 +913,7 @@ def getEpisodeRating(imdb, season, episode):
 #
 ####################################################################################################
 sql_dict = {
-    'sql_create_movie_collection' :
+    'sql_create_movies_collection' :
         'CREATE TABLE IF NOT EXISTS movies_collection (last_collected_at TEXT, last_updated_at TEXT, Title TEXT, Year INT, trakt INT, slug TEXT, imdb TEXT, tmdb INT, UNIQUE(trakt, imdb, tmdb));',
     'sql_create_shows_collection' :
         'CREATE TABLE IF NOT EXISTS shows_collection (last_collected_at TEXT, last_updated_at TEXT, Title TEXT, Year INT, trakt INT, slug TEXT, tvdb INT, imdb TEXT, tmdb INT, tvrage TEXT, UNIQUE(trakt, tvdb, imdb, tmdb));',
@@ -883,6 +923,11 @@ sql_dict = {
         'CREATE TABLE progress (media_type text not null, trakt integer primary key, imdb text, tmdb integer, tvdb integer, showtrakt integer, showimdb text, showtmdb integer, showtvdb integer, season integer, episode integer, resume_point real, curr_time text, last_played text, resume_id integer, tvshowtitle text, title text, year integer)',
     'sql_insert_trakt_progress' :
         'INSERT OR REPLACE INTO progress (media_type, trakt, imdb, tmdb, tvdb, showtrakt, showimdb, showtmdb, showtvdb, season, episode, resume_point, curr_time, last_played, resume_id, tvshowtitle, title, year) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?, ?, ?, ?) ',
+
+
+
+    'sql_create_service' :
+        'CREATE TABLE IF NOT EXISTS service(setting TEXT, value TEXT, UNIQUE(setting));',
     'sql_update_service' :
         'UPDATE service SET value = ? where setting = ?',
 
@@ -1178,6 +1223,8 @@ def update_service(_all, _crew):
         dbcur = get_connection_cursor(dbcon)
         d = {'all':_all, 'crew_last_sync': _crew}
 
+
+
         for k,v in d.items():
             sql = sql_dict['sql_update_service']
             #sql = sql_dict['sql_update_service']
@@ -1312,6 +1359,33 @@ def _dict_factory(cursor, row):
 # end of core database functions
 
 
+def get_db_connection(file=control.traktsyncFile, return_as_dict=True):
+    """
+    Returns a database connection and cursor for the specified SQLite file.
+
+    Attempts to establish a connection and retrieve a cursor; returns (None, None) if unsuccessful.
+
+    Args:
+        file (str): Path to the SQLite database file.
+        return_as_dict (bool): If True, rows are returned as dictionaries.
+
+    Returns:
+        tuple: (database connection, database cursor) or (None, None) if connection fails.
+    """
+    try:
+        dbcon = get_connection(file, return_as_dict)
+        dbcur = get_connection_cursor(dbcon)
+
+        # check if we have a valid connection and cursor
+        if dbcur and dbcon:
+            return dbcon, dbcur
+        c.log("Error: dbcur or dbcon is None, cannot create connection")
+        return None, None
+
+    except (database.Error, database.OperationalError) as e:
+        c.log(f"Error getting database connection: {e}")
+        return None, None
+
 ####
 # start of trakt functions
 
@@ -1324,7 +1398,7 @@ def check_sync_tables():
         last_activities = getTraktAsJson('/sync/last_activities')
         c.log(f"[CM Debug @ 741 in trakt.py] last_activities = type(last_activities) = {type(last_activities)} and content = {last_activities}")
 
-        if last_activities is not None:
+        if last_activities:
             create_trakt_tables(last_activities)
         else:
             c.log("Error: last_activities is None")
@@ -1393,34 +1467,35 @@ def create_trakt_tables(last_activities):
     """
     Creates the tables in the trakt sync database if they don't exist
     """
-    dbcon = get_connection(control.traktsyncFile, return_as_dict=True)
-    dbcur = get_connection_cursor(dbcon)
-
     try:
-        for key in last_activities:
-            name = key
-            val = last_activities[key]
-            if isinstance(last_activities[key], str):
+        dbcon = get_connection(control.traktsyncFile, return_as_dict=True)
+        dbcur = get_connection_cursor(dbcon)
 
-                if not table_exists('service'):
-                    sql = "CREATE TABLE IF NOT EXISTS service(setting TEXT, value TEXT, UNIQUE(setting));"
+        if dbcur and dbcon: #check if we have a valid connection and cursor
+            for key, val in last_activities.items():
+                if isinstance(val, str):
+                    if not table_exists('service'):
+                        sql = "CREATE TABLE IF NOT EXISTS service(setting TEXT, value TEXT, UNIQUE(setting));"
+                        dbcur.execute(sql)
+
+                    sql = f"INSERT OR REPLACE INTO service Values ('{key}', '{val}')"
                     dbcur.execute(sql)
 
-                sql = f"INSERT OR REPLACE INTO service Values ('{key}', '{val}')"
-                dbcur.execute(sql)
+                elif isinstance(val, dict):
+                    if not table_exists(key):
+                        sql = f"CREATE TABLE IF NOT EXISTS {key} (setting TEXT, value TEXT, UNIQUE(setting));"
+                        dbcur.execute(sql)
 
-            elif isinstance(last_activities[key], dict):
-                if not table_exists(name):
-                    sql = f"CREATE TABLE IF NOT EXISTS '{name}' (setting TEXT, value TEXT, UNIQUE(setting));"
+                    for k, v in val.items():
+                        sql = f"INSERT OR REPLACE INTO {key} Values ('{k}', '{v}')"
+                        dbcur.execute(sql)
+
+                    timestamp = datetime.now().strftime("%Y-%m-%dT%H:%M:%S.000Z")
+                    sql = f"INSERT OR REPLACE INTO service Values ('crew_last_sync', '{timestamp}')"
                     dbcur.execute(sql)
-
-                for k in val:
-                    sql = f"INSERT OR REPLACE INTO '{name}' Values ('{k}', '{val[k]}')"
-                    dbcur.execute(sql)
-
-                timestamp = datetime.now().strftime("%Y-%m-%dT%H:%M:%S.000Z")
-                sql = f"INSERT OR REPLACE INTO service Values ('crew_last_sync', '{timestamp}')"
-                dbcur.execute(sql)
+        else:
+            c.log("Error: dbcur or dbcon is None, cannot create trakt tables")
+            return
 
     except Exception as e:
         c.log(f'Exception in create_trakt_tables(last_activities): Error = {e}')
@@ -1479,7 +1554,7 @@ def get_trakt_collection(media_type="all") -> None:
 
         if media_type in ['movies', 'all']:
             if not table_exists('movies_collection'):
-                sql = sql_dict['sql_create_movie_collection']
+                sql = sql_dict['sql_create_movies_collection']
                 dbcon = get_connection(control.traktsyncFile, return_as_dict=True)
                 dbcur = get_connection_cursor(dbcon)
                 dbcur.execute(sql)
@@ -1489,7 +1564,7 @@ def get_trakt_collection(media_type="all") -> None:
 
         if media_type in ['shows', 'all']:
             if not table_exists('shows_collection'):
-                sql = sql_dict['sql_create_tvshow_collection']
+                sql = sql_dict['sql_create_shows_collection']
                 c.log(f"[CM Debug @ 893 in trakt.py] sql is of type: {type(sql)} and = {sql}")
                 dbcon = get_connection(control.traktsyncFile, return_as_dict=True)
                 dbcur = get_connection_cursor(dbcon)
@@ -1529,10 +1604,21 @@ def get_collection(media_type, trakt_id=0, imdb_id='', tmdb_id=0):
         list: A list of rows from the database matching the specified identifiers.
     """
     try:
+
+        if media_type not in ['movies', 'shows']:
+            c.log(f"[CM Debug @ 1607 in trakt.py] media_type = {media_type}, not in ['movies', 'shows'], returning")
+            return
+        if not table_exists(f"{media_type}_collection"):
+            c.log(f"[CM Debug @ 1608 in trakt.py] table doesn't exist, creating {media_type}_collection with sql = {sql_dict[f'sql_create_{media_type}_collection']}")
+            create_table(f"{media_type}_collection", sql_dict[f"sql_create_{media_type}_collection"])
         query = []
+        media_type = media_type.lower()
+        c.log(f"[CM Debug @ 1609 in trakt.py] media_type = {media_type}, trakt_id = {trakt_id}, imdb_id = {imdb_id}, tmdb_id = {tmdb_id}")
+
 
         if trakt_id == 0 and imdb_id == '' and tmdb_id == 0:
             sql = f"SELECT * FROM {media_type}_collection"
+            c.log(f"[CM Debug @ 1614 in trakt.py] sql is of type: {type(sql)} and = {sql}")
         else:
             if trakt_id != 0:
                 query.append(f"trakt = {trakt_id}")
@@ -1545,10 +1631,24 @@ def get_collection(media_type, trakt_id=0, imdb_id='', tmdb_id=0):
         dbcon = get_connection(control.traktsyncFile, return_as_dict=True)
         dbcur = get_connection_cursor(dbcon)
         dbcur.execute(sql)
-        return dbcur.fetchall()
+        rows = dbcur.fetchall()
+
+        dbcon.commit()
+
+        if len(rows) > 0:
+            return rows
+        else:
+            return
+
+    except OperationalError as e:
+        c.log(f'Exception raised in get_collection. Error = {e}')
     except Exception as e:
         c.log(f'Exception raised in get_collection. Error = {e}')
-        raise e
+    finally:
+        dbcur.close()
+        dbcon.close()
+
+
 
 
 def get_collection_orig(media_type, trakt=0, imdb='', tmdb=0):
@@ -1626,6 +1726,7 @@ def table_exists(table_name) -> bool:
 
 def insert_collection(collection, mediatype):
     try:
+        table_name = ''
 
         if mediatype == 'movies':
             table_name = 'movies_collection'
@@ -1664,8 +1765,6 @@ def insert_collection(collection, mediatype):
 
 
 
-
-        #fore
         c.log(f"[CM Debug @ 839 in trakt.py] collection = {collection}")
         c.log(f"[CM Debug @ 839 in trakt.py] collection = {table_name}")
 
@@ -1711,10 +1810,13 @@ def get_trakt_progress(media_type: str, trakt_id: int = 0) -> list:
 
         c.log(f"[CM Debug @ 1616 in trakt.py] sql is of type: {type(sql)} and = {sql}")
 
-
         dbcur.execute(sql)
         c.log(f"[CM Debug @ 1620 in trakt.py] sql is of type: {type(sql)} and = {sql}")
-        return dbcur.fetchall()
+        rows = dbcur.fetchall()
+        dbcon.commit()
+
+        return rows
+
     except Exception as e:
         import traceback
         failure = traceback.format_exc()
