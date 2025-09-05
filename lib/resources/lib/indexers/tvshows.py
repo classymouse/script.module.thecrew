@@ -194,6 +194,7 @@ class tvshows:
 
             if u in self.trakt_link and '/collection/' in url:
                     self.list = cache.get(self.collection_list, 0)
+                    c.log(f"[CM Debug @ 197 in tvshows.py] self.list = {self.list}")
                     self.list = sorted(self.list, key=lambda k: utils.title_key(k['title']))
 
             if u in self.trakt_link and '/users/' in url:
@@ -726,8 +727,6 @@ class tvshows:
 
 
         def add_to_list(item):
-            c.log(f"[CM Debug @ 736 in tvshows.py] start add_to_list, title = {item['title']}")
-            #title = item['title']
             title = item.get('title', '')
             if title != '':
                 title = re.sub(r'\s(|[(])(UK|US|AU|\d{4})(|[)])$', '', title)
@@ -739,23 +738,20 @@ class tvshows:
                 year = re.sub('[^0-9]', '', str(year))
 
             #imdb = item['ids']['imdb'] or '0'
-            imdb = item.get('ids', {}).get('imdb', '0')
-            if imdb != '0':
-                imdb = 'tt' + re.sub('[^0-9]', '', str(imdb))
-            tmdb = item.get('ids', {}).get('tmdb', '0')
-            tvdb = item.get('ids', {}).get('tvdb', '0')
+            ids = item.get('ids', {})
+            if ids:
+                imdb = ids.get('imdb', '0')
+                if imdb != '0':
+                    imdb = 'tt' + re.sub('[^0-9]', '', str(imdb))
+                tmdb = ids.get('tmdb', '0')
+                tvdb = ids.get('tvdb', '0')
+                tmdb = str(tmdb)
+                tvdb = str(tvdb)
+            else:
+                imdb = tmdb = tvdb = '0', '0', '0'
 
-            tmdb = str(tmdb)
-            tvdb = str(tvdb)
-
-
-            #tmdb = str(item['ids']['tmdb']) or '0'
-            #tvdb = str(item['ids']['tvdb']) or '0'
-
-
-            if tmdb in dupes:
-                raise Exception()
-            dupes.append(tmdb)
+            if tmdb not in dupes:
+                dupes.append(tmdb)
 
             premiered = item.get('first_aired', '0')
 
@@ -917,12 +913,24 @@ class tvshows:
 
     def collection_list(self):
         # collection = trakt.get_collection('movies')
-        collection = trakt.get_trakt_collection('shows')
+        if not self.list:
+            self.list = []
 
+
+        collection = trakt.get_collection('movies') or []
+        c.log(f"[CM Debug @ 1048 in movies.py] collection = {collection}")
+        if len(collection) == 0:
+            trakt.get_trakt_collection('movies')
+            collection = trakt.get_collection('movies') or []
+        if len(collection) == 0:
+            return
         c.log(f"[CM Debug @ 1046 in movies.py] collection = {collection}")
+
 
         for item in collection:
             try:
+
+                c.log(f"[CM Debug @ 1059 in movies.py] item = {item}")
                 tmdb = str(item['tmdb'])
 
                 imdb = item['imdb']

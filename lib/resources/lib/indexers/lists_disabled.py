@@ -1178,7 +1178,7 @@ class indexer:
                 cm.append((control.lang(30708), 'XBMC.Action(Info)'))
 
             if (folder is False and '|regex=' not in str(i.get('url'))) or (folder is True and content in ['tvshows', 'seasons']):
-                cm.append((control.lang(30723).encode('utf-8'), 'RunPlugin(%s?action=queueItem)' % sysaddon))
+                cm.append((control.lang(30723), 'RunPlugin(%s?action=queueItem)' % sysaddon))
 
             if content == 'movies':
                 try:

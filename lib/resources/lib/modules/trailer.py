@@ -297,33 +297,66 @@ class trailers:
 
             if not trailer_list:
                 return 'empty'
+            else:
+                trailer_list.sort(reverse=True)
 
             try:
                 trailers = []
                 for t in trailer_list:
                     li = control.item(label=t['title'])
-                    #li.setArt({'icon': t['icon'], 'thumb': t['icon'], 'poster': t['icon']})
+                    # li.setProperty('IsPlayable', 'true')
                     li.setArt({'icon': t['icon'], 'thumb': t['icon'], 'poster': self.poster})
                     trailers.append(li)
+
 
                 if len(trailers) == 1:
                     return trailer_list[0]
 
-                if len(trailers) == 0:
+                if not trailers:
                     return 'empty'
 
                 select = control.selectDialog(trailers, control.lang(90220) % str(mode), useDetails=True)
 
-                if select < 0:
-                    return 'canceled'
-                return trailer_list[select]
+                return 'canceled' if select < 0 else trailer_list[select]
 
+
+
+
+                # return self.select_item(trailer_list, mode)
             except Exception as e:
-                c.log(f"[CM Debug @ 302 in trailer.py] exception: {e}")
+                import traceback
+                failure = traceback.format_exc()
+                c.log(f'[CM Debug @ 324 in trailer.py]Traceback:: {failure}')
+                c.log(f'[CM Debug @ 324 in trailer.py]Exception raised. Error = {e}')
                 pass
+            # except Exception as e:
+            #     c.log(f"[CM Debug @ 302 in trailer.py] exception: {e}")
+            #     pass
         except Exception as e:
             c.log(f"[CM Debug @ 305 in trailer.py] exception: {e}")
             pass
+
+    # TODO Rename this here and in `getSources`
+    def select_item(self, trailer_list, mode):
+        trailers = []
+        for t in trailer_list:
+            li = control.item(label=t['title'])
+            # li.setProperty('IsPlayable', 'true')
+            li.setArt({'icon': t['icon'], 'thumb': t['icon'], 'poster': self.poster})
+            trailers.append(li)
+            trailers.sort(reverse=True)
+
+        if len(trailers) == 1:
+            return trailer_list[0]
+
+        if not trailers:
+            return 'empty'
+
+        select = control.selectDialog(trailers, control.lang(90220) % str(mode), useDetails=True)
+
+        return 'canceled' if select < 0 else trailer_list[select]
+
+
     def get_youtube_link2(self, url):
         import re
         headers = {

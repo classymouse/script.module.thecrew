@@ -920,13 +920,14 @@ class indexer:
             devmode = False
 
         content_type = next((item['content'] for item in items if 'content' in item), None)
+        key = content_type if content_type is not None else 'addons'
         mode = {
             'movies': 'movies',
             'tvshows': 'tvshows',
             'seasons': 'seasons',
             'episodes': 'episodes',
             'videos': 'videos'
-        }.get(content_type, 'addons')
+        }.get(key, 'addons')
 
         for i in items:
             try:
@@ -954,18 +955,15 @@ class indexer:
             except ValueError:
                 devurl = None
 
-            if devurl == 'developer' and devmode is not True:
+            if devurl == 'developer' and not devmode:
                 continue
             poster = i['poster'] if 'poster' in i else '0'
             banner = i['banner'] if 'banner' in i else '0'
             fanart = i['fanart'] if 'fanart' in i else '0'
             if poster == '0':
                 poster = addonPoster
-            if banner == '0' and poster == '0':
-                banner = addonBanner
-            elif banner == '0':
-                banner = poster
-
+            if banner == '0':
+                banner = addonBanner if poster == '0' else poster
             content = i['content'] if 'content' in i else '0'
             folder = i['folder'] if 'folder' in i else True
             meta = dict((k,v) for k, v in i.items() if not v == '0')

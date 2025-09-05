@@ -346,20 +346,14 @@ class Navigator:
 
 
     def get_menu_enabled(self, menu_item) -> bool:
-        # if c.get_setting(menu_item) == 'false':
-        #     return False
-        c.log(f"[CM Debug @ 248 in navigator.py] inside get_menu_enabled with menu_item = {menu_item}")
-        if not DEVMODE:
+        """Checks if a menu item is enabled based on the current month and DEVMODE status."""
+        if DEVMODE:
             return True
-        if menu_item in ['navi.holidays', 'navi.halloween']:
-            # check for date
-
-            c.log(f'[CM Debug @ 239 in navigator.py] menu_item = {menu_item} with datetime.now().month = {datetime.now().month}')
-            if menu_item == 'navi.holidays'and datetime.now().month == 12:
-                return True
-            if menu_item == 'navi.halloween' and datetime.now().month == 10:
-                return True
-        return True
+        if menu_item == 'navi.holidays'and datetime.now().month == 12:
+            return True
+        if menu_item == 'navi.halloween' and datetime.now().month == 10:
+            return True
+        return False
 
 
     def account_check(self) -> None:
@@ -504,8 +498,11 @@ class Navigator:
 
         self.endDirectory()
 
+
+
     #######
-    # cm - Devs only, don't run these if you don't know what you are doing!
+    # cm - Devs only, don't run these if you don't know what you are doing! It can screw your setup up really bad!
+    # cm - Please don't ask for help if you don't know what you are doing
     #######
     def developers(self):
 
@@ -525,14 +522,13 @@ class Navigator:
         self.addDirectoryItem('Sync Progress', 'syncTrakt','main_classy.png', 'main_classy.png')
         self.addDirectoryItem(32624, 'movieProgress','main_classy.png', 'main_classy.png')
 
-        #self.addDirectoryItem('Run Startupmaintenance', 'startupMaintenance','main_classy.png', 'main_classy.png')
-        #self.addDirectoryItem('Set Sizes', 'setSizes','main_classy.png', 'main_classy.png')
-        #self.addDirectoryItem('Update Sizes', 'updateSizes','main_classy.png', 'main_classy.png')
-
         self.endDirectory()
     #######
-    # cm - Devs only, don't run these if you don't know what you are doing!
+    # cm - Devs only, don't run these if you don't know what you are doing! It can screw your setup up really bad!
+    # cm - Please don't ask for help if you don't know what you are doing!
     #######
+
+
 
     def orionoid(self):
         self.addDirectoryItem(32128, 'userdetailsOrion', 'orion.png', 'orion.png')
@@ -552,10 +548,8 @@ class Navigator:
 
     def halloween(self):
         self.addDirectoryItem(32203, 'movies&url=https://api.trakt.tv/users/istoit/lists/halloween-fun-frights/items?', 'halloween.png', 'halloween.png')
-        # self.addDirectoryItem(32203, 'movies&url=halloween_imdb', 'halloween.png', 'halloween.png')
-        # self.addDirectoryItem(32204, 'movies&url=halloween_top_100', 'halloween.png', 'halloween.png')
-        # self.addDirectoryItem(32205, 'movies&url=halloween_best', 'halloween.png', 'halloween.png')
-        # self.addDirectoryItem(32206, 'movies&url=halloween_great', 'halloween.png', 'halloween.png')
+        self.addDirectoryItem(32204, 'movies&url=https://trakt.tv/users/29zombies/lists/halloween/items?', 'halloween.png', 'halloween.png')
+        self.addDirectoryItem(32205, 'movies&url=https://api.trakt.tv/users/movistapp/lists/halloween-movies/items?', 'halloween.png', 'halloween.png')
         # self.addDirectoryItem(32202, 'movies&url=80be23e079cfcfed1a44d4d5c629c121?', 'halloween.png', 'halloween.png')
 
         self.endDirectory()

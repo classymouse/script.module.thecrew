@@ -1485,7 +1485,16 @@ class sources:
             string6 = control.lang(32606)
             string7 = control.lang(32607)
 
-            progressDialog = control.progressDialog if control.setting('progress.dialog') == '0' else control.progressDialogBG
+            c.log(f"[CM Debug @ 1488 in sources.py] progress.dialog = {c.get_setting('progress.dialog')}")
+
+            progressDialog = control.progressDialog if c.get_setting('progress.dialog') == '0' else control.progressDialogBG
+
+
+
+
+
+
+
             progressDialog.create(control.addonInfo('name'), '')
             progressDialog.update(0)
 
@@ -1498,12 +1507,10 @@ class sources:
             mainsourceDict, sourcelabelDict = self.get_movie_episode_sources(title, year, imdb, tmdb, season, episode, tvshowtitle, premiered, sourceDict, content, threads)
 
             timeout = int(control.setting('scrapers.timeout.1')) or 30
-
-            #fixed oh 27-4-2021
             quality = int(control.setting('hosts.quality')) or 0
             debrid_only = control.setting('debrid.only') or 'false'
 
-            line1 = line2 = line3 = ""
+            line1 = line2 = line3 = line4 = ''
 
             pre_emp =  control.setting('preemptive.termination')
             pre_emp_limit = int(control.setting('preemptive.limit'))
@@ -1545,7 +1552,7 @@ class sources:
                         try:
                             alive_threads = [thread for thread in threads if thread.is_alive()]
                             thread_names = [thread.getName() for thread in alive_threads]
-                            waiting_for = [sourcelabelDict[name] for name in thread_names if name in mainsourceDict]
+                            # waiting_for = [sourcelabelDict[name] for name in thread_names if name in mainsourceDict]
                             info = [sourcelabelDict[name] for name in thread_names]
 
                             #c.log(f"[CM Debug @ 1474 in sources.py] alive_threads = {alive_threads} | thread_names = {thread_names} | waiting_for = {waiting_for} | info = {info}", 1)
