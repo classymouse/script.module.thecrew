@@ -129,8 +129,8 @@ def get(media_type, imdb, tmdb=0, traktid=0, tvdb=0, season=0, episode=0, local=
     :return: The seek position in seconds for the media
     :rtype: float
     """
-    c.log(f"[CM Debug @ 129 in bookmarks.py] setting = {control.setting('bookmarks')} | local = {local} | trakt.getTraktCredentialsInfo() = {trakt.getTraktCredentialsInfo()}")
-    if control.setting('bookmarks') == 'true' and trakt.getTraktCredentialsInfo() and not local:
+    c.log(f"[CM Debug @ 129 in bookmarks.py] setting = {control.setting('bookmarks')} | local = {local} | trakt.getTraktCredentialsInfo() = {trakt.get_trakt_credentials_info()}")
+    if control.setting('bookmarks') == 'true' and trakt.get_trakt_credentials_info() and not local:
         try:
             if media_type == 'episode':
                 #trakt_info = trakt.getTraktAsJson('https://api.trakt.tv/sync/playback/episodes?extended=full')

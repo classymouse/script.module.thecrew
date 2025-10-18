@@ -71,8 +71,8 @@ action = params.get('action')
 class seasons:
     def __init__(self):
         self.list = []
-        self.speedtest = {}
-        self.speedtest['start'] = time.perf_counter()
+        self.speedtest = {'start': time.perf_counter()}
+        self.meta = {}
 
         self.session = requests.Session()
 
@@ -104,7 +104,6 @@ class seasons:
     def get(self, tvshowtitle, year, imdb, tmdb, meta=None, idx=True, create_directory=True):
         try:
             if idx is True:
-                c.log(f"[CM Debug @ 101 in episodes.py] title = {tvshowtitle}, year = {year}, imdb = {imdb}, tmdb = {tmdb}, meta = {meta}")
                 #self.list = cache.get(self.tmdb_list, 24, tvshowtitle, year, imdb, tmdb, meta)
                 self.list = self.tmdb_list(tvshowtitle, year, imdb, tmdb, meta)
                 if create_directory is True:
@@ -165,7 +164,7 @@ class seasons:
             popularity = item.get('popularity', '0')
 
             duration = item.get('episode_run_time', 45)
-            c.log(f"[CM Debug @ 164 in episodes.py] the duration of {tvshowtitle} is of type({type(duration)}) and the value is {duration}")
+            c.log(f"[CM Debug @ 167 in episodes.py] item = {repr(item)}")
             if isinstance(duration, list):
                 duration = duration[0] if len(duration) > 0 else 45
             duration = str(duration)
@@ -183,9 +182,15 @@ class seasons:
 
             cast = []
             try:
-                self.get_cast(item, cast)
+                self.get_cast(item)
             except Exception as e:
-                c.log(f"[CM Debug @ 185 in episodes.py] Exception raised in tmdb_list: {e}")
+                import traceback
+                failure = traceback.format_exc()
+                c.log(f'[CM Debug @ 188 in episodes.py]Traceback:: {failure}')
+                c.log(f'[CM Debug @ 188 in episodes.py]Exception raised. Error = {e}')
+
+            # except Exception as e:
+            #     c.log(f"[CM Debug @ 185 in episodes.py] Exception raised in tmdb_list: {e}")
             if not cast:
                 cast = '0'
 
@@ -203,14 +208,12 @@ class seasons:
             banner = clearlogo = clearart = landscape = '0'
 
             if meta:
-                c.log(f"[CM Debug @ 227 in episodes.py] meta = {meta}")
                 _meta = json.loads(unquote_plus(meta))
-                show_poster = _meta['poster'],
-                fanart = _meta['fanart'],
-                c.log(f"[CM Debug @ 238 in episodes.py] fanart = {fanart}")
-                banner = _meta['banner'],
-                clearlogo = _meta['clearlogo'],
-                clearart = _meta['clearart'],
+                show_poster = _meta['poster']
+                fanart = _meta['fanart']
+                banner = _meta['banner']
+                clearlogo = _meta['clearlogo']
+                clearart = _meta['clearart']
                 landscape = _meta['landscape']
             else:
                 poster_path = item.get('poster_path', '')
@@ -226,9 +229,7 @@ class seasons:
                 else:
                     fanart = '0'
 
-                tv_fanart = fanart_tv.get_fanart_tv_art(tvdb=tvdb_id)
-                if tv_fanart:
-
+                if tv_fanart := cache.get(fanart_tv.get_fanart_tv_art, 72, tvdb_id):
                     c.log(f"[CM Debug @ 254 in episodes.py] tv_fanart =  {type(tv_fanart)}, data = {tv_fanart}")
 
                     show_poster = tv_fanart.get('poster', '0')
@@ -317,23 +318,30 @@ class seasons:
 
         return self.list
 
-    def get_cast(self, item, cast):
-        credits_list = item.get('aggregate_credits', {}).get('cast', [])[:30]
-        for person in credits_list:
+    def get_cast(self, item):
+        """
+        Populate a TV show item with additional metadata.
+        """
+        cast_list = item.get('aggregate_credits', {}).get('cast', [])[:30]
+        cast_info = []
+        for person in cast_list:
             icon = self.tmdb_img_link % (
                 c.tmdb_profilesize, person['profile_path']
                 ) if person['profile_path'] else ''
-            cast.append({
+            cast_info.append({
                 'name': person['name'],
                 'role': person['roles'][0]['character'],
                 'thumbnail': icon
             })
-        crew_list = item.get('aggregate_credits').get('crew', [])
-        writer = [x['name'] for x in crew_list if x['jobs']['job'] == 'Writer']
-        director = [x['name'] for x in crew_list if x['jobs']['job'] == 'Director']
 
-        writer = ' / '.join(writer) if writer else '0'
-        director = ' / '.join(director) if director else '0'
+        crew_list = item.get('aggregate_credits', {}).get('crew', [])
+        writers = [x['name'] for x in crew_list if 'Writer' in x.get('jobs', [])]
+        directors = [x['name'] for x in crew_list if 'Director' in x.get('jobs', [])]
+
+        writer = ' / '.join(writers) if writers else '0'
+        director = ' / '.join(directors) if directors else '0'
+
+        return cast_info, writer, director
 
 
 
@@ -348,215 +356,14 @@ class seasons:
         return show_plot
 
     def super_info(self, i):
-        try:
-            return i
-        except Exception as e:
-            import traceback
-            failure = traceback.format_exc()
-            c.log(f'[CM Debug @ 333 in episodes.py]Traceback:: {failure}')
-            c.log(f'[CM Debug @ 333 in episodes.py]Exception raised. Error = {e}')
-            pass
-
-    def tmdb_list_backup(self, tvshowtitle, year, imdb, tmdb, meta, lite=False):
-        try:
-
-            tvdb = '0'
-            if tmdb is None:
-                tmdb = '0'
-
-            if tmdb == '0' and not imdb == '0':
-                try:
-                    url = self.tmdb_by_imdb % imdb
-                    result = self.session.get(url, timeout=15).json()
-                    _id = result.get('tv_results', [])[0]
-                    tmdb = _id.get('id')
-                    #tmdb = '0' if not tmdb else str(tmdb)
-                    tmdb = str(tmdb) if tmdb else '0'
-                except Exception:
-                    pass
-
-            if imdb == '0' or tmdb == '0' or tvdb == '0':
-                try:
-                    ids_from_trakt = cache.get(trakt.SearchTVShow, 24, tvshowtitle, year, full=False)
-                    ids_from_trakt = ids_from_trakt.get('show')
-                    if imdb == '0':
-                        imdb = ids_from_trakt.get('ids', {}).get('imdb', '0')
-                        if imdb != '0':
-                            imdb = 'tt' + re.sub('[^0-9]', '', str(imdb))
-                    if tmdb == '0':
-                        tmdb = ids_from_trakt.get('ids', {}).get('tmdb', '0')
-                        if tmdb != '0':
-                            tmdb = str(tmdb)
-                    if tvdb == '0':
-                        tvdb = ids_from_trakt.get('ids', {}).get('tvdb', '0')
-                        if tvdb != '0':
-                            tvdb = str(tvdb)
-                except Exception:
-                    pass
-
-        except Exception as e:
-            c.log(f"[CM Debug @ 158 in episodes.py] Exception raised in tmdb_list: {e}")
-            return
-        try:
-            if tmdb == '0':
-                raise Exception()
-            if self.lang == 'en':
-                item = self.session.get(
-                    self.tmdb_show_link % (tmdb, 'en'), timeout=16).json()
-            elif lite is True:
-                item = self.session.get(
-                    self.tmdb_show_lite_link % tmdb, timeout=16).json()
-            else:
-                item = self.session.get(
-                    self.tmdb_show_link % (tmdb, self.lang) + ',translations', timeout=16).json()
-
-            if item is None:
-                raise Exception()
-
-
-            c.log(f"[CM Debug @ 177 in episodes.py] item = {item}")
-
-            _seasons = item['seasons']
-
-            if self.specials == 'false':
-                _seasons = [s for s in _seasons if not s['season_number'] == 0]
-
-            studio = item['networks'][0]['name'] or '0'
-
-            genres = item['genres'] or '0'
-            if genres != '0':
-                genre = [d['name'] for d in genres]
-                genre = ' / '.join(genre)
-
-            c.log(f"[CM Debug @ 365 in episodes.py] item runtime = {item['episode_run_time']}")
-
-            duration = item['episode_run_time'][0] if 'episode_run_time' in item and item['episode_run_time'] else '45'
-            duration = str(duration)
-
-
-            m = item['content_ratings']['results'] or '0'
-            if m != '0':
-                mpaa = [d['rating'] for d in m if d['iso_3166_1'] == 'US'][0]
-            else:
-                mpaa = '0'
-
-            status = item['status'] or '0'
-
-
-            castwiththumb = []
-            try:
-                cast = item['aggregate_credits']['cast'][:30]
-                for person in cast:
-                    _icon = person['profile_path']
-                    icon = self.tmdb_img_link % (c.tmdb_profilesize, _icon) if _icon else ''
-                    castwiththumb.append(
-                        {
-                            'name': person['name'],
-                            'role': person['roles'][0]['character'],
-                            'thumbnail': icon
-                        })
-            except Exception:
-                pass
-            if not castwiththumb:
-                castwiththumb = '0'
-
-            show_plot = 'The Crew - No Plot Available' if 'overview' not in item or not item['overview'] else item['overview']
-            show_plot = client.replaceHTMLCodes(c.ensure_str(show_plot, errors='replace'))
-
-            if not self.lang == 'en' and show_plot == '0':
-                try:
-                    translations = item.get('translations', {})
-                    translations = translations.get('translations', [])
-                    show_plot = self.get_plot_fallback_item(translations)
-                except Exception:
-                    pass
-
-            unaired = ''
-
-            banner = clearlogo = clearart = landscape = '0'
-
-            if meta:
-                _meta = json.loads(unquote_plus(meta))
-                show_poster = _meta['poster'],
-                fanart = _meta['fanart'],
-                banner = _meta['banner'],
-                clearlogo = _meta['clearlogo'],
-                clearart = _meta['clearart'],
-                landscape = _meta['landscape']
-            else:
-                poster_path = item['poster_path'] if 'poster_path' in item else ''
-
-                if poster_path:
-                    show_poster = self.tmdb_img_link % (c.tmdb_postersize, poster_path)
-                else:
-                    show_poster = '0'
-
-                fanart_path = item['backdrop_path'] if 'backdrop_path' in item else ''
-
-                if fanart_path:
-                    fanart = self.tmdb_img_link % (c.tmdb_fanartsize, fanart_path)
-                else:
-                    fanart = '0'
-
-        except Exception as e:
-            c.log(f"Exception raised in tmdb_list part 2: {e}")
-            pass
-
-
-        for item in _seasons:
-            try:
-                season = str(int(item['season_number']))
-                unaired = 'false'
-
-                premiered = item.get('air_date', '0')
-                if status == 'Ended':
-                    pass
-                elif not premiered or premiered == '0':
-                    raise Exception()
-                elif int(re.sub('[^0-9]', '', str(premiered))) > int(re.sub('[^0-9]', '', str(self.today_date))):
-                    unaired = 'true'
-                    if self.showunaired != 'true':
-                        raise Exception()
-
-                plot = 'The Crew - No Plot Available' if 'overview' not in item or\
-                        not item['overview'] else item['overview']
-                plot = client.replaceHTMLCodes(c.ensure_str(plot, errors='replace'))
-
-
-                poster_path = item['poster_path'] if 'poster_path' in item else ''
-                if poster_path:
-                    poster = self.tmdb_img_link % (c.tmdb_postersize, poster_path)
-                else:
-                    poster = show_poster
-
-                self.list.append({'season': season, 'tvshowtitle': tvshowtitle,
-                                    'year': year, 'premiered': premiered, 'status': status,
-                                    'studio': studio, 'genre': genre, 'duration': duration,
-                                    'mpaa': mpaa, 'castwiththumb': castwiththumb,
-                                    'plot': plot, 'imdb': imdb, 'tmdb': tmdb,
-                                    'tvdb': tvdb, 'poster': poster, 'fanart': fanart,
-                                    'banner': banner, 'clearlogo': clearlogo,
-                                    'clearart': clearart, 'landscape': landscape,
-                                    'unaired': unaired})
-            except Exception:
-                pass
-
-        return self.list
+        """Populate a TV show item with additional metadata."""
+        # TODO add more info here, for now, just a placeholder
+        return i
 
 
 
-
-
-
-    def worker(self, level = 0):
-        """
-        Worker for episodes. This function is used in multiple places in the CM codebase.
-        It takes a list of episodes and fetches the metadata for each episode in parallel.
-        The function can be used to fetch the metadata for a list of episodes with or without info.
-        If level is 0, the function fetches all the metadata for each episode.
-        If level is 1, the function only fetches the title, year, season, episode and tvshowtitle.
-        The function returns a list of metadata for each episode.
-        """
+    def worker(self, level = 0) -> None:
+        """Worker for episodes. This function is used in multiple places."""
         try:
             total = len(self.list)
 
@@ -571,21 +378,19 @@ class seasons:
 
             try:
                 result = []
-                #cm - changed worker 21-04-2025
-                #cm - changed worker 27-04-2025 - added max threads/fixed steps
+
                 with concurrent.futures.ThreadPoolExecutor(max_workers=c.get_max_threads(total, 50)) as executor:
                     futures = {executor.submit(self.super_info, i): i for i in range(total)}
 
-                    #c.log(f"[CM Debug @ 1287 in episodes.py] futures = {futures}")
 
                     for future in concurrent.futures.as_completed(futures):
                         i = futures[future]
                         try:
                             result.append(future.result())
                             if(len(result) == total):
-                                c.log(f"[CM Debug @ 1291 in episodes.py] completed all {len(result)} futures in worker for super_info")
+                                c.log(f"[CM Debug @ 383 in episodes.py] completed all {len(result)} futures in worker for super_info")
                         except Exception as e:
-                            c.log(f"[CM Debug @ 1296 in episodes.py] Exception raised. Error = {e}")
+                            c.log(f"[CM Debug @ 385 in episodes.py] Exception raised in episodes->seasons::worker. Error = {e}")
 
                 if self.meta:
                     metacache.insert(self.meta)
@@ -607,18 +412,13 @@ class seasons:
 
     def seasonDirectory(self, items):
         try:
-
-            c.log(f"[CM Debug @ 587 in episodes.py] inside seasonDirectory, len(items) = {len(items)}")
             if items is None or len(items) == 0:
                 control.idle()
-                # sys.exit()
 
             sysaddon = sys.argv[0]
             syshandle = int(sys.argv[1])
 
-            #c.log(f"[CM Debug @ 311 in episodes.py] items = {items}")
-
-            traktCredentials = trakt.getTraktCredentialsInfo()
+            traktCredentials = trakt.get_trakt_credentials_info()
 
             try:
                 indicators = playcount.getSeasonIndicators(items[0]['imdb'])#['1']
@@ -634,56 +434,37 @@ class seasons:
             addToLibrary = control.lang(32551)
 
 
-            # changed by CM -  22-4-2021
+            # cm
             colorlist = [32589, 32590, 32591, 32592, 32593, 32594, 32595, 32596, 32597, 32598]
             colornr = colorlist[int(control.setting('unaired.identify'))]
             unairedcolor = re.sub(r"\][\w\s]*\[", "][I]%s[/I][", control.lang(int(colornr)))
 
-            # fixed by CM -  28-4-2021
             if unairedcolor == '':
                 unairedcolor = '[COLOR red][I]%s[/I][/COLOR]'
 
-            c.log(f"[CM Debug @ 622 in episodes.py] items = {items[0]}")
-
             for i in items:
                 try:
-                    c.log(f"\n\n\n[CM Debug @ 627 in episodes.py] item = {i}\n\n\n============================================\n\n\n")
                     label = (f"{labelMenu} {i['season']}")
 
-                    try:
-                        if i['unaired'] == 'true':
-                            label = unairedcolor % label
-                    except Exception:
-                        pass
+                    if 'unaired' in i and i['unaired'] == 'true':
+                        label = unairedcolor % label
 
                     systitle = sysname = quote_plus(i['tvshowtitle'])
 
-
-
                     # !warning change!!
-                    # TODO str() maakt dat er bij fanart iets fout gaat, ondrzoeken! (niet bij poster), tuple bij fanart
-                    poster = (
-                        str(i['poster'])
-                        if 'poster' in i and i['poster'] != '0'
-                        else c.addon_poster()
-                    )
+                    # TODO str() maakt dat er bij fanart iets fout gaat, onderzoeken! (niet bij poster), tuple bij fanart
+                    poster = (str(i['poster']) if 'poster' in i and i['poster'] != '0' else c.addon_poster())
                     fanart = '0'
                     if isinstance(i['fanart'], tuple):
                         fanart = i['fanart'][0]
                     if fanart == '0':
-                        fanart = str(i['fanart']) if 'fanart' in i and not i['fanart'] == '0' else c.addon_fanart()
-
-                    c.log(f"[CM Debug @ 564 in episodes.py] i want to know the type of fanart. It is = {type(fanart)}")
-
-                    c.log(f"[CM Debug @ 568 in episodes.py] fanart = {fanart} and type = {type(fanart)}")
-                    banner = str(i['banner']) if 'banner' in i and not i['banner'] == '0' else c.addon_banner()
-                    landscape = str(i['landscape']) if 'landscpape' in i and not i['landscape'] == '0' else fanart
-                    clearlogo = str(i['clearlogo']) if 'clearlogo' in i and not i['clearlogo'] == '0' else c.addon_clearlogo()
-                    clearart = str(i['clearart']) if 'clearart' in i and not i['clearart'] == '0' else c.addon_clearart()
-
-                    discart = str(i['discart']) if 'discart' in i and not i['discart'] == '0' else c.addon_discart()
-
-                    duration = i['duration'] if 'duration' in i and not i['duration'] == '0' else '45'
+                        fanart = (str(i['fanart']) if 'fanart' in i and i['fanart'] != '0' else c.addon_fanart())
+                    banner = str(i['banner']) if 'banner' in i and i['banner'] != '0' else c.addon_banner()
+                    landscape = str(i['landscape']) if 'landscpape' in i and i['landscape'] != '0' else fanart
+                    clearlogo = str(i['clearlogo']) if 'clearlogo' in i and i['clearlogo'] != '0' else c.addon_clearlogo()
+                    clearart = str(i['clearart']) if 'clearart' in i and i['clearart'] != '0' else c.addon_clearart()
+                    discart = str(i['discart']) if 'discart' in i and i['discart'] != '0' else c.addon_discart()
+                    duration = i['duration'] if 'duration' in i and i['duration'] != '0' else '45'
                     status = i['status'] if 'status' in i else '0'
 
                     episode_meta = {'poster': poster, 'fanart': fanart, 'banner': banner,
@@ -694,7 +475,7 @@ class seasons:
 
                     imdb, tvdb, tmdb, year, season = i['imdb'], i['tvdb'], i['tmdb'], i['year'], i['season']
 
-                    meta = dict((k, v) for k, v in iter(i.items()) if not v == '0')
+                    meta = {k: v for k, v in i.items() if v != '0'}
                     meta['code'] = imdb
                     meta['imdbnumber'] = imdb
                     meta['imdb_id'] = imdb
@@ -707,18 +488,15 @@ class seasons:
                         meta['duration'] = '45'
 
                     if meta['duration'] != '0':
-                        #meta['duration'] = str(int(meta['duration']) * 60)
                         meta['duration'] = str(int(meta['duration']))
 
+                    meta['genre'] = cleangenre.lang(meta['genre'], self.lang)
+
                     try:
-                        meta['genre'] = cleangenre.lang(meta['genre'], self.lang)
-                    except Exception:
-                        pass
-                    try:
-                        seasonYear = i['premiered']
-                        seasonYear = re.findall(r'(\d{4})', seasonYear)[0]
-                        seasonYear = str(seasonYear)
-                        meta['year'] = seasonYear
+                        season_year = i['premiered'] if 'premiered' in i and i['premiered'] != '0' else i['year']
+                        season_year = re.findall(r'(\d{4})', season_year)[0]
+                        season_year = str(season_year)
+                        meta['year'] = season_year
                     except Exception:
                         pass
 
@@ -731,14 +509,12 @@ class seasons:
                     except Exception:
                         pass
 
-                    cm = []
-                    cm.append((playRandom, f'RunPlugin({sysaddon}?action=random&rtype=episode&tvshowtitle={systitle}&year={year}&imdb={imdb}&tmdb={tmdb}&season={season})'))
-                    cm.append((queueMenu, f'RunPlugin({sysaddon}?action=queueItem)'))
-
-                    #if
-                    cm.append((watchedMenu, f'RunPlugin({sysaddon}?action=tvPlaycount&name={systitle}&imdb={imdb}&tmdb={tmdb}&season={season}&query=7)'))
-                    cm.append((unwatchedMenu, f'RunPlugin({sysaddon}?action=tvPlaycount&name={systitle}&imdb={imdb}&tmdb={tmdb}&season={season}&query=6)'))
-
+                    cm = [
+                        (playRandom,f'RunPlugin({sysaddon}?action=random&rtype=episode&tvshowtitle={systitle}&year={year}&imdb={imdb}&tmdb={tmdb}&season={season})',),
+                        (queueMenu, f'RunPlugin({sysaddon}?action=queueItem)'),
+                        (watchedMenu,f'RunPlugin({sysaddon}?action=tvPlaycount&name={systitle}&imdb={imdb}&tmdb={tmdb}&season={season}&query=7)',),
+                        (unwatchedMenu,f'RunPlugin({sysaddon}?action=tvPlaycount&name={systitle}&imdb={imdb}&tmdb={tmdb}&season={season}&query=6)',),
+                    ]
                     if traktCredentials:
                         cm.append((traktManagerMenu, f'RunPlugin({sysaddon}?action=traktManager&name={sysname}&tmdb={tmdb}&content=tvshow)'))
 
@@ -753,11 +529,8 @@ class seasons:
                     art = {}
                     thumb = meta.get('thumb') or fanart
 
-                    #c.log(f"[CM Debug @ 469 in episodes.py] poster = {type(poster)} and banner = {type(banner)} and fanart = {type(fanart)} and thumb = {type(thumb)} and landscape = {type(landscape)} and clearlogo = {type(clearlogo)} and clearart = {type(clearart)} and discart = {type(discart)}")
-
                     art.update({
                         'icon': poster,
-                        #'thumb': poster,
                         'banner': banner,
                         'poster': poster,
                         'tvshow.poster': poster,
@@ -765,27 +538,20 @@ class seasons:
                         'landscape': landscape,
                         'clearlogo': clearlogo,
                         'thumb': thumb,
-                        #'clearart': clearart,
-                        #'discart': discart
+                        'clearart': clearart,
+                        'discart': discart
                     })
                     item.setArt(art)
 
 
                     castwiththumb = i.get('castwiththumb')
-                    if castwiththumb and not castwiththumb == '0':
-                        #item.setCast(castwiththumb)
+                    if castwiththumb and castwiththumb != '0':
                         meta['cast'] = castwiththumb
 
                     meta['art'] = art
 
-                    #c.log(f"[CM Debug @ 498 in episodes.py] type art = {type(art)}")
-                    #item.setArt(art)
-                    #item.setArt(meta['art'])
-
                     info_tag = ListItemInfoTag(item, 'video')
                     infolabels = control.tagdataClean(meta)
-
-                    #infolabels.update({'genre': genres, 'studio': studios, 'country': countries})
 
                     info_tag.set_info(infolabels)
                     unique_ids = {'imdb': imdb, 'tmdb': str(tmdb)}
@@ -819,7 +585,7 @@ class seasons:
                     item.addContextMenuItems(cm)
 
                     url = f'{sysaddon}?action=episodes&tvshowtitle={systitle}&year={year}&imdb={imdb}&tmdb={tmdb}&meta={sysmeta}&season={season}'
-                    c.log(f"[CM Debug @ 800 in episodes.py]additem with label = {label}")
+                    c.log(f"[CM Debug @ 589 in episodes.py]additem with label = {label}")
 
 
                     control.addItem(handle=syshandle, url=url, listitem=item, isFolder=True)
@@ -837,7 +603,6 @@ class seasons:
 
             control.content(syshandle, 'tvshows')
             control.directory(syshandle, cacheToDisc=True)
-            c.log(f"[CM Debug @ 818 in episodes.py] after ending control.directory(syshandle, cacheToDisc=True)")
             views.set_view('seasons', {'skin.estuary': 55, 'skin.confluence': 500})
         except Exception as e:
             import traceback
@@ -931,17 +696,19 @@ class episodes:
                 c.log(f"[CM Debug @ 928 in episodes.py] url = {url}")
                 #self.list = cache.get(self.tmdb_list, 1, tvshowtitle, year, imdb_id, tmdb_id, season, meta)
                 self.list = cache.get(self.tmdb_list, 0, tvshowtitle, year, imdb_id, tmdb_id, season, meta)
+
                 if season is not None and episode is not None:
-                    c.log(f"[CM Debug @ 831 in episodes.py] title = {tvshowtitle}, year = {year}, imdb_id = {imdb_id}, tmdb_id = {tmdb_id}, season = {season}, episode = {episode}")
+                    c.log(f"[CM Debug @ 701 in episodes.py] title = {tvshowtitle}, year = {year}, imdb_id = {imdb_id}, tmdb_id = {tmdb_id}, season = {season}, episode = {episode}")
                     #idx = [x for x, y in enumerate(self.list) if y['season'] == str(season) and y['episode'] == str(episode)][-1]
                     idx = [x for x, y in enumerate(self.list) if y['season'] == str(season) and y['episode'] == str(episode)][-1]
-                    c.log(f"[CM Debug @ 834 in episodes.py] idx = {idx}")
+                    c.log(f"[CM Debug @ 704 in episodes.py] idx = {idx}")
                     self.list = [y for x, y in enumerate(self.list) if x >= idx]
-
+                    self.list = sorted(self.list, key=lambda k: (int(k['season']), int(k['episode'])))
                 if create_directory:
                     self.episodeDirectory(self.list)
             else:
                 self.list = self.tmdb_list(tvshowtitle, year, imdb_id, tmdb_id, season, lite=True)
+
 
             return self.list
         except Exception:
@@ -1100,14 +867,14 @@ class episodes:
         userlists = []
         try:
 
-            if trakt.getTraktCredentialsInfo() is False:
+            if trakt.get_trakt_credentials_info() is False:
                 raise Exception()
             activity = trakt.getAllActivity()
         except Exception:
             pass
 
         try:
-            if trakt.getTraktCredentialsInfo() is False:
+            if trakt.get_trakt_credentials_info() is False:
                 raise Exception()
             try:
                 if activity > cache.timeout(self.trakt_user_list, self.traktlists_link, self.trakt_user):
@@ -1119,7 +886,7 @@ class episodes:
             pass
         try:
             self.list = []
-            if trakt.getTraktCredentialsInfo() is False:
+            if trakt.get_trakt_credentials_info() is False:
                 raise Exception()
             try:
                 if activity > cache.timeout(self.trakt_user_list, self.traktlikedlists_link, self.trakt_user):
@@ -1403,7 +1170,7 @@ class episodes:
                 failure = traceback.format_exc()
                 c.log(f'[CM Debug @ 933 in episodes.py]Traceback:: {failure}')
                 c.log(f'[CM Debug @ 933 in episodes.py]Exception raised. Error = {e}')
-                pass
+
 
         itemlist = itemlist[::-1]
         return itemlist
@@ -1431,9 +1198,10 @@ class episodes:
                 showtrakt = str(item['showtrakt'])
 
                 result = self.get_show_watched_progress(showtrakt)
-                episodes_aired = result['aired']
-                episodes_watched = result['completed']
-                next_episode = result['next_episode']
+                if result:
+                    episodes_aired = result['aired']
+                    episodes_watched = result['completed']
+                    next_episode = result['next_episode']
 
                 c.log(f"[CM Debug @ 1216 in episodes.py] next_episodes = {repr(next_episode)}")
 
@@ -1505,8 +1273,6 @@ class episodes:
                 if num_1 >= num_2:
                     c.log(f"{item['show']['title']}: All episodes watched")
                     #! in a loop, unnessecary to raise exception, we can just skip and continue
-
-
 
                 season = str(item['seasons'][-1]['number'])
                 episode = [x for x in item['seasons'][-1]['episodes'] if 'number' in x]
@@ -1593,19 +1359,6 @@ class episodes:
             c.log(f'[CM Debug @ 1600 in episodes.py]Exception raised. Error = {e}')
             pass
         c.log(f"[CM Debug @ 1602 in episodes.py] items = {items}")
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
         try:
@@ -2094,6 +1847,7 @@ class episodes:
             fanart = banner = clearlogo = clearart = landscape = duration = status = '0'
             if meta:
                 _meta = json.loads(unquote_plus(meta))
+                c.log(f"[CM Debug @ 1858 in episodes.py] _meta = {_meta}")
                 poster = _meta['poster']
                 fanart = _meta['fanart']
                 banner = _meta['banner']
@@ -2269,10 +2023,8 @@ class episodes:
         try:
             item = self.list[i]
 
-            if 'showimdb' in item:
-                is_episode = True
-            else:
-                is_episode = False
+            is_episode = 'showimdb' in item
+
 
             if is_episode:
                 show_imdb = item['showimdb']
@@ -2298,14 +2050,14 @@ class episodes:
                 show_tvdb = item['tvdb']
                 show_trakt = item['trakt'] if 'trakt' in item else '0'
 
-                show_title = item['tvshowtitle']
-                c.log(f"[CM Debug @ 1338 in episodes.py] tvshowtitle = {show_title}")
-                title = item['title'] if 'title' in item else ''
-                season = item['season']
-                episode = item['episode']
-                year = item['year']
+            show_title = item['tvshowtitle']
+            c.log(f"[CM Debug @ 1338 in episodes.py] tvshowtitle = {show_title}")
+            title = item['title'] if 'title' in item else ''
+            season = item['season']
+            episode = item['episode']
+            year = item['year']
 
-                label = f'{show_title}'
+            label = f'{show_title}'
 
             resume_point = item['resume_point'] if 'resume_point' in item else '0.0'
 
@@ -2387,25 +2139,18 @@ class episodes:
 
 
 
-            in_widget = False
-            if c.is_widget_listing():
-                in_widget = True
-
+            in_widget = bool(c.is_widget_listing())
             plot = episode_item['overview'] if episode_item.get('overview') else show_item.get('overview', '0')
             plot = client.replaceHTMLCodes(plot) if plot else '0'
 
             crew = episode_item.get('credits', {}).get('crew', []) if 'credits' in episode_item else show_item['crew'] if 'crew' in show_item else []
 
-            if crew:
-                crew = [c for c in crew if c['job'] in ['Director', 'Writer']]
-            else:
-                crew = []
+            crew = [c for c in crew if c['job'] in ['Director', 'Writer']] if crew else []
 
             director = writer = '0'
 
             if crew:
                 director = [d for d in crew if d['job'] == 'Director']
-
                 director = '/'.join([d['name'] for d in director])
 
                 writer = [w for w in crew if w['job'] == 'Writer']
@@ -2413,9 +2158,9 @@ class episodes:
 
             castwiththumb = []
             try:
-                credits = episode_item.get('credits', {})
-                cast = credits.get('cast', [])[:30]
-                guests = credits.get('guest_stars', [])[:30]
+                creds = episode_item.get('credits', {})
+                cast = creds.get('cast', [])[:30]
+                guests = creds.get('guest_stars', [])[:30]
                 cast.extend(guests)
                 for person in cast:
                     profile_path = person.get('profile_path', '')
@@ -2504,7 +2249,7 @@ class episodes:
         addon_fanart, use_fanart = c.addon_fanart(), control.setting('fanart') == 'true'
         addon_clearlogo, addon_clearart = c.addon_clearlogo(), c.addon_clearart()
         addon_discart, addon_thumb = c.addon_discart(), c.addon_thumb()
-        trakt_credentials = trakt.getTraktCredentialsInfo()
+        trakt_credentials = trakt.get_trakt_credentials_info()
         indicators = playcount.get_tvshow_indicators(refresh=True)
 
         try:
@@ -2525,11 +2270,10 @@ class episodes:
         unaired_color = control.lang(color_number)
         unaired_color = re.sub(r"\][\w\s]*\[", "][I]%s[/I][", unaired_color)
 
-        def add_item(item):
+
+        for item in items:
             try:
                 meta = {k: v for k, v in item.items() if v != '0'}
-
-
                 imdb_id = item['imdb']
                 tmdb_id = item['tmdb']
                 year = item['year']
@@ -2539,7 +2283,6 @@ class episodes:
                 episode_str = f' (S{int(season):02d}E{int(episode):02d})'
 
                 title = item['title'] + episode_str
-                c.log(f"[CM Debug @ 2502 in episodes.py] title = {title}")
                 label = item['label'] + episode_str if 'label' in item else title
                 c.log(f"[CM Debug @ 2504 in episodes.py] label = {label}")
 
@@ -2669,8 +2412,6 @@ class episodes:
                 cm.append((control.lang(32551), f'RunPlugin({sys_addon}?action=tvshowToLibrary&tvshowtitle={tvshowtitle}&year={year}&imdb={imdb_id}&tmdb={tmdb_id})'))
                 cm.append((control.lang(32098), f'RunPlugin({sys_addon}?action=clearSources)'))
 
-
-
                 art = {
                     'icon': thumb,
                     'thumb': thumb,
@@ -2701,8 +2442,8 @@ class episodes:
                 meta['director'] = c.string_split_to_list(meta['director']) if 'director' in meta else []
                 meta['writer'] = c.string_split_to_list(meta['writer']) if 'writer' in meta else []
 
-                meta.update({'offset': offset})
-                meta.update({'resume_point': resume_point})
+                meta['offset'] = offset
+                meta['resume_point'] = resume_point
 
                 info_tag = ListItemInfoTag(liz, 'video')
                 infolabels = control.tagdataClean(meta)
@@ -2720,36 +2461,8 @@ class episodes:
             except Exception as e:
                 import traceback
                 failure = traceback.format_exc()
-                c.log(f'[CM Debug @ 2308 in episodes.py]Traceback:: {failure}')
-                c.log(f'[CM Debug @ 2308 in episodes.py]Exception raised. Error = {e}')
-                pass
-
-
-        try:
-            max_nr = len(items)
-            x = 0
-
-            with concurrent.futures.ThreadPoolExecutor(max_workers=max_nr) as executor:
-                futures = {executor.submit(add_item, item): item for item in items}
-                for future in concurrent.futures.as_completed(futures):
-                    x += 1
-                    if c.devmode:
-                        c.log(f"[CM Debug @ 2704 in episodes.py] Progress: {x}/{max_nr}")
-
-        except Exception as e:
-            import traceback
-            failure = traceback.format_exc()
-            c.log(f'[CM Debug @ 876 in tvshows.py]Traceback:: {failure}')
-            c.log(f'[CM Debug @ 876 in tvshows.py]Exception raised. Error = {e}')
-            pass
-
-
-
-
-
-
-
-
+                c.log(f'[CM Debug @ 2466 in episodes.py]Traceback:: {failure}')
+                c.log(f'[CM Debug @ 2466 in episodes.py]Exception raised. Error = {e}')
 
         control.content(sys_handle, 'episodes')
         control.directory(sys_handle, cacheToDisc=True)
@@ -2773,7 +2486,7 @@ class episodes:
         addon_fanart, use_fanart = c.addon_fanart(), control.setting('fanart') == 'true'
         addon_clearlogo, addon_clearart = c.addon_clearlogo(), c.addon_clearart()
         addon_discart, addon_thumb = c.addon_discart(), c.addon_thumb()
-        trakt_credentials = trakt.getTraktCredentialsInfo()
+        trakt_credentials = trakt.get_trakt_credentials_info()
         indicators = playcount.get_tvshow_indicators(refresh=True)
 
         try:
@@ -2886,8 +2599,6 @@ class episodes:
                 if year == '0' and 'premiered' in item:
                     year = re.findall(r'(\d{4})', item['premiered'])[0]
 
-
-
                 meta['offset'] = offset
                 meta['resume_point'] = resume_point
                 meta['dev'] = 'Classy'
@@ -2906,7 +2617,6 @@ class episodes:
                 else:
                     meta['trailer'] = f'{sys_addon}?action=trailer&name={tvshowtitle}&url={trailer}&imdb={imdb_id}&tmdb={tmdb_id}&mediatype=episode&meta={trailer_meta}'
 
-
                 sys_meta = quote_plus(json.dumps(meta))
 
                 url = f'{sys_addon}?action=play&title={title}&year={year}&imdb={imdb_id}&tmdb={tmdb_id}&season={season}&episode={episode}&tvshowtitle={tvshowtitle}&premiered={premiered}&meta={sys_meta}&t={self.systime}'
@@ -2919,7 +2629,6 @@ class episodes:
 
                 if multi: # Browse series
                     if c.is_widget_listing():
-                        #cm.append((control.lang(32071), f'RunPlugin({sys_addon}?action=seasons&tvshowtitle={tvshowtitle}&year={year}&imdb={imdb_id}&tmdb={tmdb_id}&meta={seasons_meta},return)'))
                         cm.append((control.lang(32071), f'{sys_addon}?action=seasons&tvshowtitle={tvshowtitle}&year={year}&imdb={imdb_id}&tmdb={tmdb_id}&meta={seasons_meta},return'))
                     else:
                         cm.append((control.lang(32071), f'Container.Update({sys_addon}?action=seasons&tvshowtitle={tvshowtitle}&year={year}&imdb={imdb_id}&tmdb={tmdb_id}&meta={seasons_meta},return)'))
@@ -2975,8 +2684,8 @@ class episodes:
                 meta['director'] = c.string_split_to_list(meta['director']) if 'director' in meta else []
                 meta['writer'] = c.string_split_to_list(meta['writer']) if 'writer' in meta else []
 
-                meta.update({'offset': offset})
-                meta.update({'resume_point': resume_point})
+                meta['offset'] = offset
+                meta['resume_point'] = resume_point
 
 
                 # Pass listitem to the infotagger module and specify tag type
@@ -3001,9 +2710,6 @@ class episodes:
                 failure = traceback.format_exc()
                 c.log(f'[CM Debug @ 2308 in episodes.py]Traceback:: {failure}')
                 c.log(f'[CM Debug @ 2308 in episodes.py]Exception raised. Error = {e}')
-                pass
-
-
         control.content(sys_handle, 'episodes')
         control.directory(sys_handle, cacheToDisc=True)
 

@@ -700,11 +700,11 @@ class movies:
         try:
             userlists = []
             activity = 0
-            if trakt.getTraktCredentialsInfo():
+            if trakt.get_trakt_credentials_info():
                 activity = trakt.getActivity()
 
             try:
-                if not trakt.getTraktCredentialsInfo():
+                if not trakt.get_trakt_credentials_info():
                     raise Exception()
                 try:
                     if activity > cache.timeout(self.trakt_user_list, self.traktlists_link, self.trakt_user):
@@ -731,7 +731,7 @@ class movies:
             #     pass
             try:
                 self.list = []
-                if trakt.getTraktCredentialsInfo() is False:
+                if trakt.get_trakt_credentials_info() is False:
                     raise Exception()
                 try:
                     if activity > cache.timeout(self.trakt_user_list, self.traktlikedlists_link, self.trakt_user):
@@ -1565,7 +1565,7 @@ class movies:
         addon_clearlogo, addon_clearart = c.addon_clearlogo(), c.addon_clearart()
         addon_discart = c.addon_discart()
 
-        traktCredentials = trakt.getTraktCredentialsInfo()
+        traktCredentials = trakt.get_trakt_credentials_info()
 
         isPlayable = 'true' if 'plugin' not in control.infoLabel( 'Container.PluginName') else 'false'
         indicators = playcount.get_movie_indicators(refresh=True) if action == 'movies' else playcount.get_movie_indicators()

@@ -450,6 +450,7 @@ class tvshows:
 
     def networks(self):
         try:
+            c.log("[CM Debug @ 462 in tvshows.py] inside networks")
             network_data = [
                 (129, "A&E", f'{self.logo_link}/ptSTdU4GPNJ1M8UVEOtA0KgtuNk.png'),
                 (2, "ABC", f'{self.logo_link}/an88sKsFz0KX5CQngAM95WkncX4.png'),
@@ -1039,12 +1040,9 @@ class tvshows:
         try:
             page = int(result['page'])
             total = int(result['total_pages'])
-            if page >= total:
-                raise Exception()
-            if 'page=' not in url:
-                raise Exception()
-            # _next = '%s&page=%s' % (url.split('&page=', 1)[0], page+1)
-            _next = f"{url.split('&page=', 1)[0]}&page={page+1}"
+            if page >= total: raise Exception()
+            if 'page=' not in url: raise Exception()
+            _next = '%s&page=%s' % (url.split('&page=', 1)[0], page+1)
         except Exception:
             _next = ''
 

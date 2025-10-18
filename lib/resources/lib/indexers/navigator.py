@@ -51,7 +51,7 @@ addon_fanart = c.addon_fanart()
 
 imdbCredentials = c.get_setting('imdb.user') != ''
 
-traktCredentials = trakt.getTraktCredentialsInfo()
+traktCredentials = trakt.get_trakt_credentials_info()
 traktIndicators = trakt.getTraktIndicatorsInfo()
 
 
@@ -280,7 +280,7 @@ class Navigator:
         self.addDirectoryItem(32559, c.get_setting('library.movie'), 'movies.png', 'DefaultMovies.png', isAction=False)
         self.addDirectoryItem(32560, c.get_setting('library.tv'), 'tvshows.png', 'DefaultTVShows.png', isAction=False)
 
-        if trakt.getTraktCredentialsInfo():
+        if trakt.get_trakt_credentials_info():
             self.addDirectoryItem(32561, 'moviesToLibrary&url=traktcollection', 'trakt.png', 'DefaultMovies.png', isFolder=False)
             self.addDirectoryItem(32562, 'moviesToLibrary&url=traktwatchlist', 'trakt.png', 'DefaultMovies.png', isFolder=False)
             self.addDirectoryItem(32563, 'tvshowsToLibrary&url=traktcollection', 'trakt.png', 'DefaultTVShows.png', isFolder=False)

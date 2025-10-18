@@ -51,6 +51,7 @@ def add_view(content) -> None:
 
     try:
         skin = control.skin
+        c.log(f"\n=======================================================================\n\n\n[CM Debug @ 54 in views.py] skin = {skin}\n=======================================================================\n\n\n")
         view_id = str(control.getCurrentViewId())
         record = (skin, content, view_id)
         control.makeFile(control.dataPath)

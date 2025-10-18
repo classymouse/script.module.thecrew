@@ -19,3 +19,6 @@
 
 class TraktResourceError(Exception):
     pass
+
+class GeneralError(Exception):
+    pass

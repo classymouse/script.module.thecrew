@@ -461,7 +461,7 @@ class player(xbmc.Player):
                     hours, minutes = divmod(minutes, 60)
                     label = f"{int(hours):02d}:{int(minutes):02d}:{int(seconds):02d}"
                     label = c.lang(32350) % label
-                    if control.setting('bookmarks') == 'true' and trakt.getTraktCredentialsInfo() is True:
+                    if control.setting('bookmarks') == 'true' and trakt.get_trakt_credentials_info() is True:
                         yes = control.yesnoDialog(label + '[CR][I]Trakt sync is enabled [scrobble][/I] ', heading=c.lang(32344)) #RESUME
                     else:
                         yes = control.yesnoDialog(label, heading=c.lang(32344)) #RESUME
@@ -491,7 +491,7 @@ class player(xbmc.Player):
             c.log(f"[CM Debug @ 501 in player.py] reset bookmarks with action = {action}. self.currentTime = {self.currentTime}, self.totalTime = {self.totalTime}, self.content = {self.content}, self.imdb = {self.imdb}, self.season = {self.season}, self.episode = {self.episode}")
             bookmarks.reset(self.currentTime, self.totalTime, self.content, self.imdb, self.season, self.episode)
 
-        if (trakt.getTraktCredentialsInfo() is True and control.setting('trakt.scrobble') == 'true'):
+        if (trakt.get_trakt_credentials_info() is True and control.setting('trakt.scrobble') == 'true'):
             if action is not None:
                 c.log(f"[CM Debug @ 506 in player.py] scrobbling to trakt: {action} with self.currentTime = {self.currentTime}, self.totalTime = {self.totalTime}, self.content = {self.content}, self.imdb = {self.imdb}, self.season = {self.season}, self.episode = {self.episode}")
                 bookmarks.set_scrobble(self.currentTime, self.totalTime, self.content, self.imdb, self.season, self.episode, action)
@@ -541,7 +541,7 @@ class player(xbmc.Player):
                 hours, minutes = divmod(minutes, 60)
                 label = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
                 label = control.lang2(12022).format(label)
-                if control.setting('bookmarks') == 'true' and trakt.getTraktCredentialsInfo() is True:
+                if control.setting('bookmarks') == 'true' and trakt.get_trakt_credentials_info() is True:
                     yes = control.yesnoDialog(label + '[CR]  (Trakt scrobble)', heading=control.lang2(13404))
                 else:
                     yes = control.yesnoDialog(label, heading=control.lang2(13404))
@@ -564,7 +564,7 @@ class player(xbmc.Player):
 
         bookmarks.reset(self.currentTime, self.totalTime, self.content, self.imdb, self.season, self.episode)
 
-        if (trakt.getTraktCredentialsInfo() is True and control.setting('trakt.scrobble') == 'true'):
+        if (trakt.get_trakt_credentials_info() is True and control.setting('trakt.scrobble') == 'true'):
             bookmarks.set_scrobble(self.currentTime, self.totalTime, self.content, self.imdb, self.season, self.episode)
 
         if float(self.currentTime / self.totalTime) >= 0.92:

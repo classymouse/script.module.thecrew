@@ -304,7 +304,7 @@ class player(xbmc.Player):
                 label = '%02d:%02d:%02d' % (hours, minutes, seconds)
                 #label = control.lang2(12022).format(label)
                 label = c.lang(32350).format(label)
-                if control.setting('trakt.scrobble') == 'true' and trakt.getTraktCredentialsInfo() is True:
+                if control.setting('trakt.scrobble') == 'true' and trakt.get_trakt_credentials_info() is True:
                     yes = control.yesnoDialog(label + '[CR]  (Trakt Scrobble)', heading=c.lang(32344))
                 else:
                     yes = control.yesnoDialog(label, heading=control.lang2(32344))
@@ -324,7 +324,7 @@ class player(xbmc.Player):
 
         bookmarks.reset(self.currentTime, self.totalTime, self.content, self.imdb, self.season, self.episode)
 
-        if (trakt.getTraktCredentialsInfo() is True and control.setting('trakt.scrobble') == 'true'):
+        if (trakt.get_trakt_credentials_info() is True and control.setting('trakt.scrobble') == 'true'):
             bookmarks.set_scrobble(self.currentTime, self.totalTime, self.content, self.imdb, self.season, self.episode)
 
         if float(self.currentTime / self.totalTime) >= 0.92:

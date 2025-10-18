@@ -41,6 +41,7 @@ from ..modules import trailer
 from ..modules import workers
 from ..modules import youtube
 from ..modules import views
+from ..modules import sources
 from ..modules.crewruntime import c
 
 
@@ -186,9 +187,6 @@ class indexer:
         self.create_list('https://raw.githubusercontent.com/classymouse/cc/main/CCcinema.xml')
 
 
-
-
-
     def root_personal(self):
         self.create_personal('personal.list')
 
@@ -232,7 +230,7 @@ class indexer:
                 i.update({'content': 'addons'})
             self.addDirectory(self.list)
             return self.list
-        except:
+        except Exception:
             pass
 
 #WhiteHat added 6-20-2022
@@ -245,7 +243,7 @@ class indexer:
                 i.update({'content': 'addons'})
             self.addDirectory(self.list)
             return self.list
-        except:
+        except Exception:
             pass
 
 #OH - checked
@@ -255,7 +253,7 @@ class indexer:
             self.worker()
             self.addDirectory(self.list)
             return self.list
-        except:
+        except Exception:
             pass
 
 
@@ -266,7 +264,7 @@ class indexer:
             self.worker()
             self.addDirectory(self.list, queue=True)
             return self.list
-        except:
+        except Exception:
             pass
 
 #TODO: check if this is working
@@ -287,7 +285,7 @@ class indexer:
             c.log(f'[CM Debug @ 397 in lists.py]Traceback:: {failure}')
             c.log(f'[CM Debug @ 397 in lists.py]Exception raised. Error = {e}')
             pass
-        #except:
+        #except Exception:
             #pass
 
 
@@ -321,7 +319,7 @@ class indexer:
                 i.update({'content': 'videos'})
             self.addDirectory(self.list)
             return self.list
-        except:
+        except Exception:
             pass
 
 
@@ -355,7 +353,7 @@ class indexer:
                         })
                 self.addDirectory(self.list)
             return self.list
-        except:
+        except Exception:
             pass
 
 
@@ -367,8 +365,7 @@ class indexer:
 
             if result.strip().startswith('#EXTM3U') and '#EXTINF' in result:
                 try:
-                    result = re.compile(
-                        r'#EXTINF:.+?\,(.+?)\n(.+?)\n', re.MULTILINE|re.DOTALL).findall(result)
+                    result = re.compile(r'#EXTINF:.+?\,(.+?)\n(.+?)\n', re.MULTILINE|re.DOTALL).findall(result)
                     result = [
                         f'<item><title>{i[0]}</title><link>{i[1]}</link></item>' for i in result
                         ]
@@ -394,21 +391,23 @@ class indexer:
             if '</link>' in r:
                 result = r
 
-            info = result.split('<item>')[0].split('<dir>')[0]
+
+            # info = result.split('<item>')[0].split('<dir>')[0]
+            info = re.split(r'<item>|<dir>', result)[0]
 
             try:
                 vip = re.findall('<poster>(.+?)</poster>', info)[0]
-            except:
+            except Exception:
                 vip = '0'
 
             try:
                 image = re.findall('<thumbnail>(.+?)</thumbnail>', info)[0]
-            except:
+            except Exception:
                 image = '0'
 
             try:
                 fanart = re.findall('<fanart>(.+?)</fanart>', info)[0]
-            except:
+            except Exception:
                 fanart = '0'
 
             # items = re.compile(
@@ -447,12 +446,12 @@ class indexer:
                 name = re.sub('<meta>.+?</meta>','', item)
                 try:
                     name = re.findall('<title>(.+?)</title>', name)[0]
-                except:
+                except Exception:
                     name = re.findall('<name>(.+?)</name>', name)[0]
 
                 try:
                     date = re.findall('<date>(.+?)</date>', item)[0]
-                except:
+                except Exception:
                     date = ''
 
                 if re.search(r'\d+', date):
@@ -460,23 +459,23 @@ class indexer:
 
                 try:
                     image2 = re.findall('<thumbnail>(.+?)</thumbnail>', item)[0]
-                except:
+                except Exception:
                     image2 = image
 
 
                 try:
                     fanart2 = re.findall('<fanart>(.+?)</fanart>', item)[0]
-                except:
+                except Exception:
                     fanart2 = fanart
 
                 try:
                     meta = re.findall('<meta>(.+?)</meta>', item)[0]
-                except:
+                except Exception:
                     meta = '0'
 
                 try:
                     url = re.findall('<link>(.+?)</link>', item)[0]
-                except:
+                except Exception:
                     url = '0'
 
                 url = url.replace('>search<', f'><preset>search</preset>{meta}<')
@@ -499,24 +498,20 @@ class indexer:
                 if action == 'play' and reglist:
                     action = 'xdirectory'
 
-                if not regdata == '':
+                if regdata != '':
                     self.hash.append({'regex': reghash, 'response': regdata})
                     url += f'|regex={reghash}'
 
-                if action in ['directory', 'xdirectory', 'plugin']:
-                    folder = True
-                else:
-                    folder = False
-
+                folder = action in ['directory', 'xdirectory', 'plugin']
                 try:
                     content = re.findall('<content>(.+?)</content>', meta)[0]
-                except:
+                except Exception:
                     content = '0'
 
                 if content == '0':
                     try:
                         content = re.findall('<content>(.+?)</content>', item)[0]
-                    except:
+                    except Exception:
                         content = '0'
 
                 if content != '0':
@@ -532,23 +527,23 @@ class indexer:
 
                 try:
                     imdb = re.findall('<imdb>(.+?)</imdb>', meta)[0]
-                except:
+                except Exception:
                     imdb = '0'
 
                 try:
                     tvdb = re.findall('<tvdb>(.+?)</tvdb>', meta)[0]
-                except:
+                except Exception:
                     tvdb = '0'
 
                 try:
                     tvshowtitle = re.findall('<tvshowtitle>(.+?)</tvshowtitle>', meta)[0]
-                except:
+                except Exception:
                     tvshowtitle = '0'
 
 
                 try:
                     title = re.findall('<title>(.+?)</title>', meta)[0]
-                except:
+                except Exception:
                     title = '0'
 
 
@@ -557,22 +552,22 @@ class indexer:
 
                 try:
                     year = re.findall('<year>(.+?)</year>', meta)[0]
-                except:
+                except Exception:
                     year = '0'
 
                 try:
                     premiered = re.findall('<premiered>(.+?)</premiered>', meta)[0]
-                except:
+                except Exception:
                     premiered = '0'
 
                 try:
                     season = re.findall('<season>(.+?)</season>', meta)[0]
-                except:
+                except Exception:
                     season = '0'
 
                 try:
                     episode = re.findall('<episode>(.+?)</episode>', meta)[0]
-                except:
+                except Exception:
                     episode = '0'
 
                 self.list.append({
@@ -593,7 +588,7 @@ class indexer:
             c.log(f'[CM Debug @ 650 in lists.py]Exception raised. Error = {e}')
             pass
 
-#cm - checked
+
     def worker(self):
         try:
             total = len(self.list)
@@ -634,7 +629,7 @@ class indexer:
 
             if self.meta:
                 metacache.insert(self.meta)
-        except:
+        except Exception:
             pass
 
     def movie_info(self, i):
@@ -688,7 +683,7 @@ class indexer:
                     }[premiered[0][1]],
                     premiered[0][0]
                     )
-            except:
+            except Exception:
                 premiered = '0'
             if premiered != '0':
                 self.list[i].update({'premiered': premiered})
@@ -706,7 +701,7 @@ class indexer:
             duration = re.sub('[^0-9]', '', str(duration))
             try:
                 duration = str(int(duration) * 60)
-            except:
+            except Exception:
                 pass
             if duration != '0':
                 self.list[i].update({'duration': duration})
@@ -720,7 +715,7 @@ class indexer:
             votes = item['imdbVotes']
             try:
                 votes = str(format(int(votes),',d'))
-            except:
+            except Exception:
                 pass
             if votes is None or votes == '' or votes == 'N/A':
                 votes = '0'
@@ -757,7 +752,7 @@ class indexer:
             cast = [x.strip() for x in cast.split(',') if not x == '']
             try:
                 cast = [(c.ensure_str(x), '') for x in cast]
-            except:
+            except Exception:
                 cast = []
             if cast == []:
                 cast = '0'
@@ -793,7 +788,7 @@ class indexer:
                     'director': director, 'writer': writer, 'cast': cast, 'plot': plot
                     }
                 })
-        except:
+        except Exception:
             pass
 
     def tv_info(self, i):
@@ -831,7 +826,7 @@ class indexer:
 
             try:
                 imdb = item['externals']['imdb']
-            except:
+            except Exception:
                 imdb = '0'
             if imdb == '' or imdb is None:
                 imdb = '0'
@@ -841,7 +836,7 @@ class indexer:
 
             try:
                 studio = item['network']['name']
-            except:
+            except Exception:
                 studio = '0'
             if studio == '' or studio is None:
                 studio = '0'
@@ -854,19 +849,19 @@ class indexer:
                 genre = '0'
             genre = ' / '.join(genre)
             c.ensure_str(genre)
-            if not genre == '0':
+            if genre != '0':
                 self.list[i].update({'genre': genre})
 
             try:
                 duration = str(item['runtime'])
-            except:
+            except Exception:
                 duration = '0'
 
             if duration in ['', None]:
                 duration = '0'
             try:
                 duration = str(int(duration) * 60)
-            except:
+            except Exception:
                 pass
             c.ensure_str(duration)
             if not duration == '0':
@@ -895,7 +890,7 @@ class indexer:
                     'duration': duration, 'rating': rating, 'plot': plot
                     }
                 })
-        except:
+        except Exception:
             pass
 
     def addDirectory(self, items, queue=False):
@@ -907,8 +902,8 @@ class indexer:
 
 
         sysaddon = sys.argv[0]
-        addonPoster = addonBanner = control.addonInfo('icon')
-        addonFanart = control.addonInfo('fanart')
+        addon_poster = addon_banner = control.addonInfo('icon')
+        addon_fanart = control.addonInfo('fanart')
 
         playlist = control.playlist
         if queue is not False:
@@ -961,9 +956,9 @@ class indexer:
             banner = i['banner'] if 'banner' in i else '0'
             fanart = i['fanart'] if 'fanart' in i else '0'
             if poster == '0':
-                poster = addonPoster
+                poster = addon_poster
             if banner == '0':
-                banner = addonBanner if poster == '0' else poster
+                banner = addon_banner if poster == '0' else poster
             content = i['content'] if 'content' in i else '0'
             folder = i['folder'] if 'folder' in i else True
             meta = dict((k,v) for k, v in i.items() if not v == '0')
@@ -1012,13 +1007,13 @@ class indexer:
                     'season.poster': poster, 'banner': banner, 'tvshow.banner': banner,
                     'season.banner': banner
                     })
-            except:
+            except Exception:
                 pass
 
             if fanart != '0':
                 item.setProperty('Fanart_Image', fanart)
-            elif addonFanart is not None:
-                item.setProperty('Fanart_Image', addonFanart)
+            elif addon_fanart is not None:
+                item.setProperty('Fanart_Image', addon_fanart)
 
             if queue is False:
                 item.setInfo(type='Video', infoLabels = meta)
@@ -1040,14 +1035,14 @@ class indexer:
             url = f"{sysaddon}?action={i['nextaction']}&url={quote_plus(i['next'])}"
             item = control.item(label=control.lang(30500).encode('utf-8'))
             item.setArt({
-                'addonPoster': addonPoster, 'thumb': addonPoster, 'poster': addonPoster,
-                'tvshow.poster': addonPoster, 'season.poster': addonPoster, 'banner': addonPoster,
-                'tvshow.banner': addonPoster, 'season.banner': addonPoster
+                'addonPoster': addon_poster, 'thumb': addon_poster, 'poster': addon_poster,
+                'tvshow.poster': addon_poster, 'season.poster': addon_poster, 'banner': addon_poster,
+                'tvshow.banner': addon_poster, 'season.banner': addon_poster
                 })
-            item.setProperty('addonFanart_Image', addonFanart)
+            item.setProperty('addonFanart_Image', addon_fanart)
 
             control.addItem(handle=int(sys.argv[1]), url=url, listitem=item, isFolder=True)
-        except:
+        except Exception:
             pass
 
         if mode is not None:
@@ -1060,11 +1055,13 @@ class indexer:
 class resolver:
     def browser(self, url):
         try:
+            if not url or not url.startswith('http'):
+                return
             url = self.get(url)
-            if url is False:
+            if not url:
                 return
             control.execute(f'RunPlugin(plugin://plugin.program.chrome.launcher/?url={quote_plus(url)}&mode=showSite&stopPlayback=no)')
-        except:
+        except Exception:
             pass
 
 
@@ -1073,28 +1070,27 @@ class resolver:
             url = self.get(url)
             if url is False:
                 return
-
             control.execute('ActivateWindow(busydialognocancel)')
             url = self.process(url)
-
             control.execute('Dialog.Close(busydialognocancel)')
 
             if url is None:
                 return control.infoDialog(control.lang(32401))
             return url
-        except:
+        except Exception:
             pass
+
 
     def get(self, url):
         try:
-            items = re.compile('<sublink(?:\s+name=|)(?:\'|\"|)(.*?)(?:\'|\"|)>(.+?)</sublink>').findall(url)
+            items = re.compile(r'<sublink(?:\s+name=|)(?:\'|\"|)(.*?)(?:\'|\"|)>(.+?)</sublink>').findall(url)
 
             if len(items) == 0:
                 return url
             if len(items) == 1:
                 return items[0][1]
 
-            items = [(f'Link {int(items.index(i))+1}' if i[0] == '' else i[0], i[1]) for i in items]
+            items = [(i[0], i[1]) for i in items if i[0] or i[0] == '']
 
             select = control.selectDialog([i[0] for i in items], control.infoLabel('listitem.label'))
 
@@ -1102,9 +1098,10 @@ class resolver:
                 return False
             else:
                 return items[select][1]
-        except:
+        except Exception:
             pass
 
+    #!TODO - check f4mproxy
     def f4m(self, url, name):
         try:
             if not any(i in url for i in ['.f4m', '.ts']):
@@ -1117,54 +1114,56 @@ class resolver:
 
             try:
                 proxy = params['proxy'][0]
-            except:
+            except Exception:
                 proxy = None
 
             try:
                 proxy_use_chunks = json.loads(params['proxy_for_chunks'][0])
-            except:
+            except Exception:
                 proxy_use_chunks = True
 
             try:
                 maxbitrate = int(params['maxbitrate'][0])
-            except:
+            except Exception:
                 maxbitrate = 0
 
             try:
                 simpleDownloader = json.loads(params['simpledownloader'][0])
-            except:
+            except Exception:
                 simpleDownloader = False
 
             try:
                 auth_string = params['auth'][0]
-            except:
+            except Exception:
                 auth_string = ''
 
             try:
                 streamtype = params['streamtype'][0]
-            except:
+            except Exception:
                 streamtype = 'TSDOWNLOADER' if ext == 'ts' else 'HDS'
-
 
             try:
                 swf = params['swf'][0]
-            except:
+            except Exception:
                 swf = None
 
             from F4mProxy import f4mProxyHelper
             return f4mProxyHelper().playF4mLink(url, name, proxy, proxy_use_chunks, maxbitrate, simpleDownloader, auth_string, streamtype, False, swf)
-        except:
+        except Exception:
             pass
+
 
     def process(self, url, direct=True):
         try:
             if not any(i in url for i in ['.jpg', '.png', '.gif']):
-                raise Exception()
+                raise ValueError()
+
             ext = url.split('?')[0].split('&')[0].split('|')[0].rsplit('.')[-1].replace('/', '').lower()
             if ext not in ['jpg', 'png', 'gif']:
-                raise Exception()
+                raise ValueError()
+
             try:
-                i = os.path.join(control.dataPath,'img')
+                i = os.path.join(control.dataPath, 'img')
                 control.deleteFile(i)
                 f = control.openFile(i, 'w')
                 f.write(client.request(url))
@@ -1172,30 +1171,30 @@ class resolver:
 
                 control.execute(f'ShowPicture("{i}")')
                 return False
-            except:
+            except Exception:
                 return
-        except:
+        except (ValueError, Exception) as e:
             pass
 
         try:
-            r, x = re.findall('(.+?)\|regex=(.+?)$', url)[0]
+            r, x = re.findall(r'(.+?)\|regex=(.+?)$', url)[0]
             x = regex.fetch(x)
             r += unquote_plus(x)
             if not '</regex>' in r:
                 raise Exception()
             u = regex.resolve(r)
-            if not u is None:
+            if u is not None:
                 url = u
-        except:
+        except Exception:
             pass
 
         try:
             if not url.startswith('rtmp'):
                 raise Exception()
-            if len(re.compile('\s*timeout=(\d*)').findall(url)) == 0:
+            if len(re.compile(r'\s*timeout=(\d*)').findall(url)) == 0:
                 url += ' timeout=10'
             return url
-        except:
+        except Exception:
             pass
 
         try:
@@ -1205,7 +1204,7 @@ class resolver:
             if not ext in ['m3u8', 'f4m', 'ts']:
                 raise Exception()
             return url
-        except:
+        except Exception:
             pass
 
         try:
@@ -1224,19 +1223,19 @@ class resolver:
                 premiered = re.findall('<premiered>(.+?)</premiered>', url)[0]
                 season = re.findall('<season>(.+?)</season>', url)[0]
                 episode = re.findall('<episode>(.+?)</episode>', url)[0]
-            except:
+            except Exception:
                 tvdb = tvshowtitle = premiered = season = episode = None
 
             direct = False
             quality = 'HD' if not preset == 'searchsd' else 'SD'
 
-            from ..modules import sources2
 
-            u = sources2.sources().getSources(title, year, imdb, tvdb, season, episode, tvshowtitle, premiered, quality)
+
+            u = sources.sources().getSources(title, year, imdb, tvdb, season, episode, tvshowtitle, premiered, quality)
 
             if u is not None:
                 return u
-        except:
+        except Exception:
             pass
 
         try:
@@ -1250,7 +1249,16 @@ class resolver:
                 raise Exception()
 
             return u
-        except:
+        except Exception:
+            pass
+
+        try:
+            if 'filmon.com/' not in url:
+                raise Exception()
+            from ..modules import filmon
+            u = filmon.resolve(url)
+            return u
+        except Exception:
             pass
 
         try:
@@ -1259,16 +1267,7 @@ class resolver:
             from ..modules import directstream
             u = directstream.google(url)[0]['url']
             return u
-        except:
-            pass
-
-        try:
-            if 'filmon.com/' not in url:
-                raise Exception()
-            from resources.lib.modules import filmon
-            u = filmon.resolve(url)
-            return u
-        except:
+        except Exception:
             pass
 
         try:
@@ -1284,7 +1283,7 @@ class resolver:
 
             if u is not False:
                 return u
-        except:
+        except Exception:
             pass
 
         if direct is True:
@@ -1342,7 +1341,7 @@ class player(xbmc.Player):
             ]:
             try:
                 meta[i] = control.infoLabel(f'listitem.{i}')
-            except:
+            except Exception:
                 pass
         meta = dict((k,v) for k, v in meta.items() if not v == '')
         if 'title' not in meta:
@@ -1363,7 +1362,7 @@ class player(xbmc.Player):
         item = control.item(path=url)
         try:
             item.setArt({'icon': icon})
-        except:
+        except Exception:
             pass
         item.setInfo(type='Video', infoLabels = meta)
         control.player.play(url, item)
@@ -1380,7 +1379,7 @@ class player(xbmc.Player):
             try:
                 self.totalTime = self.getTotalTime()
                 self.currentTime = self.getTime()
-            except:
+            except Exception:
                 pass
             control.sleep(2000)
         control.sleep(5000)
@@ -1427,14 +1426,14 @@ class bookmarks:
 
             try:
                 yes = control.dialog.contextmenu([label, control.lang(32501), ])
-            except:
+            except Exception:
                 yes = control.yesnoDialog(label, '', '', str(name), control.lang(32503), control.lang(32501))
 
             if yes:
                 self.offset = '0'
 
             return self.offset
-        except:
+        except Exception:
             return offset
 
     def reset(self, currentTime, totalTime, name, year='0'):
@@ -1457,5 +1456,5 @@ class bookmarks:
             dbcur.execute("DELETE FROM bookmark WHERE idFile = '%s'" % idFile)
             if ok: dbcur.execute("INSERT INTO bookmark Values (?, ?)", (idFile, timeInSeconds))
             dbcon.commit()
-        except:
+        except Exception:
             pass

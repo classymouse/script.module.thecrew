@@ -202,6 +202,15 @@ class trailers:
 
 
     def getSources(self, mode):
+        """
+        Retrieves trailer sources from IMDB or TMDb.
+
+        Args:
+            mode (str): The source to retrieve the trailer from. Options are 'imdb' and 'tmdb'.
+
+        Returns:
+            dict: A dictionary containing the trailer url and other metadata.
+        """
         try:
             if mode == 'imdb':
                 #result = cache.get(client.request, 0, self.imdb_baselink.format(self.imdb))
@@ -297,8 +306,8 @@ class trailers:
 
             if not trailer_list:
                 return 'empty'
-            else:
-                trailer_list.sort(reverse=True)
+            # else:
+            #     trailer_list.sort(reverse=True)
 
             try:
                 trailers = []
