@@ -548,7 +548,8 @@ class movies:
 
             search_query = search_query.lower()
             clean_search_query = utils.title_key(search_query)
-            url = self.person_search_link % quote_plus(clean_search_query)
+            # url = self.person_search_link % quote_plus(clean_search_query)
+            url = self.person_link % quote_plus(clean_search_query)
             c.log(f"[CM Debug @ 427 in movies.py] url = {url}")
             self.persons(url)
 
@@ -678,23 +679,72 @@ class movies:
         self.addDirectory(self.list)
         return self.list
 
-    def persons(self, url):
-        c.log(f"[CM Debug @ 682 in movies.py] url = {url}")
-        if url is None:
-            #self.list = cache.get(self.tmdb_person_list, 24, self.personlist_link)
-            # self.tmdb_person_list(self.personlist_link)
-            self.tmdb_person_list(self.persons_link)
-        else:
-            # self.list = cache.get(self.tmdb_person_list, 1, url)
-            self.list = cache.get(self.tmdb_person_list, 0, url)
+    def persons(self, url) -> list:
+        """
+        Retrieve a list of persons (TMDB) and prepare them for directory display.
 
-        #for i in range(0, len(self.list)):
-            #self.list[i].update({'action': 'movies'})
+        - If url is None, use the default popular-persons endpoint (self.persons_link).
+        - Ensures self.list is reset to avoid duplicates.
+        - Validates tmdb_person_list return value and normalizes to a list.
+        - Adds an 'action' key to each item only if missing/appropriate.
+        - Returns a list (never None).
+        """
+        c.log(f"[CM Debug @ 682 in movies.py] persons() called with url = {url!r}")
 
-        for item in self.list:
-            item.update({'action': 'movies'})
-        self.addDirectory(self.list)
-        return self.list
+        try:
+            # Ensure we start from a clean list to avoid duplicates
+            self.list = []
+
+            # Choose the URL to fetch
+            fetch_url = self.persons_link if not url else url
+
+            # tmdb_person_list appends into self.list and returns it,
+            # but wrap in try/except in case of unexpected errors.
+            try:
+                result = self.tmdb_person_list(fetch_url)
+            except Exception as exc:
+                c.log(f"[CM Debug @ 690 in movies.py] tmdb_person_list failed for {fetch_url}: {exc}")
+                result = None
+
+            # Normalize result to a list
+            if result is None:
+                c.log(f"[CM Debug @ 696 in movies.py] tmdb_person_list returned None for {fetch_url}")
+                self.list = []
+            elif isinstance(result, list):
+                self.list = result
+            else:
+                # If result is a single dict, wrap it; if it's iterable, try to convert
+                if isinstance(result, dict):
+                    self.list = [result]
+                else:
+                    try:
+                        self.list = list(result)
+                    except Exception:
+                        c.log(f"[CM Debug @ 706 in movies.py] Unexpected result type from tmdb_person_list: {type(result)}")
+                        self.list = []
+
+            # Ensure each item has an action and minimal fields expected by callers/UI
+            for item in self.list:
+                if isinstance(item, dict):
+                    item.setdefault('action', 'movies')
+                    item.setdefault('name', item.get('name', 'Unknown'))
+                    # ensure image/thumb/poster keys exist to avoid later KeyError
+                    item.setdefault('image', item.get('image', c.addon_poster()))
+                    item.setdefault('poster', item.get('poster', item.get('image')))
+                    item.setdefault('thumb', item.get('thumb', item.get('image')))
+                else:
+                    c.log(f"[CM Debug @ 722 in movies.py] Skipping non-dict item in person list: {repr(item)}")
+
+            # Only call addDirectory if we have items
+            if self.list:
+                self.addDirectory(self.list)
+                return self.list
+
+            return []
+        except Exception as e:  # keep top-level safety
+            import traceback
+            c.log(f"[CM Debug @ 734 in movies.py] persons() unexpected error: {traceback.format_exc()}")
+            return []
 
     def userlists(self):
         try:
@@ -1220,7 +1270,7 @@ class movies:
         try:
             result = self.session.get(url, timeout=15).json()
 
-            c.log(f"[CM Debug @ 1018 in movies.py] result = {result}")
+            c.log(f"[CM Debug @ 1224 in movies.py] result = {result}")
             items = result['results']
         except Exception:
             pass
@@ -1621,8 +1671,8 @@ class movies:
                     #label += f' [COLOR gold]({int(resume_point)}%)[/COLOR] '
                 try:
                     premiered = i['premiered']
-                    if (premiered == '0' and status in ['Upcoming', 'In Production', 'Planned']) or\
-                        (int(re.sub('[^0-9]', '', premiered)) > int(re.sub('[^0-9]', '', str(self.today_date)))):
+                    if (premiered == '0' and status in ['Upcoming', 'In Production', 'Planned']) or \
+                            (int(re.sub('[^0-9]', '', premiered)) > int(re.sub('[^0-9]', '', str(self.today_date)))):
 
                         # changed by cm -  17-5-2023
                         # changed by cm -  27-12-2024
@@ -1655,17 +1705,18 @@ class movies:
                 meta.update({'duration': str(int(meta['duration']) * 60)})
                 #meta.update({'genre': cleangenre.lang(meta['genre'], self.lang)})
 
-                poster = i['poster'] if 'poster' in i and not i['poster'] == '0' else addon_poster
-                fanart = i['fanart'] if 'fanart' in i and not i['fanart'] == '0' else addon_fanart
-                banner = i['banner'] if 'banner' in i and not i['banner'] == '0' else addon_banner
-                landscape = i['landscape'] if 'landscape' in i and not i['landscape'] == '0' else fanart
-                clearlogo = i['clearlogo'] if 'clearlogo' in i and not i['clearlogo'] == '0' else addon_clearlogo
-                clearart = i['clearart'] if 'clearart' in i and not i['clearart'] == '0' else addon_clearart
-                discart = i['discart'] if 'discart' in i and not i['discart'] == '0' else addon_discart
+                poster = i['poster'] if 'poster' in i and i['poster'] != '0' else addon_poster
+                fanart = i['fanart'] if 'fanart' in i and i['fanart'] != '0' else addon_fanart
+                banner = i['banner'] if 'banner' in i and i['banner'] != '0' else addon_banner
+                landscape = i['landscape'] if 'landscape' in i and i['landscape'] != '0' else fanart
+                clearlogo = i['clearlogo'] if 'clearlogo' in i and i['clearlogo'] != '0' else addon_clearlogo
+                clearart = i['clearart'] if 'clearart' in i and i['clearart'] != '0' else addon_clearart
+                discart = i['discart'] if 'discart' in i and i['discart'] != '0' else addon_discart
 
                 poster = [i[x] for x in ['poster3', 'poster', 'poster2'] if i.get(x, '0') != '0']
                 poster = poster[0] if poster else addon_poster
-                meta.update({'poster': poster})
+
+                meta['poster'] = poster
 
                 sysmeta = quote_plus(json.dumps(meta))
 
@@ -1674,12 +1725,16 @@ class movies:
                 else:
                     meta['trailer'] = f'{sysaddon}?action=trailer&name={systitle}&url={systrailer}&imdb={imdb}&tmdb={tmdb}&mediatype=movie&meta={sysmeta}'
                 #c.log(f"[CM Debug @ 1671 in movies.py] systime = {self.systime}")
-                url = '%s?action=play&title=%s&year=%s&imdb=%s&tmdb=%s&meta=%s&t=%s' % (sysaddon, systitle, year, imdb, tmdb, sysmeta, self.systime)
+                url = f'{sysaddon}?action=play&title={systitle}&year={year}&imdb={imdb}&tmdb={tmdb}&meta={sysmeta}&t={self.systime}'
                 #url = f'{sysaddon}action=play&title={systitle}&year={year}&imdb={imdb}&tmdb={tmdb}&meta={sysmeta}&t={self.systime}'
                 sysurl = quote_plus(url)
 
-                cm = []
-                cm.append((findSimilar, f"Container.Update({sysaddon}?action=movies&url={quote_plus(self.related_link % tmdb)})"))
+                cm = [
+                    (
+                        findSimilar,
+                        f"Container.Update({sysaddon}?action=movies&url={quote_plus(self.related_link % tmdb)})",
+                    )
+                ]
                 cm.append((queueMenu, f'RunPlugin({sysaddon}?action=queueItem)'))
 
                 try:
@@ -1695,9 +1750,12 @@ class movies:
                     pass
 
                 if traktCredentials is True:
-                    cm.append((traktManagerMenu, 'RunPlugin(%s?action=traktManager&name=%s&imdb=%s&content=movie)' % (sysaddon, syslabel, imdb)))
-                cm.append((playbackMenu, 'RunPlugin(%s?action=alterSources&url=%s&meta=%s)' % (sysaddon, sysurl, sysmeta)))
-                cm.append((addToLibrary, 'RunPlugin(%s?action=movieToLibrary&name=%s&title=%s&year=%s&imdb=%s&tmdb=%s)' % (sysaddon, syslabel, systitle, year, imdb, tmdb)))
+                #     cm.append((traktManagerMenu, 'RunPlugin(%s?action=traktManager&name=%s&imdb=%s&content=movie)' % (sysaddon, syslabel, imdb)))
+                # cm.append((playbackMenu, 'RunPlugin(%s?action=alterSources&url=%s&meta=%s)' % (sysaddon, sysurl, sysmeta)))
+                # cm.append((addToLibrary, 'RunPlugin(%s?action=movieToLibrary&name=%s&title=%s&year=%s&imdb=%s&tmdb=%s)' % (sysaddon, syslabel, systitle, year, imdb, tmdb)))
+                    cm.append((traktManagerMenu, f'RunPlugin({sysaddon}?action=traktManager&name={syslabel}&imdb={imdb}&content=movie)'))
+                cm.append((playbackMenu, f'RunPlugin({sysaddon}?action=alterSources&url={sysurl}&meta={sysmeta})'))
+                cm.append((addToLibrary, f'RunPlugin({sysaddon}?action=movieToLibrary&name={syslabel}&title={systitle}&year={year}&imdb={imdb}&tmdb={tmdb})'))
 
                 try:
                     item = control.item(label=label, offscreen=True)
@@ -1705,15 +1763,17 @@ class movies:
                     item = control.item(label=label)
 
                 art = {}
-                art.update({'icon': poster, 'thumb': poster, 'poster': poster})
-
-                if setting_fanart == 'true':
-                    art.update({'fanart': fanart})
-                art.update({'banner': banner})
-                art.update({'clearlogo': clearlogo})
-                art.update({'clearart': clearart})
-                art.update({'landscape': landscape})
-                art.update({'discart': discart})
+                art.update({
+                    'icon': poster,
+                    'thumb': poster,
+                    'poster': poster,
+                    **({'fanart': fanart} if setting_fanart == 'true' else {}),
+                    'banner': banner,
+                    'clearlogo': clearlogo,
+                    'clearart': clearart,
+                    'landscape': landscape,
+                    'discart': discart
+                })
 
                 item.setArt(art)
                 #item.addContextMenuItems(cm)
@@ -1751,14 +1811,14 @@ class movies:
                 c.log(f'[CM Debug @ 1796 in movies.py]Traceback:: {failure}')
                 c.log(f'[CM Debug @ 1796 in movies.py]Exception raised. Error = {e}')
                 pass
-            #except Exception as e:
-                #c.log(f"[CM Debug @ 1797 in movies.py] exception raised: error = {e}")
-                #pass
+                #except Exception as e:
+                    #c.log(f"[CM Debug @ 1797 in movies.py] exception raised: error = {e}")
+                    #pass
 
         try:
             url = items[0]['next']
             if url == '':
-                raise Exception()
+                raise ValueError('No next page URL found')
 
             icon = control.addonNext()
             url = '%s?action=moviePage&url=%s' % (sysaddon, quote_plus(url))
@@ -1773,7 +1833,7 @@ class movies:
                 })
 
             control.addItem(handle=syshandle, url=url, listitem=item, isFolder=True)
-        except Exception:
+        except (Exception, ValueError):
             pass
 
         control.content(syshandle, 'movies')

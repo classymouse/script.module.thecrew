@@ -405,7 +405,7 @@ class libtvshows:
 
             c.log(f"[CM Debug @ 289 in libtools.py] tvshowtitle = {tvshowtitle}|year = {year}|imdb = {imdb}|tmdb = {tmdb}")
             from resources.lib.indexers import episodes
-            seasons = episodes.seasons().get(tvshowtitle, year, imdb, tmdb, meta=None, idx=False)
+            seasons = episodes.Seasons().get(tvshowtitle, year, imdb, tmdb, meta=None, idx=False)
             seasons = [i['season'] for i in seasons]
             c.log(f'[CM Debug @ 293 in libtools.py] seasons ={repr(seasons)}')
             for s in seasons:
@@ -707,7 +707,7 @@ class libepisodes:
                 if it is not None:
                     raise Exception()
 
-                seasons = episodes.seasons().get(item['tvshowtitle'], item['year'], item['imdb'], item['tmdb'], meta=None, idx=False)
+                seasons = episodes.Seasons().get(item['tvshowtitle'], item['year'], item['imdb'], item['tmdb'], meta=None, idx=False)
                 season = [i['season'] for i in seasons]
                 for s in season:
                     #c.log('lib_seasons: ' + str(s))

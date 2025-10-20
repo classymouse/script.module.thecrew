@@ -82,7 +82,7 @@ class sources:
             self.Orion = None
 
 
-    def play(self, title, year, imdb_id, tmdb_id, season, episode, tvshowtitle, premiered, meta, select='1'):
+    def play(self, title, year, imdb, tmdb, season, episode, tvshowtitle, premiered, meta, select='1'):
         """
         Play a video based on the provided metadata.
 
@@ -106,7 +106,7 @@ class sources:
             if media_type != 'movie' and tvshowtitle:
                 title = tvshowtitle or title
 
-            returned_sources = self.getSources(title, year, imdb_id, tmdb_id, season, episode, tvshowtitle, premiered)
+            returned_sources = self.getSources(title, year, imdb, tmdb, season, episode, tvshowtitle, premiered)
             select = control.setting('hosts.mode') if not select else select
 
             if returned_sources:
@@ -131,7 +131,7 @@ class sources:
                 self.url = url
                 return self.errorForSources()
 
-            player().run(title, year, season, episode, imdb_id, tmdb_id, url, metadata)
+            player().run(title, year, season, episode, imdb, tmdb, url, metadata)
         except Exception:
             pass
 

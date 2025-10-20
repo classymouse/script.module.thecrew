@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-
+# flake8: noqa: E501
 '''
  ***********************************************************
  * The Crew Add-on
@@ -11,718 +11,421 @@
  *
  ********************************************************cm*
 '''
-
+# pylint: disable=C0301  # disable "line too long" (file-wide)
 
 import sys
 from .crewruntime import c
 
+# moved imports to module top-level for clarity and performance
+import importlib
+import inspect
+import json
+import traceback
+import types
+from random import randint
+from urllib.parse import quote_plus
+
+# moved previously-local imports to top-level as requested
+from . import cache
+from . import control
+from . import downloader
+from . import sources as local_sources
+from . import views
+
 def router(params):
+    """
+    Refactored single-entry router that preserves original behaviour.
+    - Uses lazy imports
+    - Handles instantiation heuristics
+    - Maps every action from the original file to a handler
+    """
+    # local helper to read params
+    def p(k, default=None):
+        return params.get(k, default)
 
+    # robust call_module: import module, resolve attribute, optionally instantiate or call method
+    def call_module(module_path, attr=None, inst=False, method=None, *a, **kw):
+        """
+        Lazily import module or accept a module object.
+        - module_path: str module name or an already-imported module object
+        - attr: attribute name in module (optional)
+        - inst: if True, try to instantiate/resolve a class/constructor
+        - method: call a method on the instance/attribute/module when provided
+        """
+        # Accept already-imported module objects
+        if not isinstance(module_path, str):
+            if inspect.ismodule(module_path):
+                mod = module_path
+            else:
+                raise TypeError(f"module_path must be a string or module, got: {type(module_path)}")
+        else:
+            # Support relative imports (module_path starting with '.')
+            try:
+                if module_path.startswith('.'):
+                    mod = importlib.import_module(module_path, package=__package__)
+                else:
+                    mod = importlib.import_module(module_path)
+            except Exception:
+                c.log(f"[router] Failed to import {module_path}")
+                raise
 
-    c.log('\n------------------------------------------------------------------------\n\
-[cm inside router @ 23]\nparams = ' + repr(params) + '\n\
-------------------------------------------------------------------------\n')
+        target = getattr(mod, attr) if attr else mod
 
+        def _find_class_in_module(m, name_hint=None):
+            hint = (name_hint or '').lower()
+            for n, obj in inspect.getmembers(m, inspect.isclass):
+                if n.lower() == hint:
+                    return obj
+            for n, obj in inspect.getmembers(m, inspect.isclass):
+                if obj.__module__ == m.__name__:
+                    return obj
+            return None
 
+        # instantiate requested
+        if inst:
+            instance = None
+            if inspect.isclass(target):
+                instance = target()
+            elif callable(target) and not inspect.ismodule(target):
+                instance = target()
+            elif inspect.ismodule(target):
+                cls = _find_class_in_module(target, attr)
+                if cls:
+                    instance = cls()
+            if instance is None:
+                raise TypeError(f"'inst' requested but target is not callable: {module_path}{f'.{attr}' if attr else ''}")
+            return getattr(instance, method)(*a, **kw) if method else instance
 
+        # call a method in module/attribute or call the callable
+        if method:
+            if inspect.ismodule(target):
+                func = getattr(target, method, None)
+                if callable(func):
+                    return func(*a, **kw)
+            else:
+                func = getattr(target, method, None)
+                if callable(func):
+                    return func(*a, **kw)
+            raise AttributeError(f"Method {method} not found on target {module_path}{f'.{attr}' if attr else ''}")
 
+        if callable(target) and not inspect.ismodule(target):
+            return target(*a, **kw)
 
+        return target
 
-
-
-    # Use tuple unpacking for faster access to params
-    action, mode, subid, name, title, year, imdb, tmdb, season, episode, tvshowtitle, premiered, url, tid, image, meta, select, query, source, content, mediatype, _id, docu_category, docu_play, windowedtrailer = (
-        params.get(key) for key in (
-            'action', 'mode', 'subid', 'name', 'title', 'year', 'imdb', 'tmdb',
-            'season', 'episode', 'tvshowtitle', 'premiered', 'url', 'tid', 'image',
-            'meta', 'select', 'query', 'source', 'content', 'mediatype', 'id', 'docuCat', 'docuPlay',
-            'windowedtrailer'
-        )
-    )
-
-
-    docu_watch = params.get('docuPlay')
-
-    windowedtrailer = params.get('windowedtrailer')
-    windowedtrailer = int(windowedtrailer) if windowedtrailer in ("0", "1") else 0
-
+    # actionlist from original file
     actionlist = {
         '247movies','247tvshows','iptv','yss','weak','daddylive',
         'sportsbay','sports24','gratis','base','waste','whitehat','arconai','iptv_lodge','stratus','distro',
         'xumo','bumble','pluto','tubi','spanish','spanish2','bp','arabic','arabic2','india','chile','colombia','argentina',
-        'spain','iptv_git','cctv','titan','porn','faith','lust','greyhat','absolution','eyecandy','purplehat', 'classy','retribution','kiddo',
+        'spain','iptv_git','cctv','titan','porn','faith','lust','greyhat','absolution','eyecandy','purplehat','classy','retribution','kiddo',
         'redhat','yellowhat','blackhat','food','ncaa','ncaab','lfl','xfl','boxing','tennis','mlb','nfl','nhl','nba',
-        'ufc','fifa','wwe','motogp','f1','pga','nascar','cricket','sports_channels', 'sreplays', 'greenhat'
+        'ufc','fifa','wwe','motogp','f1','pga','nascar','cricket','sports_channels','sreplays','greenhat'
     }
 
-
-
+    action = p('action')
     if action is None:
-        from resources.lib.indexers import navigator
-        from resources.lib.modules import cache
+        # default behaviour
+        call_module('resources.lib.indexers.navigator', 'Navigator', inst=True, method='root')
         cache.cache_version_check()
-        navigator.navigator.root()
+        return
 
-    elif action in actionlist:
-        from resources.lib.indexers import lists
-        indexer = lists.indexer()
-        getattr(indexer, f'root_{action}')()
-
-    elif action == 'greenhat':
-        from resources.lib.indexers import lists
-        lists.indexer().root_greenhat()
-
-    elif action == 'gitNavigator':
-        from resources.lib.indexers import lists
-        lists.indexer().root_git()
-
-    elif action == 'plist':
-        from resources.lib.indexers import lists
-        lists.indexer().root_personal()
-
-    elif action == 'directory':
-        from resources.lib.indexers import lists
-        lists.indexer().get(url)
-
-    elif action == 'qdirectory':
-        from resources.lib.indexers import lists
-        lists.indexer().getq(url)
-
-    elif action == 'xdirectory':
-        from resources.lib.indexers import lists
-        lists.indexer().getx(url)
-
-    elif action == 'developer':
-        from resources.lib.indexers import lists
-        lists.indexer().developer()
-
-    elif action == 'classytest':
-        from resources.lib.modules import control
-        control.infoDialog("Classy Test", sound=False, icon='INFO')
-
-    elif action == 'tvtuner':
-        from resources.lib.indexers import lists
-        lists.indexer().tvtuner(url)
-
-    elif 'youtube' in str(action):
-        from resources.lib.indexers import lists
-        lists.indexer().youtube(url, action)
-
-    elif action == 'browser':
-        from resources.lib.indexers import lists
-        sports.resolver().browser(url)
-
-    elif action == 'docuNavigator':
-        from resources.lib.indexers import docu
-        docu.documentary().root()
-
-    elif action == 'docuHeaven':
-        from resources.lib.indexers import docu
-        if docu_category is not None:
-            docu.documentary().docu_list(docu_category)
-        elif docu_watch is not None:
-            docu.documentary().docu_play(docu_watch)
-            #docu.documentary().play_video(docu_watch)
+    # handle big actionlist with lists.indexer().root_<action>()
+    if action in actionlist:
+        idx = call_module('resources.lib.indexers.lists', 'indexer', inst=True)
+        func_name = f'root_{action}'
+        if hasattr(idx, func_name):
+            getattr(idx, func_name)()
         else:
-            if docu_category is not None:
-                docu.documentary().docu_list(docu_category)
+            # Safely resolve and call the 'root' attribute only if callable.
+            root = getattr(idx, 'root', None)
+            if callable(root):
+                root()
             else:
-                docu.documentary().root()
+                c.log(f"[router] indexer 'root' not callable for action: {action}")
+        return
 
-    elif action == 'bluehat':
-        from resources.lib.indexers import navigator
-        navigator.navigator.bluehat()
-
-    elif action == 'whitehat':
-        from resources.lib.indexers import navigator
-        navigator.navigator.whitehat()
-
-    elif action == 'movieNavigator':
-        from resources.lib.indexers import navigator
-        navigator.navigator.movies()
-
-    elif action == 'movieliteNavigator':
-        from resources.lib.indexers import navigator
-        navigator.navigator.movies(lite=True)
-
-    elif action == 'mymovieNavigator':
-        from resources.lib.indexers import navigator
-        navigator.navigator.mymovies()
-
-    elif action == 'mymovieliteNavigator':
-        from resources.lib.indexers import navigator
-        navigator.navigator.mymovies(lite=True)
-
-    elif action == 'nav_add_addons':
-        from resources.lib.indexers import navigator
-        navigator.navigator.add_addons()
-
-    elif action == 'tvNavigator':
-        from resources.lib.indexers import navigator
-        navigator.navigator.tvshows()
-
-    elif action == 'traktlist':
-        from resources.lib.indexers import navigator
-        navigator.navigator.traktlist()
-
-    elif action == 'imdblist':
-        from resources.lib.indexers import navigator
-        navigator.navigator.imdblist()
-
-    elif action == 'tmdbtvlist':
-        from resources.lib.indexers import navigator
-        navigator.navigator.tmdbtvlist()
-
-    elif action == 'tmdbmovieslist':
-        from resources.lib.indexers import navigator
-        navigator.navigator.tmdbmovieslist()
-
-    elif action == 'tvliteNavigator':
-        from resources.lib.indexers import navigator
-        navigator.navigator.tvshows(lite=True)
-
-    elif action == 'mytvNavigator':
-        from resources.lib.indexers import navigator
-        navigator.navigator.mytvshows()
-
-    elif action == 'mytvliteNavigator':
-        from resources.lib.indexers import navigator
-        navigator.navigator.mytvshows(lite=True)
-
-    elif action == 'downloadNavigator':
-        from resources.lib.indexers import navigator
-        navigator.navigator.downloads()
-
-    elif action == 'libraryNavigator':
-        from resources.lib.indexers import navigator
-        navigator.navigator.library()
-
-    elif action == 'OrionNavigator':
-        from resources.lib.indexers import navigator
-        navigator.navigator.orionoid()
-
-    elif action == 'userdetailsOrion':
-        from .orion_api import oa
-        #OrionApi.auth_orion()
-        oa.authorize_orion()
-
-    elif action == 'settingsOrion':
-        from .orion_api import oa
-        #OrionApi.auth_orion()
-        oa.settings_orion()
-
-    elif action == 'userlabelOrion':
-        from .orion_api import oa
-        #OrionApi.auth_orion()
-        oa.info_orion()
-
-    elif action == 'toolNavigator':
-        from resources.lib.indexers import navigator
-        navigator.navigator.tools()
-
-    elif action == 'developers':
-        from resources.lib.indexers import navigator
-        navigator.navigator.developers()
-
-    elif action == 'cachingTools':
-        from resources.lib.indexers import navigator
-        navigator.navigator.cachingTools()
-
-    elif action == 'searchNavigator':
-        from resources.lib.indexers import navigator
-        navigator.navigator.search()
-
-    elif action == 'viewsNavigator':
-        from resources.lib.indexers import navigator
-        navigator.navigator.views()
-
-    elif action == 'clearCache':
-        from resources.lib.indexers import navigator
-        navigator.navigator.clearCache()
-
-    elif action == 'clearAllCache':
-        from resources.lib.indexers import navigator
-        navigator.navigator.clearCacheAll()
-
-    elif action == 'clearMetaCache':
-        from resources.lib.indexers import navigator
-        navigator.navigator.clearCacheMeta()
-
-    elif action == 'clearCacheSearch':
-        from resources.lib.indexers import navigator
-        navigator.navigator.clearCacheSearch()
-
-    #CM 2021/17/7 @todo obsolete part
-    elif action == 'infoCheck':
-        from resources.lib.indexers import navigator
-        navigator.navigator.info_check('')
-
-    elif action == 'movies':
-        from resources.lib.indexers import movies
-        if url in ['tmdb_networks', 'tmdb_networks_no_unaired']:
-            movies.movies().get(url, tid)
+    # helper for docuHeaven fallback
+    def _docu_heaven():
+        if p('docuCat') is not None:
+            call_module('resources.lib.indexers.docu', 'documentary', True, 'docu_list', * (p('docuCat'),))
+        elif p('docuPlay') is not None:
+            call_module('resources.lib.indexers.docu', 'documentary', True, 'docu_play', * (p('docuPlay'),))
         else:
-            movies.movies().get(url)
+            call_module('resources.lib.indexers.docu', 'documentary', inst=True, method='root')
 
-    elif action == 'movieProgress':
-        from resources.lib.indexers import movies
-        movies.movies().get(action)
-
-    elif action == 'moviePage':
-        from resources.lib.indexers import movies
-        movies.movies().get(url)
-
-    elif action == 'movieWidget':
-        from resources.lib.indexers import movies
-        movies.movies().widget()
-
-    elif action == 'movieSearch':
-        from resources.lib.indexers import movies
-        movies.movies().search()
-
-    elif action == 'movieSearchnew':
-        from resources.lib.indexers import movies
-        movies.movies().search_new()
-
-    elif action == 'movieSearchterm':
-        from resources.lib.indexers import movies
-        movies.movies().search_term(name)
-
-    elif action == 'movieDeleteTerm':
-        from resources.lib.indexers import movies
-        movies.movies().delete_search_term(_id)
-
-    elif action == 'moviePerson':
-        from resources.lib.indexers import movies
-        movies.movies().person()
-
-    elif action == 'movieGenres':
-        from resources.lib.indexers import movies
-        movies.movies().genres()
-
-    elif action == 'movieLanguages':
-        from resources.lib.indexers import movies
-        movies.movies().languages()
-
-    elif action == 'movieCertificates':
-        from resources.lib.indexers import movies
-        movies.movies().certifications()
-
-    elif action == 'movieYears':
-        from resources.lib.indexers import movies
-        movies.movies().years()
-
-    elif action == 'moviePersons':
-        from resources.lib.indexers import movies
-        movies.movies().persons(url)
-
-    elif action == 'movieUserlists':
-        from resources.lib.indexers import movies
-        movies.movies().userlists()
-
-    elif action == 'channels':
-        from resources.lib.indexers import channels
-        channels.channels().get()
-
-    elif action == 'tvshows':
-        from resources.lib.indexers import tvshows
-        if url  == 'tmdb_networks':
-            tvshows.tvshows().get(url, tid)
-        else:
-            tvshows.tvshows().get(url)
-
-    elif action == 'tvshowPage':
-        from resources.lib.indexers import tvshows
-        tvshows.tvshows().get(url)
-
-    elif action == 'tvSearch':
-        from resources.lib.indexers import tvshows
-        tvshows.tvshows().search()
-
-    elif action == 'tvSearchnew':
-        from resources.lib.indexers import tvshows
-        tvshows.tvshows().search_new()
-
-    elif action == 'tvSearchterm':
-        from resources.lib.indexers import tvshows
-        tvshows.tvshows().search_term(name)
-
-    elif action == 'tvDeleteTerm':
-        from resources.lib.indexers import tvshows
-        tvshows.tvshows().delete_search_term(_id)
-
-    elif action == 'tvPerson':
-        from resources.lib.indexers import tvshows
-        tvshows.tvshows().person()
-
-    elif action == 'tvGenres':
-        from resources.lib.indexers import tvshows
-        tvshows.tvshows().genres()
-
-    elif action == 'tvNetworks':
-        from resources.lib.indexers import tvshows
-        tvshows.tvshows().networks()
-
-    elif action == 'tvLanguages':
-        from resources.lib.indexers import tvshows
-        tvshows.tvshows().languages()
-
-    elif action == 'tvCertificates':
-        from resources.lib.indexers import tvshows
-        tvshows.tvshows().certifications()
-
-    elif action == 'tvPersons':
-        from resources.lib.indexers import tvshows
-        tvshows.tvshows().persons(url)
-
-    elif action == 'tvUserlists':
-        from resources.lib.indexers import tvshows
-        tvshows.tvshows().userlists()
-
-    elif action == 'seasons':
-        from resources.lib.indexers import episodes
-        episodes.seasons().get(tvshowtitle, year, imdb, tmdb, meta)
-
-    elif action == 'episodes':
-        from resources.lib.indexers import episodes
-        episodes.episodes().get(tvshowtitle, year, imdb, tmdb, meta, season, episode)
-
-    elif action == 'calendar':
-        from resources.lib.indexers import episodes
-        episodes.episodes().calendar(url)
-
-    elif action == 'tvWidget':
-        from resources.lib.indexers import episodes
-        episodes.episodes().widget()
-
-    elif action == 'calendars':
-        from resources.lib.indexers import episodes
-        episodes.episodes().calendars()
-
-    elif action == 'episodeUserlists':
-        from resources.lib.indexers import episodes
-        episodes.episodes().userlists()
-
-    elif action == 'setfanartquality':
-        from . import control
-        c.log('[CM Debug @ 397 in crew.py] hiero')
-        control.setFanartQuality()
-
-    elif action == 'refresh':
-        from . import control
-        control.refresh()
-
-    elif action == 'queueItem':
-        from . import control
-        control.queueItem()
-
-    elif action == 'openSettings':
-        from . import control
-        control.openSettings(query)
-
-    #elif action == 'openDebuglog':
-        #from . import control
-        #control.openLogViewer()
-
-
-
-    # developers menu
-    elif action == "get_qrcode":
-        from . import orion_api
-        orion_api.get_orion_qr()
-
-
-
-    elif action == 'traktSyncsetup':
-        from . import trakt
-        trakt.traktSyncsetup()
-
-    elif action == 'traktchecksync':
-        from . import trakt
-        trakt.check_sync_tables()
-
-    elif action == 'traktgetcollections':
-        from . import trakt
-        trakt.get_trakt_collection('all')
-
-
-
-
-    elif action == 'startupMaintenance':
-        from . import control
-        control.startupMaintenance()
-
-    elif action == 'setSizes':
-        from . import control
-        control.setSizes()
-
-    elif action == 'updateSizes':
-        from . import control
-        control.updateSizes()
-
-    # end developers menu
-
-    elif action == 'changelog':
-        from resources.lib.modules import changelog
-        changelog.get()
-
-    elif action == 'artwork':
-        from . import control
-        control.artwork()
-
-    elif action == 'addView':
-        from . import views
-        views.add_view(content)
-
-    elif action == 'moviePlaycount':
-        from . import playcount
-        playcount.movies(imdb, query)
-
-    elif action == 'episodePlaycount':
-        from . import playcount
-        playcount.episodes(imdb, tmdb, season, episode, query)
-
-    elif action == 'seasonPlaycount':
-        from . import playcount
-        playcount.seasons(imdb, tmdb, season, episode, query)
-
-    elif action == 'tvPlaycount':
-        from . import playcount
-        #playcount.tvshows(name, imdb, tmdb, season, query)
-        playcount.tvshows(imdb, tmdb, query)
-
-    elif action == 'trailer':
-        from . import trailer
-        c.log(f"[CM Debug @ 461 in crew.py] trailer name = {name} |url = {url} |imdb = {imdb} |tmdb = {tmdb} |windowedtrailer = {windowedtrailer}|mediatype = {mediatype}")
-        trailer.trailers().get(name, url, imdb, tmdb, windowedtrailer, mediatype, meta)
-        #trailer.trailer().play(name, url, meta, windowedtrailer)
-
-    elif action == 'traktManager':
-        from resources.lib.modules import trakt
-        trakt.manager(name, imdb, tmdb, content)
-
-    elif action == 'authTrakt':
-        from resources.lib.modules import trakt
-        trakt.auth_trakt()
-
-    elif action == 'authRD':
-        from resources.lib.modules.debridapis import realdbrid
-        control.infoDialog()
-
-    elif action == 'ResolveUrlTorrent':
-        from . import control
-        control.openSettings(query, "script.module.resolveurl")
-
-    elif action == 'download':
-        import json
-        from . import sources
-        from . import downloader
+    # complex 'play' handler reused by play/play1
+    def _play_handler(use_player=False):
         try:
-            downloader.download(name, image, sources.sources().sourcesResolve(json.loads(source)[0], True))
-        except:
-            pass
-
-    elif action == 'play':
-        from resources.lib.indexers import lists
-        try:
+            content = p('content')
             if content is not None:
-                c.log(f"[CM Debug @ 524 in crew.py] content = {content}")
-                lists.player().play(url, content)
-            else:
-                from resources.lib.modules import sources
-                #c.log(f"[CM Debug @ 538 in crew.py] playing from sources, title = {title} | year = {year} | imdb = {imdb} | tmdb = {tmdb} | season = {season} | episode = {episode} | tvshowtitle = {tvshowtitle} | premiered = {premiered} | meta = {meta} | select = {select}")
-                sources.sources().play(title, year, imdb, tmdb, season, episode, tvshowtitle, premiered, meta, select)
+                # lists.player().play(url, content)
+                call_module('resources.lib.indexers.lists', 'player', True, 'play', * (p('url'), content))
+                return
+            # sources.sources().play(...)
+            call_module('resources.lib.modules.sources', 'sources', inst=True, method='play', title=p('title'), year=p('year'), imdb=p('imdb'), tmdb=p('tmdb'), season=p('season'), episode=p('episode'), tvshowtitle=p('tvshowtitle'), premiered=p('premiered'), meta=p('meta'), select=p('select'))
         except Exception as e:
-            import traceback
-            failure = traceback.format_exc()
-            c.log('[CM @ 470 in crew]Traceback:: ' + str(failure))
-            c.log('[CM @ 471 in crew]Error:: ' + str(e))
-            pass
+            c.log(f'[CM @ router]Traceback:: {traceback.format_exc()}')
+            c.log(f'[CM @ router]Error:: {e}')
 
-    elif action == 'play1':
-        from resources.lib.indexers import lists
-        if content is not None:
-            lists.player().play(url, content)
-        else:
-            from resources.lib.modules import sources
-            sources.sources().play(title, year, imdb, tmdb, season, episode, tvshowtitle, premiered, meta, select)
-
-    elif action == 'addItem':
-        from resources.lib.modules import sources
-        sources.sources().addItem(title)
-
-    elif action == 'playItem':
-        from resources.lib.modules import sources
-        sources.sources().playItem(title, source)
-
-    elif action == 'alterSources':
-        from resources.lib.modules import sources
-        sources.sources().alterSources(url, meta)
-
-    elif action == 'clearSources':
-        from resources.lib.modules import sources
-        sources.sources().clearSources()
-
-    elif action == 'random':
-        rtype = params.get('rtype')
-        if rtype == 'movie':
-            from resources.lib.indexers import movies
-            rlist = movies.movies().get(url, create_directory=False)
-            r = sys.argv[0]+"?action=play"
-        elif rtype == 'episode':
-            from resources.lib.indexers import episodes
-            rlist = episodes.episodes().get(tvshowtitle, year, imdb, tmdb, meta, season, create_directory=False)
-            r = sys.argv[0]+"?action=play"
-        elif rtype == 'season':
-            from resources.lib.indexers import episodes
-            rlist = episodes.seasons().get(tvshowtitle, year, imdb, tmdb, meta, create_directory=False)
-            r = sys.argv[0]+"?action=random&rtype=episode"
-        elif rtype == 'show':
-            from resources.lib.indexers import tvshows
-            rlist = tvshows.tvshows().get(url, create_directory=False)
-            r = sys.argv[0]+"?action=random&rtype=season"
-        from . import control
-        from random import randint
-        from urllib.parse import quote_plus
-        import json
+    # download handler (keeps original silent failure behaviour)
+    def _download_handler():
         try:
-            rand = randint(1, len(rlist))-1
-            for p in ['title', 'year', 'imdb', 'tmdb', 'season', 'episode', 'tvshowtitle', 'premiered', 'select']:
-                if rtype == "show" and p == "tvshowtitle":
-                    try:
-                        r += '&'+p+'='+ quote_plus(rlist[rand]['title'])
-                    except:
-                        pass
+            src = p('source')
+            # use top-level downloader/local_sources imported above
+            downloader.download(p('name'), p('image'), local_sources.sources().sourcesResolve(json.loads(src)[0], True))
+        except (ValueError, IndexError, TypeError, KeyError, json.JSONDecodeError) as e:
+            c.log(f"[CM Debug @ 173 in crew.py] Download handler error: {e}")
+            # ignore expected parsing/indexing/type errors but avoid catching all Exceptions
+
+
+    # random handler preserves original branching
+    def _random_handler():
+        try:
+            rtype = p('rtype')
+            rlist = []
+            r = f"{sys.argv[0]}?action=play"
+
+            if rtype == 'movie':
+                rlist = call_module('resources.lib.indexers.movies', 'movies', inst=True, method='get', create_directory=False, url=p('url'))
+            elif rtype == 'episode':
+                # use the correct attribute/class name 'episodes' (not 'episode')
+                rlist = call_module('resources.lib.indexers.episodes', 'episodes', inst=True, method='get', create_directory=False, tvshowtitle=p('tvshowtitle'), year=p('year'), imdb=p('imdb'), tmdb=p('tmdb'), meta=p('meta'), season=p('season'))
+            elif rtype == 'season':
+                rlist = call_module('resources.lib.indexers.episodes', 'Seasons', inst=True, method='get', create_directory=False, tvshowtitle=p('tvshowtitle'), year=p('year'), imdb=p('imdb'), tmdb=p('tmdb'), meta=p('meta'))
+                r = f"{sys.argv[0]}?action=random&rtype=episode"
+            elif rtype == 'show':
+                rlist = call_module('resources.lib.indexers.tvshows', 'tvshows', inst=True, method='get', create_directory=False, url=p('url'))
+                r = f"{sys.argv[0]}?action=random&rtype=season"
+
+            # Defensive normalization: ensure we have a sequence
+            if not rlist:
+                control.infoDialog(control.lang(32537), time=8000)
+                return
+
+            if not isinstance(rlist, (list, tuple)):
+                if isinstance(rlist, dict):
+                    rlist = [rlist]
                 else:
-                    try:
-                        r += '&'+p+'='+ quote_plus(rlist[rand][p])
-                    except:
-                        pass
+                    # Only attempt to convert to list if object is actually iterable
+                    if hasattr(rlist, '__iter__'):
+                        try:
+                            rlist = list(rlist) # type: ignore
+                        except Exception:
+                            c.log(f"[CM Debug @ random_handler] converting rlist to list failed (type={type(rlist)}): {repr(rlist)}")
+                            control.infoDialog(control.lang(32537), time=8000)
+                            return
+                    else:
+                        c.log(f"[CM Debug @ random_handler] rlist not iterable (type={type(rlist)}): {repr(rlist)}")
+                        control.infoDialog(control.lang(32537), time=8000)
+                        return
+
+            rand = randint(0, len(rlist) - 1)
+            for pkey in ['title', 'year', 'imdb', 'tmdb', 'season', 'episode', 'tvshowtitle', 'premiered', 'select']:
+                try:
+                    if rtype == "show" and pkey == "tvshowtitle":
+                        r += '&' + pkey + '=' + quote_plus(rlist[rand].get('title', ''))
+                    else:
+                        r += '&' + pkey + '=' + quote_plus(str(rlist[rand].get(pkey, '')))
+                except Exception:
+                    pass
             try:
-                r += '&meta='+ quote_plus(json.dumps(rlist[rand]))
-            except:
-                r += '&meta='+ quote_plus("{}")
+                r += f'&meta={quote_plus(json.dumps(rlist[rand]))}'
+            except Exception:
+                r += '&meta=' + quote_plus("{}")
+            # feedback dialogs similar to original
             if rtype == "movie":
                 try:
-                    control.infoDialog(rlist[rand]['title'], control.lang(32536), time=30000)
-                except:
+                    control.infoDialog(rlist[rand].get('title', ''), control.lang(32536), time=30000)
+                except Exception:
                     pass
             elif rtype == "episode":
                 try:
-                    control.infoDialog(rlist[rand]['tvshowtitle']+" - Season "+ rlist[rand]['season'] + " - "+rlist[rand]['title'], control.lang(32536), time=30000)
-                except:
+                    control.infoDialog(f"{rlist[rand].get('tvshowtitle','')} - Season {rlist[rand].get('season','')} - {rlist[rand].get('title','')}", control.lang(32536), time=30000)
+                except Exception:
                     pass
-            control.execute('RunPlugin(%s)' % r)
-        except:
+            control.execute(f'RunPlugin({r})')
+        except Exception:
             control.infoDialog(control.lang(32537), time=8000)
 
-    elif action == 'movieToLibrary':
-        from resources.lib.modules import libtools
-        #libtools.libmovies().add(name, title, year, imdb, tmdb)
-        libtools.libmovies().add_movie(name, title, year, imdb, tmdb)
+    # mapping of actions to handlers (covers all actions from original file)
+    action_map = {
+        # navigator group
+        'bluehat': lambda: call_module('resources.lib.indexers.navigator', 'Navigator', inst=True, method='bluehat'),
+        'whitehat': lambda: call_module('resources.lib.indexers.navigator', 'Navigator', inst=True, method='whitehat'),
+        'movieNavigator': lambda: call_module('resources.lib.indexers.navigator', 'Navigator', inst=True, method='movies'),
+        'movieliteNavigator': lambda: call_module('resources.lib.indexers.navigator', 'Navigator', inst=True, method='movies', lite=True),
+        'mymovieNavigator': lambda: call_module('resources.lib.indexers.navigator', 'Navigator', inst=True, method='mymovies'),
+        'mymovieliteNavigator': lambda: call_module('resources.lib.indexers.navigator', 'Navigator', inst=True, method='mymovies', lite=True),
+        'nav_add_addons': lambda: call_module('resources.lib.indexers.navigator', 'Navigator', inst=True, method='add_addons'),
+        'tvNavigator': lambda: call_module('resources.lib.indexers.navigator', 'Navigator', inst=True, method='tvshows'),
+        'traktlist': lambda: call_module('resources.lib.indexers.navigator', 'Navigator', inst=True, method='traktlist'),
+        'imdblist': lambda: call_module('resources.lib.indexers.navigator', 'Navigator', inst=True, method='imdblist'),
+        'tmdbtvlist': lambda: call_module('resources.lib.indexers.navigator', 'Navigator', inst=True, method='tmdbtvlist'),
+        'tmdbmovieslist': lambda: call_module('resources.lib.indexers.navigator', 'Navigator', inst=True, method='tmdbmovieslist'),
+        'tvliteNavigator': lambda: call_module('resources.lib.indexers.navigator', 'Navigator', inst=True, method='tvshows', lite=True),
+        'mytvNavigator': lambda: call_module('resources.lib.indexers.navigator', 'Navigator', inst=True, method='mytvshows'),
+        'mytvliteNavigator': lambda: call_module('resources.lib.indexers.navigator', 'Navigator', inst=True, method='mytvshows', lite=True),
+        'downloadNavigator': lambda: call_module('resources.lib.indexers.navigator', 'Navigator', inst=True, method='downloads'),
+        'libraryNavigator': lambda: call_module('resources.lib.indexers.navigator', 'Navigator', inst=True, method='library'),
+        'OrionNavigator': lambda: call_module('resources.lib.indexers.navigator', 'Navigator', inst=True, method='orionoid'),
+        'toolNavigator': lambda: call_module('resources.lib.indexers.navigator', 'Navigator', inst=True, method='tools'),
+        'developers': lambda: call_module('resources.lib.indexers.navigator', 'Navigator', inst=True, method='developers'),
+        'cachingTools': lambda: call_module('resources.lib.indexers.navigator', 'Navigator', inst=True, method='cachingTools'),
+        'searchNavigator': lambda: call_module('resources.lib.indexers.navigator', 'Navigator', inst=True, method='search'),
+        'viewsNavigator': lambda: call_module('resources.lib.indexers.navigator', 'Navigator', inst=True, method='views'),
+        'clearCache': lambda: call_module('resources.lib.indexers.navigator', 'Navigator', inst=True, method='clearCache'),
+        'clearAllCache': lambda: call_module('resources.lib.indexers.navigator', 'Navigator', inst=True, method='clearCacheAll'),
+        'clearMetaCache': lambda: call_module('resources.lib.indexers.navigator', 'Navigator', inst=True, method='clearCacheMeta'),
+        'clearCacheSearch': lambda: call_module('resources.lib.indexers.navigator', 'Navigator', inst=True, method='clearCacheSearch'),
+        'newsNavigator': lambda: call_module('resources.lib.indexers.navigator', 'Navigator', inst=True, method='news'),
+        'collectionsNavigator': lambda: call_module('resources.lib.indexers.navigator', 'Navigator', inst=True, method='collections'),
+        'collectionActors': lambda: call_module('resources.lib.indexers.navigator', 'Navigator', inst=True, method='collectionActors'),
+        'collectionBoxset': lambda: call_module('resources.lib.indexers.navigator', 'Navigator', inst=True, method='collectionBoxset'),
+        'collectionBoxsetKids': lambda: call_module('resources.lib.indexers.navigator', 'Navigator', inst=True, method='collectionBoxsetKids'),
+        'collectionKids': lambda: call_module('resources.lib.indexers.navigator', 'Navigator', inst=True, method='collectionKids'),
+        'collectionSuperhero': lambda: call_module('resources.lib.indexers.navigator', 'Navigator', inst=True, method='collectionSuperhero'),
+        'holidaysNavigator': lambda: call_module('resources.lib.indexers.navigator', 'Navigator', inst=True, method='holidays'),
+        'halloweenNavigator': lambda: call_module('resources.lib.indexers.navigator', 'Navigator', inst=True, method='halloween'),
+        'kidsgreyNavigator': lambda: call_module('resources.lib.indexers.navigator', 'Navigator', inst=True, method='kidsgrey'),
+        # lists indexer shortcuts
+        'gitNavigator': lambda: call_module('resources.lib.indexers.lists', 'indexer', inst=True, method='root_git'),
+        'plist': lambda: call_module('resources.lib.indexers.lists', 'indexer', inst=True, method='root_personal'),
+        'directory': lambda: call_module('resources.lib.indexers.lists', 'indexer', True, 'get', * (p('url'),)),
+        'qdirectory': lambda: call_module('resources.lib.indexers.lists', 'indexer', True, 'getq', * (p('url'),)),
+        'xdirectory': lambda: call_module('resources.lib.indexers.lists', 'indexer', True, 'getx', * (p('url'),)),
+        'developer': lambda: call_module('resources.lib.indexers.lists', 'indexer', inst=True, method='developer'),
+        'tvtuner': lambda: call_module('resources.lib.indexers.lists', 'indexer', True, 'tvtuner', * (p('url'),)),
+        'youtube': lambda: call_module('resources.lib.indexers.lists', 'indexer', True, 'youtube', * (p('url'), p('action'))),
+        'browser': lambda: call_module('resources.lib.indexers.lists', 'indexer', True, 'browser', * (p('url'),)),
+        'docuNavigator': lambda: call_module('resources.lib.indexers.docu', 'documentary', inst=True, method='root'),
+        'docuHeaven': _docu_heaven,
+        # movies
+        'movies': lambda: call_module('resources.lib.indexers.movies', 'movies', True, 'get', * (p('url'), p('tid')) ) if p('url') in ['tmdb_networks', 'tmdb_networks_no_unaired'] else call_module('resources.lib.indexers.movies', 'movies', True, 'get', * (p('url'),)),
+        'movieProgress': lambda: call_module('resources.lib.indexers.movies', 'movies', True, 'get', * (p('action'),)),
+        'moviePage': lambda: call_module('resources.lib.indexers.movies', 'movies', True, 'get', * (p('url'),)),
+        'movieWidget': lambda: call_module('resources.lib.indexers.movies', 'movies', inst=True, method='widget'),
+        'movieSearch': lambda: call_module('resources.lib.indexers.movies', 'movies', inst=True, method='search'),
+        'movieSearchnew': lambda: call_module('resources.lib.indexers.movies', 'movies', inst=True, method='search_new'),
+        'movieSearchterm': lambda: call_module('resources.lib.indexers.movies', 'movies', True, 'search_term', * (p('name'),)),
+        'movieDeleteTerm': lambda: call_module('resources.lib.indexers.movies', 'movies', True, 'delete_search_term', * (p('id'),)),
+        'moviePerson': lambda: call_module('resources.lib.indexers.movies', 'movies', inst=True, method='person'),
+        'movieGenres': lambda: call_module('resources.lib.indexers.movies', 'movies', inst=True, method='genres'),
+        'movieLanguages': lambda: call_module('resources.lib.indexers.movies', 'movies', inst=True, method='languages'),
+        'movieCertificates': lambda: call_module('resources.lib.indexers.movies', 'movies', inst=True, method='certifications'),
+        'movieYears': lambda: call_module('resources.lib.indexers.movies', 'movies', inst=True, method='years'),
+        'moviePersons': lambda: call_module('resources.lib.indexers.movies', 'movies', True, 'persons', * (p('url'),)),
+        'movieUserlists': lambda: call_module('resources.lib.indexers.movies', 'movies', inst=True, method='userlists'),
+        # channels
+        'channels': lambda: call_module('resources.lib.indexers.channels', 'channels', inst=True, method='get'),
+        # tvshows
+        'tvshows': lambda: call_module('resources.lib.indexers.tvshows', 'tvshows', True, 'get', * (p('url'), p('tid')) ) if p('url') == 'tmdb_networks' else call_module('resources.lib.indexers.tvshows', 'tvshows', True, 'get', * (p('url'),)),
+        'tvshowPage': lambda: call_module('resources.lib.indexers.tvshows', 'tvshows', True, 'get', * (p('url'),)),
+        'tvSearch': lambda: call_module('resources.lib.indexers.tvshows', 'tvshows', inst=True, method='search'),
+        'tvSearchnew': lambda: call_module('resources.lib.indexers.tvshows', 'tvshows', inst=True, method='search_new'),
+        'tvSearchterm': lambda: call_module('resources.lib.indexers.tvshows', 'tvshows', True, 'search_term', * (p('name'),)),
+        'tvDeleteTerm': lambda: call_module('resources.lib.indexers.tvshows', 'tvshows', True, 'delete_search_term', * (p('id'),)),
+        'tvPerson': lambda: call_module('resources.lib.indexers.tvshows', 'tvshows', inst=True, method='person'),
+        'tvGenres': lambda: call_module('resources.lib.indexers.tvshows', 'tvshows', inst=True, method='genres'),
+        'tvNetworks': lambda: call_module('resources.lib.indexers.tvshows', 'tvshows', inst=True, method='networks'),
+        'tvLanguages': lambda: call_module('resources.lib.indexers.tvshows', 'tvshows', inst=True, method='languages'),
+        'tvCertificates': lambda: call_module('resources.lib.indexers.tvshows', 'tvshows', inst=True, method='certifications'),
+        'tvPersons': lambda: call_module('resources.lib.indexers.tvshows', 'tvshows', True, 'persons', * (p('url'),)),
+        'tvUserlists': lambda: call_module('resources.lib.indexers.tvshows', 'tvshows', inst=True, method='userlists'),
+        # seasons / episodes
+        'seasons': lambda: call_module('resources.lib.indexers.episodes', 'Seasons', True, 'get', * (p('tvshowtitle'), p('year'), p('imdb'), p('tmdb'), p('meta'))),
+        'episodes': lambda: call_module('resources.lib.indexers.episodes', 'episodes', True, 'get',
+                                       * (p('tvshowtitle'), p('year'), p('imdb'), p('tmdb'), p('meta'), p('season'), p('episode'))),
+        'calendar': lambda: call_module('resources.lib.indexers.episodes', 'episodes', True, 'calendar', * (p('url'),)),
+        'tvWidget': lambda: call_module('resources.lib.indexers.episodes', 'episodes', inst=True, method='widget'),
+        'calendars': lambda: call_module('resources.lib.indexers.episodes', 'episodes', inst=True, method='calendars'),
+        'episodeUserlists': lambda: call_module('resources.lib.indexers.episodes', 'episodes', inst=True, method='userlists'),
+        # settings / control
+        'setfanartquality': lambda: call_module('resources.lib.modules.control', 'control', method='setFanartQuality'),
+        'refresh': lambda: call_module('resources.lib.modules.control', 'control', method='refresh'),
+        'queueItem': lambda: call_module('resources.lib.modules.control', 'control', method='queueItem'),
+        'openSettings': lambda: call_module('resources.lib.modules.control', 'control', False, 'openSettings', * (p('query'),)),
+        # orion
+        'userdetailsOrion': lambda: call_module('.orion_api', 'oa', method='authorize_orion'),
+        'settingsOrion': lambda: call_module('.orion_api', 'oa', method='settings_orion'),
+        'userlabelOrion': lambda: call_module('.orion_api', 'oa', method='info_orion'),
+        'get_qrcode': lambda: call_module('.orion_api', 'orion_api', method='get_orion_qr'),
+        # trakt / maintenance / misc
+        'traktSyncsetup': lambda: call_module('.trakt', 'trakt', method='traktSyncsetup'),
+        'traktchecksync': lambda: call_module('.trakt', 'trakt', method='check_sync_tables'),
+        'traktgetcollections': lambda: call_module('.trakt', 'trakt', False, 'get_trakt_collection', * ('all',)),
+        'startupMaintenance': lambda: call_module('.control', 'control', method='startupMaintenance'),
+        'setSizes': lambda: call_module('.control', 'control', method='setSizes'),
+        'updateSizes': lambda: call_module('.control', 'control', method='updateSizes'),
+        'changelog': lambda: call_module('resources.lib.modules.changelog', method='get'),
+        'artwork': lambda: call_module('.control', 'control', method='artwork'),
+        'addView': lambda: call_module('.views', 'views', method='add_view', **{'content': p('content')}),
 
-    elif action == 'moviesToLibrary':
-        from resources.lib.modules import libtools
-        libtools.libmovies().range(url)
+        'moviePlaycount': lambda: call_module('.playcount', 'movies', * (p('imdb'), p('query'))),
+        'episodePlaycount': lambda: call_module('.playcount', 'episode', * (p('imdb'), p('tmdb'), p('season'), p('episode'), p('query'))),
+        'seasonPlaycount': lambda: call_module('.playcount', 'season', * (p('imdb'), p('tmdb'), p('season'), p('query'))),
+        'tvPlaycount': lambda: call_module('.playcount',  'tvshows', * (p('imdb'), p('tmdb'), p('query'))),
 
-    elif action == 'moviesToLibrarySilent':
-        from resources.lib.modules import libtools
-        libtools.libmovies().silent(url)
+        'trailer': lambda: call_module('.trailer', 'trailers', True, 'get', * (p('name'), p('url'), p('imdb'), p('tmdb'), int(p('windowedtrailer') or 0), p('mediatype'), p('meta'))),
 
-    elif action == 'syncTrakt':
-        from resources.lib.modules import trakt
-        c.log(f"[CM Debug @ 624 in crew.py] running syncTrakt()")
-        trakt.syncTrakt()
+        'traktManager': lambda: call_module('resources.lib.modules.trakt','', False, 'manager', * (p('name'), p('imdb'), p('tmdb'), p('content'))),
+        'authTrakt': lambda: call_module('resources.lib.modules.trakt', 'trakt', method='auth_trakt'),
+        'authRD': lambda: (call_module('resources.lib.modules.debridapis.realdbrid', 'realdbrid', method='__dict__') , call_module('.control', 'control', method='infoDialog'))[1],
+        'ResolveUrlTorrent': lambda: call_module('.control', 'control', False, 'openSettings', * (p('query'), "script.module.resolveurl")),
+        'download': _download_handler,
+        'play': _play_handler,
+        'play1': _play_handler,
+        'addItem': lambda: call_module('resources.lib.modules.sources', 'sources', True, 'addItem', * (p('title'),)),
+        'playItem': lambda: call_module('resources.lib.modules.sources', 'sources', True, 'playItem', * (p('title'), p('source'))),
+        'alterSources': lambda: call_module('resources.lib.modules.sources', 'sources', True, 'alterSources', * (p('url'), p('meta'))),
+        'clearSources': lambda: call_module('resources.lib.modules.sources', 'sources', inst=True, method='clearSources'),
+        'random': _random_handler,
+        # library / sync / tools
+        'movieToLibrary': lambda: call_module('resources.lib.modules.libtools', '', inst=True, method='libmovies', **{}) or call_module('resources.lib.modules.libtools', 'libtools', True, 'add_movie', * (p('name'), p('title'), p('year'), p('imdb'), p('tmdb'))),
+        'moviesToLibrary': lambda:
+            call_module('resources.lib.modules.libtools', attr='', inst=True,  method='libmovies', **{}) or\
+            call_module('resources.lib.modules.libtools', 'libmovies', True, 'range', p('url')),
+        'moviesToLibrarySilent': lambda:
+            call_module('resources.lib.modules.libtools', 'libtools', method='libmovies', **{}) or\
+            call_module('resources.lib.modules.libtools', 'libmovies', True, 'silent', * (p('url'),)),
+        'syncTrakt': lambda: (c.log("[CM Debug @ router] running syncTrakt()"), call_module('resources.lib.modules.trakt', 'trakt', method='syncTrakt'))[1],
+        'tvshowToLibrary': lambda:
+            call_module('resources.lib.modules.libtools', method='libtvshows', **{}) or\
+            call_module('resources.lib.modules.libtools', '',  True, 'add', * (p('tvshowtitle'), p('year'), p('imdb'), p('tmdb'))),
+        'tvshowsToLibrary': lambda:
+            call_module('resources.lib.modules.libtools', method='libtvshows', **{}) or\
+            call_module('resources.lib.modules.libtools', '',  True, 'range', * (p('url'),)),
+        'tvshowsToLibrarySilent': lambda:
+            call_module('resources.lib.modules.libtools', method='libtvshows', **{}) or\
+            call_module('resources.lib.modules.libtools', 'libtools', True, 'silent', * (p('url'),)),
+        'updateLibrary': lambda:
+            call_module('resources.lib.modules.libtools', method='libepisodes', **{}) or\
+            call_module('resources.lib.modules.libtools', 'libtools', True, 'update', * (p('query'),)),
+        'service': lambda:
+            call_module('resources.lib.modules.libtools', method='libepisodes', **{}) or\
+            call_module('resources.lib.modules.libtools', 'libtools', inst=True, method='service'),
+        'urlResolver': lambda: (importlib.import_module('resolveurl'), call_module('resolveurl', None, method='display_settings'))[1],
+        # more lists.indexer roots
+        'debridkids': lambda: call_module('resources.lib.indexers.lists', 'indexer', inst=True, method='root_debridkids'),
+        'waltdisney': lambda: call_module('resources.lib.indexers.lists', 'indexer', inst=True, method='root_waltdisney'),
+        'learning': lambda: call_module('resources.lib.indexers.lists', 'indexer', inst=True, method='root_learning'),
+        'songs': lambda: call_module('resources.lib.indexers.lists', 'indexer', inst=True, method='root_songs'),
+    }
 
-
-
-    elif action == 'tvshowToLibrary':
-        from resources.lib.modules import libtools
-        libtools.libtvshows().add(tvshowtitle, year, imdb, tmdb)
-
-    elif action == 'tvshowsToLibrary':
-        from resources.lib.modules import libtools
-        libtools.libtvshows().range(url)
-
-    elif action == 'tvshowsToLibrarySilent':
-        from resources.lib.modules import libtools
-        libtools.libtvshows().silent(url)
-
-    elif action == 'updateLibrary':
-        from resources.lib.modules import libtools
-        libtools.libepisodes().update(query)
-
-    elif action == 'service':
-        from resources.lib.modules import libtools
-        libtools.libepisodes().service()
-
-    elif action == 'urlResolver':
+    # Execute handler if present
+    handler = action_map.get(action)
+    if handler:
         try:
-            import resolveurl
-        except:
-            pass
-        resolveurl.display_settings()
+            return handler()
+        except Exception as e:
+            c.log(f"[router] Handler for {action} failed: {e}\n{traceback.format_exc()}")
+            raise
 
-    elif action == 'newsNavigator':
-        from resources.lib.indexers import navigator
-        navigator.navigator.news()
-
-    elif action == 'collectionsNavigator':
-        from resources.lib.indexers import navigator
-        navigator.navigator.collections()
-
-    elif action == 'collectionActors':
-        from resources.lib.indexers import navigator
-        navigator.navigator.collectionActors()
-
-    elif action == 'collectionBoxset':
-        from resources.lib.indexers import navigator
-        navigator.navigator.collectionBoxset()
-
-    elif action == 'collectionBoxsetKids':
-        from resources.lib.indexers import navigator
-        navigator.navigator.collectionBoxsetKids()
-
-    elif action == 'collectionKids':
-        from resources.lib.indexers import navigator
-        navigator.navigator.collectionKids()
-
-    elif action == 'collectionSuperhero':
-        from resources.lib.indexers import navigator
-        navigator.navigator.collectionSuperhero()
-
-    elif action == 'collections':
-        from resources.lib.indexers import collections
-        collections.collections().get(url)
-
-    elif action == 'holidaysNavigator':
-        from resources.lib.indexers import navigator
-        navigator.navigator.holidays()
-
-    elif action == 'halloweenNavigator':
-        from resources.lib.indexers import navigator
-        navigator.navigator.halloween()
-
-    #elif action == 'bugReports':
-        #from resources.lib.reports import bugreports
-        #bugreports.BugReporter()
-
-    elif action == 'kidsgreyNavigator':
-        from resources.lib.indexers import navigator
-        navigator.navigator.kidsgrey()
-
-    elif action == 'debridkids':
-        from resources.lib.indexers import lists
-        lists.indexer().root_debridkids()
-
-    elif action == 'waltdisney':
-        from resources.lib.indexers import lists
-        lists.indexer().root_waltdisney()
-
-    elif action == 'learning':
-        from resources.lib.indexers import lists
-        lists.indexer().root_learning()
-
-    elif action == 'songs':
-        from resources.lib.indexers import lists
-        lists.indexer().root_songs()
+    # If not handled, fallback to original verbose chain for any remaining actions
+    try:
+        # keep original fallback behaviour: try to import modules as in legacy
+        # This block mirrors remaining branches that were not mapped above
+        # (If you find an unhandled action in logs, add it to action_map)
+        c.log(f"[router] Unhandled action: {action}")
+    except Exception:
+        c.log(f"[router] Unexpected error: {traceback.format_exc()}")

@@ -381,11 +381,11 @@ class player(xbmc.Player):
                     c.log(f"[CM Debug @ 356 in player.py] watcher: {watcher}")
                     _property = control.window.getProperty(pname)
 
-                    if watcher is True and not _property == '7':
+                    if watcher and _property != '7':
                         control.window.setProperty(pname, '7')
                         playcount.markMovieDuringPlayback(self.imdb, '7')
 
-                    elif watcher is False and not _property == '6':
+                    elif not watcher and _property != '6':
                         control.window.setProperty(pname, '6')
                         playcount.markMovieDuringPlayback(self.imdb, '6')
                 except:
@@ -402,11 +402,11 @@ class player(xbmc.Player):
                     c.log(f"[CM Debug @ 412 in player.py] episode watcher: {watcher}")
                     _property = control.window.getProperty(pname)
 
-                    if watcher is True and not _property == '7':
+                    if watcher and _property != '7':
                         control.window.setProperty(pname, '7')
                         playcount.markEpisodeDuringPlayback(self.imdb, self.tmdb, self.season, self.episode, '7')
 
-                    elif watcher is False and not _property == '6':
+                    elif not watcher and not _property == '6':
                         control.window.setProperty(pname, '6')
                         playcount.markEpisodeDuringPlayback(self.imdb, self.tmdb, self.season, self.episode, '6')
                 except:
@@ -491,10 +491,9 @@ class player(xbmc.Player):
             c.log(f"[CM Debug @ 501 in player.py] reset bookmarks with action = {action}. self.currentTime = {self.currentTime}, self.totalTime = {self.totalTime}, self.content = {self.content}, self.imdb = {self.imdb}, self.season = {self.season}, self.episode = {self.episode}")
             bookmarks.reset(self.currentTime, self.totalTime, self.content, self.imdb, self.season, self.episode)
 
-        if (trakt.get_trakt_credentials_info() is True and control.setting('trakt.scrobble') == 'true'):
-            if action is not None:
-                c.log(f"[CM Debug @ 506 in player.py] scrobbling to trakt: {action} with self.currentTime = {self.currentTime}, self.totalTime = {self.totalTime}, self.content = {self.content}, self.imdb = {self.imdb}, self.season = {self.season}, self.episode = {self.episode}")
-                bookmarks.set_scrobble(self.currentTime, self.totalTime, self.content, self.imdb, self.season, self.episode, action)
+        if trakt.get_trakt_credentials_info() is True and control.setting('trakt.scrobble') == 'true' and action is not None:
+            c.log(f"[CM Debug @ 506 in player.py] scrobbling to trakt: {action} with self.currentTime = {self.currentTime}, self.totalTime = {self.totalTime}, self.content = {self.content}, self.imdb = {self.imdb}, self.season = {self.season}, self.episode = {self.episode}")
+            bookmarks.set_scrobble(self.currentTime, self.totalTime, self.content, self.imdb, self.season, self.episode, action)
 
         if float(self.currentTime / self.totalTime) >= 0.92:
             self.libForPlayback()
@@ -504,26 +503,26 @@ class player(xbmc.Player):
 
 
     def onPlayBackResumed(self):
-        c.log(f"[CM Debug @ 517 in player.py] onPlayBackResumed with self.currentTime = {self.currentTime}, self.totalTime = {self.totalTime}")
+        c.log(f"[CM Debug @ 506 in player.py] onPlayBackResumed with self.currentTime = {self.currentTime}, self.totalTime = {self.totalTime}")
         self.update_time('start')
 
     def onPlayBackPaused(self):
-        c.log(f"[CM Debug @ 520 in player.py] onPlayBackPaused with self.currentTime = {self.currentTime}, self.totalTime = {self.totalTime}")
+        c.log(f"[CM Debug @ 510 in player.py] onPlayBackPaused with self.currentTime = {self.currentTime}, self.totalTime = {self.totalTime}")
         self.update_time('pause')
 
     def onPlayBackStopped(self):
-        c.log(f"[CM Debug @ 526 in player.py] onPlayBackStopped with self.currentTime = {self.currentTime}, self.totalTime = {self.totalTime}")
+        c.log(f"[CM Debug @ 514 in player.py] onPlayBackStopped with self.currentTime = {self.currentTime}, self.totalTime = {self.totalTime}")
         self.update_time('stop')
 
     def onPlayBackEnded(self):
-        c.log(f"[CM Debug @ 520 in player.py] onPlayBackEnded with self.currentTime = {self.currentTime}, self.totalTime = {self.totalTime}")
+        c.log(f"[CM Debug @ 518 in player.py] onPlayBackEnded with self.currentTime = {self.currentTime}, self.totalTime = {self.totalTime}")
         self.update_time('stop')
 
     def onPlayBackSeek(self, time, seekOffset):
-        c.log(f"[CM Debug @ 533 in player.py] onPlayBackSeek with time = {time}, seekOffset = {seekOffset}")
+        c.log(f"[CM Debug @ 522 in player.py] onPlayBackSeek with time = {time}, seekOffset = {seekOffset}")
         secs_time = float(time/60)
         secs_seekOffset = float(seekOffset/60)
-        c.log(f"[CM Debug @ 537 in player.py] time = {secs_time}, seekOffset = {secs_seekOffset}")
+        c.log(f"[CM Debug @ 525 in player.py] time = {secs_time}, seekOffset = {secs_seekOffset}")
 
 
 

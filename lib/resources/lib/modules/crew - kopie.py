@@ -386,7 +386,7 @@ def router(params):
 
     elif action == 'seasons':
         from resources.lib.indexers import episodes
-        episodes.seasons().get(tvshowtitle, year, imdb, tmdb, meta)
+        episodes.Seasons().get(tvshowtitle, year, imdb, tmdb, meta)
 
     elif action == 'episodes':
         from resources.lib.indexers import episodes
@@ -580,7 +580,7 @@ def router(params):
             r = sys.argv[0]+"?action=play"
         elif rtype == 'season':
             from resources.lib.indexers import episodes
-            rlist = episodes.seasons().get(tvshowtitle, year, imdb, tmdb, meta, create_directory=False)
+            rlist = episodes.Seasons().get(tvshowtitle, year, imdb, tmdb, meta, create_directory=False)
             r = sys.argv[0]+"?action=random&rtype=episode"
         elif rtype == 'show':
             from resources.lib.indexers import tvshows

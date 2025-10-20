@@ -13,6 +13,8 @@
  *
  ********************************************************cm*
 '''
+
+import contextlib
 import sys
 #import xbmc
 
@@ -68,32 +70,26 @@ def get_tvshow_indicators(refresh=False):
 
 
 def getSeasonIndicators(imdb):
-    try:
+    with contextlib.suppress(Exception):
         if not trakt.getTraktIndicatorsInfo():
             raise Exception()
         return trakt.syncSeason(imdb)
-    except Exception:
-        pass
 
 
 def get_movie_overlay(indicators, imdb):
     try:
         if trakt.getTraktIndicatorsInfo() is False:
             overlay = bookmarks.get_watched('movie', imdb, '', '')
-            return str(overlay)
         else:
             playcount = [i for i in indicators if i == imdb]
-            overlay = 7 if len(playcount) > 0 else 6
-            return str(overlay)
+            overlay = 7 if playcount else 6
+        return str(overlay)
     except Exception:
         return '6'
 
 def movie_has_indicator(indicators, imdb):
     try:
-        if trakt.getTraktIndicatorsInfo() is False:
-            return False
-        else:
-            return imdb in indicators
+        return False if trakt.getTraktIndicatorsInfo() is False else imdb in indicators
     except Exception:
         return False
 
@@ -223,7 +219,7 @@ def movies(imdb, watched):
         pass
 
 
-def episodes(imdb, tmdb, season_id, episode, watched):
+def episode(imdb, tmdb, season, episode, query):
     try:
         if not trakt.getTraktIndicatorsInfo():
             raise Exception()
@@ -231,10 +227,10 @@ def episodes(imdb, tmdb, season_id, episode, watched):
         key = 'imdb' if imdb else 'tmdb'
         media_id = imdb or tmdb
 
-        if int(watched) == 7:
-            trakt.markEpisodeAsWatched(key, media_id, season_id, episode)
+        if int(query) == 7:
+            trakt.markEpisodeAsWatched(key, media_id, season, episode)
         else:
-            trakt.markEpisodeAsNotWatched(key,media_id,  season_id, episode)
+            trakt.markEpisodeAsNotWatched(key,media_id,  season, episode)
         trakt.cachesyncTVShows()
         control.refresh()
     except Exception as e:
@@ -242,10 +238,10 @@ def episodes(imdb, tmdb, season_id, episode, watched):
 
 
     try:
-        if int(watched) == 7:
-            bookmarks.reset(1, 1, 'episode', imdb, season_id, episode)
+        if int(query) == 7:
+            bookmarks.reset(1, 1, 'episode', imdb, season, episode)
         else:
-            bookmarks.delete_record('episode', imdb, season_id, episode)
+            bookmarks.delete_record('episode', imdb, season, episode)
         if not trakt.getTraktIndicatorsInfo():
             control.refresh()
     except Exception as e:
@@ -258,7 +254,7 @@ def episodes(imdb, tmdb, season_id, episode, watched):
         #c.log(f"[CM Debug @ 257 in playcount.py] Exception in playcount.py: {e}")
         #pass
 
-def season(imdb, tmdb, season_id, watched):
+def season(imdb, tmdb, season, query):
     """
     Marks a TV season as watched or not watched based on the provided parameters.
 
@@ -282,10 +278,10 @@ def season(imdb, tmdb, season_id, watched):
         key = 'imdb' if imdb else 'tmdb'
         media_id = imdb or tmdb
 
-        if int(watched) == 7:
-            trakt.markSeasonAsWatched(key,media_id, season_id)
+        if int(query) == 7:
+            trakt.markSeasonAsWatched(key,media_id, season)
         else:
-            trakt.markSeasonAsNotWatched(key,media_id, season_id)
+            trakt.markSeasonAsNotWatched(key,media_id, season)
         trakt.cachesyncTVShows()
 
     except Exception as e:

@@ -101,6 +101,41 @@ class Navigator:
         self.endDirectory()
 
 
+    def root(self) -> None:
+        c.log(f"[CM Debug @ 64 in navigator.py] devmode = {DEVMODE}")
+        if DEVMODE:
+            self.addDirectoryItem('[COLOR orchid]¤[/COLOR] [B][COLOR orange]Developers[/COLOR][/B]', 'developers','main_orangehat.png', 'main_orangehat.png')
+        if self.get_menu_enabled('navi.holidays'):
+            self.addDirectoryItem(90157, 'holidaysNavigator', 'holidays.png', 'holidays.png')
+        if self.get_menu_enabled('navi.halloween'):
+            self.addDirectoryItem(30201, 'halloweenNavigator', 'halloween.png', 'halloween.png')
+        if c.get_setting('navi.movies') != 'false':
+            self.addDirectoryItem(32001, 'movieNavigator','main_movies.png', 'DefaultMovies.png')
+        if c.get_setting('navi.tvshows') != 'false':
+            self.addDirectoryItem(32002, 'tvNavigator','main_tvshows.png', 'DefaultTVShows.png')
+        if c.get_setting('navi.sports') != 'false':
+            self.addDirectoryItem(90006, 'bluehat', 'main_bluehat.png', 'DefaultMovies.png')
+        if c.get_setting('navi.iptv') != 'false':
+            self.addDirectoryItem(90007, 'whitehat', 'main_whitehat.png', 'DefaultMovies.png')
+        if c.get_setting('navi.kidsgrey') != 'false':
+            self.addDirectoryItem(90009, 'kidsgreyNavigator', 'main_greyhat.png', 'DefaultTVShows.png')
+        if c.get_setting('navi.1clicks') != 'false':
+            self.addDirectoryItem(90011, 'greenhat', 'main_greenhat.png', 'DefaultMovies.png')
+        if c.get_setting('navi.purplehat') != 'false':
+            self.addDirectoryItem(90189, 'purplehat', 'main_purplehat.png', 'DefaultMovies.png')
+        if DEVMODE:
+            self.addDirectoryItem('[COLOR orchid]¤[/COLOR] [B][COLOR orange]Classy Collections[/COLOR][/B]', 'classy', 'main_classy.png', 'DefaultMovies.png')
+        if ADULT:
+            self.addDirectoryItem(90008, 'porn', 'main_pinkhat.png', 'DefaultMovies.png')
+        if c.get_setting('navi.personal.list') != 'false':
+            self.addDirectoryItem(90167, 'plist', 'userlists.png', 'userlists.png')
+        self.addDirectoryItem(32008, 'toolNavigator','main_tools.png', 'DefaultAddonProgram.png')
+        if DOWNLOADS is True:
+            self.addDirectoryItem(32009, 'downloadNavigator','downloads.png', 'DefaultFolder.png')
+        self.addDirectoryItem(32010, 'searchNavigator','main_search.png', 'DefaultFolder.png')
+
+        self.endDirectory()
+
     def movies(self, lite=False):
         self.addDirectoryItem(32003, 'mymovieliteNavigator','mymovies.png', 'DefaultVideoPlaylists.png')
         if(c.get_setting('dev_pw') == c.ensure_text(base64.b64decode(b'dGhlY3Jldw=='))) or (month == 12):
@@ -148,7 +183,7 @@ class Navigator:
 
         if traktCredentials is True:
             self.addDirectoryItem(90050, 'movies&url=onDeck','trakt.png', 'DefaultMovies.png')
-            self.addDirectoryItem(32624, 'movieProgress','trakt.png', 'DefaultMovies.png')
+            self.addDirectoryItem(32624, 'movieProgress','main_classy.png', 'DefaultMovies.png')
             self.addDirectoryItem(32032, 'movies&url=traktcollection', 'trakt.png', 'DefaultMovies.png',queue=True, context=(32551, 'moviesToLibrary&url=traktcollection'))
             self.addDirectoryItem(32033, 'movies&url=traktwatchlist', 'trakt.png', 'DefaultMovies.png',queue=True, context=(32551, 'moviesToLibrary&url=traktwatchlist'))
             self.addDirectoryItem(32035, 'movies&url=traktfeatured', 'trakt.png', 'DefaultMovies.png', queue=True)
