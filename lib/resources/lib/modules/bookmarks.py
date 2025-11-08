@@ -114,8 +114,6 @@ def get_progress_bookmark(imdb = 0, tmdb = 0, traktid = 0, tvdb = 0, mediatype =
         else:
             sql_select += " ORDER BY tvshowtitle ASC"
 
-        c.log(f"[CM Debug @ 109 in bookmarks.py] sql_select = {sql_select}")
-
         control.makeFile(control.dataPath)
         dbcon = trakt.get_connection(control.traktsyncFile, return_as_dict=True)
         dbcur = trakt.get_connection_cursor(dbcon)

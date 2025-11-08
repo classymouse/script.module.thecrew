@@ -13,10 +13,6 @@
 ********************************************************cm*
 '''
 
-
-
-# pylint: disable=invalid-name,broad-except, broad-exception-caught, import-error
-
 from sqlite3 import dbapi2 as db, OperationalError
 import os
 import traceback
@@ -42,16 +38,14 @@ class CMDatabase():
 
     def __del__(self) -> None:
         '''Close shop.'''
-        try:
-            if self.cur is not None:
-                self.cur.close()
-        except Exception:
-            pass
-        try:
-            if self.con is not None:
-                self.con.close()
-        except Exception:
-            pass
+
+        if self.cur:
+            self.cur.close()
+
+
+        if self.con:
+            self.con.close()
+
 
     def _get_connection(self) -> None:
         try:

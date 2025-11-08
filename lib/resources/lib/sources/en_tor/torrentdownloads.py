@@ -79,7 +79,7 @@ class source:
             data = parse_qs(url)
             data = dict([(i, data[i][0]) if data[i] else (i, '') for i in data])
 
-            self.title = data['tvshowtitle'] if 'tvshowtitle' in data else data['title']
+            self.title = data.get('tvshowtitle', data['title'])
             self.hdlr = 'S%02dE%02d' % (int(data['season']), int(data['episode'])) if 'tvshowtitle' in data else data['year']
 
             query = '%s S%02dE%02d' % (
@@ -97,8 +97,10 @@ class source:
             headers = {'User-Agent': client.agent()}
             _html = client.request(url, headers=headers)
             threads = []
-            for i in re.findall(r'<item>(.+?)</item>', _html, re.DOTALL):
-                threads.append(workers.Thread(self._get_items, i))
+            threads.extend(
+                workers.Thread(self._get_items, i)
+                for i in re.findall(r'<item>(.+?)</item>', _html, re.DOTALL)
+            )
             [i.start() for i in threads]
             [i.join() for i in threads]
 
@@ -131,13 +133,11 @@ class source:
             info.append(size)
             info = ' | '.join(info)
 
-            if not seeders == '0':
-                if cleantitle.get(re.sub('(|)', '', t)) == cleantitle.get(self.title):
-                    if y == self.hdlr:
-                        self._sources.append({
-                            'source': 'torrent', 'quality': quality, 'language': 'en', 'url': url,
-                            'info': info, 'direct': False, 'debridonly': True
-                            })
+            if seeders != '0' and (cleantitle.get(re.sub('(|)', '', t)) == cleantitle.get(self.title) and y == self.hdlr):
+                self._sources.append({
+                    'source': 'torrent', 'quality': quality, 'language': 'en', 'url': url,
+                    'info': info, 'direct': False, 'debridonly': True
+                    })
 
         except BaseException:
             pass

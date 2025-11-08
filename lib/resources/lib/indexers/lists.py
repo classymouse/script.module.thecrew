@@ -1231,7 +1231,7 @@ class resolver:
 
 
 
-            u = sources.sources().getSources(title, year, imdb, tvdb, season, episode, tvshowtitle, premiered, quality)
+            u = sources.Sources().getSources(title, year, imdb, tvdb, season, episode, tvshowtitle, premiered, quality)
 
             if u is not None:
                 return u

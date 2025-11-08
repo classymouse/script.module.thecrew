@@ -104,7 +104,7 @@ class Navigator:
     def root(self) -> None:
         c.log(f"[CM Debug @ 64 in navigator.py] devmode = {DEVMODE}")
         if DEVMODE:
-            self.addDirectoryItem('[COLOR orchid]¤[/COLOR] [B][COLOR orange]Developers[/COLOR][/B]', 'developers','main_orangehat.png', 'main_orangehat.png')
+            self.addDirectoryItem('[COLOR orchid]¤[/COLOR] [B][COLOR white]Dev menu[/COLOR][/B]', 'developers','dev.png', 'main_orangehat.png')
         if self.get_menu_enabled('navi.holidays'):
             self.addDirectoryItem(90157, 'holidaysNavigator', 'holidays.png', 'holidays.png')
         if self.get_menu_enabled('navi.halloween'):

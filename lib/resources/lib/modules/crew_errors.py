@@ -19,6 +19,11 @@
 
 class TraktResourceError(Exception):
     pass
+class TraktError(Exception):
+    pass
+
+class NoResultsError(Exception):
+    pass
 
 class GeneralError(Exception):
     pass

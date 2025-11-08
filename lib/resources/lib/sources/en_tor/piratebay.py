@@ -1,24 +1,20 @@
 # -*- coding: utf-8 -*-
 
 '''
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+********************************************************cm*
+* The Crew Add-on
+*
+* @file piratebay.py
+* @package script.module.thecrew
+*
+* @copyright (c) 2025, The Crew
+* @license GNU General Public License, version 3 (GPL-3.0)
+*
+********************************************************cm*
 '''
-
 
 import re
 import traceback
-import json
 import ast
 from urllib.parse import parse_qs, urljoin, urlencode, quote_plus
 
@@ -188,7 +184,6 @@ class source:
                     info = ' | '.join(info)
                     sources.append({'source': 'Torrent', 'quality': quality, 'language': 'en', 'url': link, 'info': info, 'direct': False, 'debridonly': True})
                 except Exception as e:
-                    import traceback
                     failure = traceback.format_exc()
                     c.log(f'[CM Debug @ 178 in piratebay.py]Traceback:: {failure}')
                     c.log(f'[CM Debug @ 178 in piratebay.py]Exception raised. Error = {e}')
@@ -203,27 +198,34 @@ class source:
                     for entry in html:
                         process_entry(entry, title, hdlr)
                 except Exception as e:
-                    import traceback
                     failure = traceback.format_exc()
                     c.log(f'[CM Debug @ 188 in piratebay.py]Traceback:: {failure}')
                     c.log(f'[CM Debug @ 189 in piratebay.py]Exception raised. Error = {e}')            #we have a listing returned
 
-
                 try:
-                    c.log(f"[CM Debug @ 211 in piratebay.py] html is of type: {type(html)} and = {html}")
+                    # c.log(f"[CM Debug @ 211 in piratebay.py] html is of type: {type(html)} and = {html}")
+                    # Ensure html is a decoded string if bytes
                     if isinstance(html, bytes):
-                        c.log(f"[CM Debug @ 213 in piratebay.py] type(html): {type(html)} is in bytes")
+                        # c.log(f"[CM Debug @ 213 in piratebay.py] type(html): {type(html)} is bytes, decoding to str")
                         html = html.decode('utf-8')
+                    # If html is a string representation of a list, parse it into a Python list
                     if isinstance(html, str):
-                        html = html.encode('utf-8')
-                    # html is a list in text so i need to convert it to a plain list
-                    # ast.literal_eval creates a safe envir for py 3.x
-                    # html = ast.literal_eval(html)
+                        try:
+                            html = ast.literal_eval(html)
+                        except Exception:
+                            # leave as-is if cannot parse; further checks will guard against wrong types
+                            pass
                     if not html:
+                        return sources
+                    # Only iterate if html is a list-like of dicts
+                    if not isinstance(html, (list, tuple)):
                         return sources
                     for entry in html:
                         try:
-                            name = entry['name']
+                            # skip non-dict entries (protects against bytes iter yielding ints)
+                            if not isinstance(entry, dict):
+                                continue
+                            name = entry.get('name', '')
                             if str(cleantitle.get(title)) not in str(cleantitle.get(name)):
                                 continue
                             y = re.findall(r'[\.|\(|\[|\s](\d{4}|S\d*E\d*|S\d*)[\.|\)|\]|\s]', name)
@@ -232,40 +234,41 @@ class source:
                             if y != hdlr:
                                 continue
 
-                            seeders = int(entry['seeders'])
+                            seeders = int(entry.get('seeders', 0))
                             if self.min_seeders > seeders:
                                 continue
 
-                            link = f'magnet:?xt=urn:btih:{entry["info_hash"]}'
+                            link = f'magnet:?xt=urn:btih:{entry.get("info_hash", "")}'
                             quality, info = source_utils.get_release_quality(name, name)
 
-                            size = entry['size']
+                            size = entry.get('size', 0)
                             #c.log(f"[CM Debug @ 146 in piratebay.py] size in bytes = {size} with type = {type(size)}")
-                            if size == 0:
+                            try:
+                                if int(size) == 0:
+                                    size = '0.00 GB'
+                                else:
+                                    size = float(size) / 1024 / 1024 / 1024
+                                    size = f'{size:.2f} GB'
+                            except Exception:
                                 size = '0.00 GB'
-                            else:
-                                size = float(size) / 1024 / 1024 / 1024
-                                size = f'{size:.2f} GB'
                             #c.log(f"[CM Debug @ 150 in piratebay.py] size = {size} with type = {type(size)}")
                             info.insert(0, size)
 
                             info = ' | '.join(info)
                             sources.append({'source': 'Torrent', 'quality': quality, 'language': 'en', 'url': link, 'info': info, 'direct': False, 'debridonly': True})
                         except Exception as e:
-                            import traceback
                             failure = traceback.format_exc()
                             c.log(f'[CM Debug @ 178 in piratebay.py]Traceback:: {failure}')
                             c.log(f'[CM Debug @ 178 in piratebay.py]Exception raised. Error = {e}')
-                            pass
+
                         #except Exception as e:
                         #    c.log(f'TPB2 - Failed to parse search results:{e}')
                         #    continue
                 except Exception as e:
-                    import traceback
                     failure = traceback.format_exc()
                     c.log(f'[CM Debug @ 171 in piratebay.py]Traceback:: {failure}')
                     c.log(f'[CM Debug @ 171 in piratebay.py]Exception raised. Error = {e}')
-                    pass
+
             else:
                 html = html.replace('&nbsp;', ' ')
                 try:
@@ -284,7 +287,9 @@ class source:
                             name = re.findall('class="detLink" title=".+?">(.+?)</a>', entry, re.DOTALL)[0]
                             name = client.replaceHTMLCodes(name)
                             # t = re.sub('(\.|\(|\[|\s)(\d{4}|S\d*E\d*|S\d*|3D)(\.|\)|\]|\s|)(.+|)', '', name, flags=re.I)
-                            if cleantitle.get(title) not in cleantitle.get(name):
+                            t_title = cleantitle.get(title) or ''
+                            t_name = cleantitle.get(name) or ''
+                            if t_title not in t_name:
                                 continue
                         except Exception:
                             continue
@@ -308,10 +313,10 @@ class source:
                         quality, info = source_utils.get_release_quality(name, name)
 
                         try:
-                            size = re.findall('((?:\d+\.\d+|\d+\,\d+|\d+)\s*(?:GB|GiB|MB|MiB))', entry)[-1]
+                            size = re.findall(r'((?:\d+\.\d+|\d+\,\d+|\d+)\s*(?:GB|GiB|MB|MiB))', entry)[-1]
                             div = 1 if size.endswith(('GB', 'GiB')) else 1024
                             size = float(re.sub('[^0-9|/.|/,]', '', size)) / div
-                            size = '%.2f GB' % size
+                            size = f'{size:.2f} GB'
                             info.append(size)
                         except Exception:
                             pass
@@ -320,7 +325,7 @@ class source:
                         sources.append({'source': 'Torrent', 'quality': quality, 'language': 'en', 'url': link, 'info': info, 'direct': False, 'debridonly': True})
                     except Exception:
                         failure = traceback.format_exc()
-                        c.log('TPB - Cycle Broken: \n' + str(failure))
+                        c.scraper_error(f'Exception: {str(failure)}', 'Piratebay')
                         continue
 
             check = [i for i in sources if i['quality'] != 'CAM']
@@ -338,18 +343,18 @@ class source:
         try:
             for domain in self.domains:
                 try:
-                    url = 'https://%s' % domain
-                    c.log(f"[CM Debug @ 204 in piratebay.py] url = {url}")
+                    url = f'https://{domain}'
+                    # c.log(f"[CM Debug @ 204 in piratebay.py] url = {url}")
                     result = client.request(url, limit=1, timeout='10')
                     result = re.findall('<input type="submit" title="(.+?)"', result, re.DOTALL)[0]
                     if result and 'Pirate Search' in result:
                         return url
                 except Exception as e:
                     c.log(f"[CM Debug @ 192 in piratebay.py] exception 1 in __get_base_url: {e}")
-                    pass
+
         except Exception as e:
             c.log(f"[CM Debug @ 195 in piratebay.py] exception 2 in __get_base_url: {e}")
-            pass
+
 
         return fallback
 

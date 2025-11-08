@@ -1,19 +1,16 @@
 # -*- coding: utf-8 -*-
 
 '''
- ***********************************************************
- * Genesis Add-on
- * Copyright (C) 2015 lambda
- *
- * - Mofidied by The Crew
- *
- * @file trakt.py
- * @package script.module.thecrew
- *
- * @copyright 2023, The Crew
- * @license GNU General Public License, version 3 (GPL-3.0)
- *
- ********************************************************cm*
+********************************************************cm*
+* The Crew Add-on
+*
+* @file trakt.py
+* @package script.module.thecrew
+*
+* @copyright (c) 2025, The Crew
+* @license GNU General Public License, version 3 (GPL-3.0)
+*
+********************************************************cm*
 '''
 
 import re
@@ -117,6 +114,9 @@ def _handle_the_request(url, post):
         headers['Authorization'] = f'Bearer {c.get_setting("trakt.token")}'
 
     response = session.post(url, data=post, headers=headers, timeout=30) if post else session.get(url, headers=headers, timeout=30)
+    # if response:
+        # c.log(f"[CM Debug @ 118 in trakt.py] url = {url}")
+        # c.log(f"[CM Debug @ 120 in trakt.py] response = {response.text}")
     response.encoding = 'utf-8'
     status_code = str(response.status_code)
 
@@ -174,23 +174,41 @@ def msg_handler(url, response, status_code, post, headers):
 
 
 def token_refresh(headers, url, post) -> None:
-    oauth = urljoin(BASE_URL, '/oauth/token')
-    opost = {
-        'client_id': CLIENT_ID,
-        'client_secret': CLIENT_SECRET,
-        'redirect_uri': REDIRECT_URI,
-        'grant_type': 'refresh_token',
-        'refresh_token': c.get_setting('trakt.refresh')
-    }
-    # response = requests.post(oauth, data=json.dumps(opost), headers=headers, timeout=30).json()
-    response = session.post(oauth, data=json.dumps(opost), headers=headers, timeout=30).json()
-    c.log(f"[CM Debug @ 160 in trakt.py] response of type {type(response)}\n\n{response}")
-    token, refresh = response['access_token'], response['refresh_token']
-    c.set_setting('trakt.token', token)
-    c.set_setting('trakt.refresh', refresh)
-    headers['Authorization'] = f'Bearer {token}'
-    return
+    try:
+        oauth = urljoin(BASE_URL, '/oauth/token')
+        opost = {
+            'client_id': CLIENT_ID,
+            'client_secret': CLIENT_SECRET,
+            'redirect_uri': REDIRECT_URI,
+            'grant_type': 'refresh_token',
+            'refresh_token': c.get_setting('trakt.refresh')
+        }
+        # response = requests.post(oauth, data=json.dumps(opost), headers=headers, timeout=30).json()
+        response = session.post(oauth, data=json.dumps(opost), headers=headers, timeout=30).json()
+        c.log(f"[CM Debug @ 160 in trakt.py] response of type {type(response)}\n\n{response}")
+        if response and isinstance(response, dict) and 'error' in response:
+            raise crew_errors.TraktError(response['error'])
 
+        if response and isinstance(response, dict) and 'error_description' in response:
+            raise crew_errors.TraktError(response['error_description'])
+
+        if response and isinstance(response, dict) and 'access_token' not in response:
+            raise crew_errors.TraktError('No access token in trakt response')
+
+        if response and isinstance(response, dict) and 'refresh_token' not in response:
+            raise crew_errors.TraktError('No refresh token in trakt response')
+
+        if response and isinstance(response, dict) and 'expires_in' not in response:
+            raise crew_errors.TraktError('No expires_in in trakt response')
+
+        token, refresh = response['access_token'], response['refresh_token']
+        c.set_setting('trakt.token', token)
+        c.set_setting('trakt.refresh', refresh)
+        headers['Authorization'] = f'Bearer {token}'
+        return
+    except crew_errors.TraktError as e:
+        c.log(f'Exception raised in token_refresh: {e}', 1)
+        return
 
 def getTraktAsJson(url, post=None):
     """Make a request to the Trakt API and return the response as a JSON string."""
@@ -211,9 +229,6 @@ def getTraktAsJson(url, post=None):
         c.log(f'[CM Debug @ 225 in trakt.py]Traceback:: {failure}')
         c.log(f'[CM Debug @ 225 in trakt.py]Exception raised. Error = {e}')
 
-
-
-
 def _sort_list_by_header(result):
     resp, res_headers = result
     # c.log(f"[CM Debug @ 230 in trakt.py] response type: {type(resp)}\n\nresponse = {resp}")
@@ -230,20 +245,7 @@ def _sort_list_by_header(result):
 
 
 
-def getTraktAsJsonDisabled(url, post=None):
-    try:
-        if post is not None:
-            r, res_headers = get_trakt(url, post)
-        elif isinstance(url, str):
-            r, res_headers = get_trakt(url)
-        r, res_headers = get_trakt(url, post)
-        r = utils.json_loads_as_str(r)
-        if 'X-Sort-By' in res_headers and 'X-Sort-How' in res_headers:
-            r = sort_list(res_headers['X-Sort-By'], res_headers['X-Sort-How'], r)
-        return r
-    except Exception as e:
-        c.log('getTraktAsJson Error: ' + str(e))
-        pass
+
 
 def auth_trakt():
     try:
@@ -306,9 +308,9 @@ def auth_trakt():
         result = client.request(urljoin(BASE_URL, '/users/me'), headers=headers)
         c.log(f"[CM Debug @ 310 in trakt.py] result of new auth was {result} of type {type(result)}")
         result = utils.json_loads_as_str(result)
-
-        user = result['username']
-        authed = '' if user == '' else str('yes')
+        if result and isinstance(result, dict) and 'username' in result:
+            user = result.get('username')
+            authed = '' if user == '' else 'yes'
 
         set_trakt_credentials(user, token, refresh)
         raise Exception()
@@ -453,6 +455,11 @@ def manager(name: str, imdb: str, tmdb: str, content: str) -> None:
 
 
 def slug(title):
+    """
+    Convert a given title to a slug string.
+    """
+    if not isinstance(title, str):
+        return ''
     title = title.strip().lower()
     title = re.sub('[^a-z0-9_]', '-', title)
     title = re.sub('-{2,}', '-', title)
@@ -461,17 +468,6 @@ def slug(title):
 def sort_list(sort_key, sort_direction, list_data) -> list:
     """
     Sort a list of trakt items based on the given key and direction.
-
-    Args:
-        sort_key (str): The key to sort the list by. Options are:
-            'rank', 'added', 'title', 'released', 'runtime', 'popularity',
-            'percentage', 'votes'.
-        sort_direction (str): The direction to sort the list. Options are:
-            'asc' or 'desc'.
-        list_data (list): The list of trakt items to sort.
-
-    Returns:
-        list: The sorted list of trakt items.
     """
     reverse = sort_direction != 'asc'
     if sort_key == 'rank':
@@ -494,12 +490,30 @@ def sort_list(sort_key, sort_direction, list_data) -> list:
         return list_data
 
 def released_key(item):
+    """ Return the released or first_aired timestamp from a trakt item. """
     if 'released' in item:
         return item['released'] or '0'
     elif 'first_aired' in item:
         return item['first_aired'] or '0'
     else:
-        return 0
+        return '0'
+
+def _convert_and_get_latest_iso(values):
+    """
+    Convert a list of ISO timestamp-like values to integers (UTC) and return the latest value.
+    Non-parseable values are treated as 0.
+    """
+    converted = []
+    for v in values:
+        try:
+            if v is None:
+                converted.append(0)
+            else:
+                converted.append(int(cleandate.new_iso_to_utc(v)))
+        except ValueError:
+            converted.append(0)
+    return sorted(converted)[-1] if converted else 0
+
 
 def getActivity() -> int:
     try:
@@ -512,10 +526,9 @@ def getActivity() -> int:
             seasons = i.get('seasons', {})
             lists = i.get('lists', {})
 
-            activity = [
+            activity_values = [
                 movies.get('collected_at', 0),
                 movies.get('watchlisted_at', 0),
-                # shows.get('collected_at', 0),
                 shows.get('watchlisted_at', 0),
                 episodes.get('collected_at', 0),
                 episodes.get('watchlisted_at', 0),
@@ -523,26 +536,7 @@ def getActivity() -> int:
                 lists.get('updated_at', 0),
                 lists.get('liked_at', 0),
             ]
-            activity = [int(cleandate.new_iso_to_utc(i)) for i in activity]
-            activity = sorted(activity, key=int)[-1]
-
-
-            # activity = [
-            #     # i.get('movies')['collected_at'],
-            #     # i["movies"]["collected_at"],
-            #     # i['episodes']['collected_at'],
-            #     # i['movies']['watchlisted_at'],
-            #     # i['shows']['watchlisted_at'],
-            #     *(
-            #         i['seasons']['watchlisted_at'],
-            #         # i['episodes']['watchlisted_at'],
-            #         i['lists']['updated_at'],
-            #         i['lists']['liked_at'],
-            #     ),
-            # ]
-        #activity = [int(cleandate.iso_to_utc(i)) for i in activity]
-            # activity = [cleandate.new_iso_to_utc(i) for i in activity]
-            # activity = sorted(activity, key=int)[-1]
+            activity = _convert_and_get_latest_iso(activity_values)
         else:
             activity = 0
 
@@ -552,19 +546,23 @@ def getActivity() -> int:
     except ValueError:
         return 0
 
+# def getWatchedActivity():
+#     try:
+#         i = getTraktAsJson('/sync/last_activities')
 def getWatchedActivity():
     try:
         i = getTraktAsJson('/sync/last_activities')
 
         c.log(f"[CM Debug @ 425 in trakt.py] i = {i}")
 
-        activity = []
-        activity.append(i['movies']['watched_at'])
-        activity.append(i['episodes']['watched_at'])
-        #activity = [cleandate.iso_to_utc(i) for i in activity]
-        activity = [cleandate.new_iso_to_utc(i) for i in activity]
-        #c.log(f"[CM Debug @ 431 in trakt.py] activity = {activity}")
-        activity = sorted(activity, key=int)[-1]
+        if not i or not isinstance(i, dict):
+            return 0
+
+        activity_values = [
+            i.get('movies', {}).get('watched_at'),
+            i.get('episodes', {}).get('watched_at'),
+        ]
+        activity = _convert_and_get_latest_iso(activity_values)
 
         return activity
 
@@ -573,13 +571,9 @@ def getWatchedActivity():
         failure = traceback.format_exc()
         c.log(f'[CM Debug @ 435 in trakt.py]Traceback:: {failure}')
         c.log(f'[CM Debug @ 435 in trakt.py]Exception raised. Error = {e}')
-        pass
-    #except:
-    #    pass
-
+        return 0
 def cachesyncMovies(timeout=0):
-    indicators = cache.get(syncMovies, timeout, TRAKTUSER)
-    return indicators
+    return cache.get(syncMovies, timeout, TRAKTUSER)
 
 def timeoutsyncMovies():
     timeout = cache.timeout(syncMovies, TRAKTUSER)
@@ -588,29 +582,26 @@ def timeoutsyncMovies():
 def syncMovies(user):
     try:
         if get_trakt_credentials_info() is False:
-            c.log("[CM Debug @ 449 in trakt.py] getTraktCredentialsInfo is false")
+            c.log("[CM Debug @ 590 in trakt.py] getTraktCredentialsInfo is false")
             return
-        indicators = getTraktAsJson('/users/me/watched/movies')
-        #c.log(f"[CM Debug @ 452 in trakt.py] indicators = {indicators}")
-        indicators = [i['movie']['ids'] for i in indicators]
-        indicators = [str(i['imdb']) for i in indicators if 'imdb' in i]
-        return indicators
-    except:
-        pass
+        if indicators := getTraktAsJson('/users/me/watched/movies'):
+            c.log(f"[CM Debug @ 594 in trakt.py] indicators = {indicators}")
+            if indicators := [i['movie']['ids'] for i in indicators]:
+                c.log(f"[CM Debug @ 594 in trakt.py] indicators = {indicators}")
+                return [str(i['imdb']) for i in indicators if 'imdb' in i]
+            else:
+                c.log("[CM Debug @ 596 in trakt.py] indicators = None")
+                return
+    except Exception as e:
+        c.log(f"[CM Debug @ 455 in trakt.py] Exception raised. Error = {e}")
 
 
 def cachesyncTVShows(timeout=0):
-    #indicators = cache.get(syncTVShows, timeout, trakt_user)
-    indicators = syncTVShows(0)
-    #c.log(f"[CM Debug @ 463 in trakt.py] indicators = {indicators}")
-    return indicators
+    return syncTVShows(0)
 
 
 def timeoutsyncTVShows():
-    timeout = cache.timeout(syncTVShows, TRAKTUSER)
-    #c.log(f"[CM Debug @ 499 in trakt.py] timeout = {timeout}")
-    if not timeout:
-        timeout = 0
+    timeout = cache.timeout(syncTVShows, TRAKTUSER) or 0
     return timeout
 
 def syncTVShows(user):
@@ -626,24 +617,11 @@ def syncTVShows(user):
         indicators = [(str(tmdb_id), aired_episodes, watched_episodes) for tmdb_id, aired_episodes, watched_episodes in indicators]
         #c.log(f"[CM Debug @ 480 in trakt.py] indicators = {indicators}")
         return indicators
-    except:
-        pass
+    except Exception as e:
+        c.log(f"[CM Debug @ 484 in trakt.py] Exception raised. Error = {e}")
 
 
-def syncTVShows2(user):
-    try:
-        if get_trakt_credentials_info() is False:
-            c.log("[CM Debug @ 475 in trakt.py] getTraktCredentialsInfo is false")
-            return
-        indicators = getTraktAsJson('/users/me/watched/shows?extended=full')
-        #c.log(f"[CM Debug @ 478 in trakt.py] indicators = {indicators}")
-        indicators = [(i['show']['ids']['tmdb'], i['show']['aired_episodes'], sum([[(s['number'], e['number']) for e in s['episodes']] for s in i['seasons']], [])) for i in indicators]
-        #c.log(f"[CM Debug @ 480 in trakt.py] indicators = {indicators}")
-        indicators = [(str(i[0]), int(i[1]), i[2]) for i in indicators]
-        #c.log(f"[CM Debug @ 482 in trakt.py] indicators = {indicators}")
-        return indicators
-    except:
-        pass
+
 
 
 def syncSeason(imdb):
@@ -673,24 +651,49 @@ def syncTraktStatus(silent=False):
 # Movies
 ##########################################
 def markMovieAsWatched(key, media_id):
-    if not imdb.startswith('tt'):
-        imdb = 'tt' + imdb
-    return get_trakt('/sync/history', {"movies": [{"ids": {key: media_id}}]})[0]
+    try:
+        if key == 'imdb' and not media_id.startswith('tt'):
+            media_id = f'tt{media_id}'
+        result = get_trakt('/sync/history', {"movies": [{"ids": {key: media_id}}]})
+        return result[0] if result else None
+    except Exception:
+        return None
 
 def markMovieAsNotWatched(key, media_id):
-    if not imdb.startswith('tt'):
-        imdb = 'tt' + imdb
-    return get_trakt('/sync/history/remove', {"movies": [{"ids": {key: media_id}}]})[0]
+    try:
+        if key == 'imdb' and not media_id.startswith('tt'):
+            media_id = f'tt{media_id}'
+        result = get_trakt('/sync/history/remove', {"movies": [{"ids": {key: media_id}}]})
+        return result[0] if result else None
+    except Exception:
+        return None
+
 
 
 ###########################################
 # TV Shows
 ###########################################
 def markTVShowAsNotWatched(key, media_id):
-    return get_trakt('/sync/history/remove', {"shows": [{"ids": {key: media_id}}]})[0]
+    try:
+        result = get_trakt('/sync/history/remove', {"shows": [{"ids": {key: media_id}}]})
+        return result[0] if result else None
+    except Exception:
+        return None
 
 def markTVShowAsWatched(key, media_id):
-    return get_trakt('/sync/history/', {"shows": [{"ids": {key: media_id}}]})[0]
+    try:
+        result = get_trakt('/sync/history/', {"shows": [{"ids": {key: media_id}}]})
+        return result[0] if result else None
+    except Exception:
+        return None
+
+
+def markTVShowAsWatched(key, media_id):
+    try:
+        result = get_trakt('/sync/history/', {"shows": [{"ids": {key: media_id}}]})
+        return result[0] if result else None
+    except Exception:
+        return None
 
 
 #############################################
@@ -698,10 +701,20 @@ def markTVShowAsWatched(key, media_id):
 #############################################
 def markSeasonAsWatched(key, media_id, season):
     c.log(f"[CM Debug @ 578 in trakt.py] season not watched = {season} with key = {key} and media_id = {media_id}")
-    return get_trakt('/sync/history', {"shows": [{"seasons": [{"number": int(season)}], "ids": {key:  media_id}}]})[0]
+    try:
+        result = get_trakt('/sync/history', {"shows": [{"seasons": [{"number": int(season)}], "ids": {key:  media_id}}]})
+        return result[0] if result else None
+    except Exception as e:
+        c.log(f"[CM Debug @ 704 in trakt.py] Exception in markSeasonAsWatched: {e}")
+        return None
 
 def markSeasonAsNotWatched(key, media_id, season):
-    return get_trakt('/sync/history/remove', {"shows": [{"seasons": [{"number": int(season)}], "ids": {key: media_id}}]})[0]
+    try:
+        result = get_trakt('/sync/history/remove', {"shows": [{"seasons": [{"number": int(season)}], "ids": {key: media_id}}]})
+        return result[0] if result else None
+    except Exception as e:
+        c.log(f"[CM Debug @ 704 in trakt.py] Exception in markSeasonAsNotWatched: {e}")
+        return None
 
 #############################################
 # Episodes
@@ -709,12 +722,24 @@ def markSeasonAsNotWatched(key, media_id, season):
 def markEpisodeAsWatched(key, media_id, season, episode):
     season, episode = int('%01d' % int(season)), int('%01d' % int(episode))
     #season, episode = int(f'{season:01d}'), int(f'{episode:01d}')
-    return get_trakt('/sync/history', {"shows": [{"seasons": [{"episodes": [{"number": episode}], "number": season}], "ids": {key: media_id}}]})[0]
+    result = get_trakt('/sync/history', {"shows": [{"seasons": [{"episodes": [{"number": episode}], "number": season}], "ids": {key: media_id}}]})
+    try:
+        return result[0] if result else None
+    except IndexError:
+        # Handle the case when get_trakt returns None
+        # For example, you can return a default value or raise an exception
+        return None
 
 def markEpisodeAsNotWatched(key, media_id, season, episode):
     season, episode = int('%01d' % int(season)), int('%01d' % int(episode))
-    season, episode = int(f'{int(season):01d}'), int(f'{int(episode):01d}')
-    return get_trakt('/sync/history/remove', {"shows": [{"seasons": [{"episodes": [{"number": episode}], "number": season}], "ids": {key: media_id}}]})[0]
+    season, episode = int(f'{season:01d}'), int(f'{episode:01d}')
+    result = get_trakt('/sync/history/remove', {"shows": [{"seasons": [{"episodes": [{"number": episode}], "number": season}], "ids": {key: media_id}}]})
+    try:
+        return result[0] if result else None
+    except IndexError:
+        # Handle the case when get_trakt returns None
+        # For example, you can return a default value or raise an exception
+        return None
 
 
 

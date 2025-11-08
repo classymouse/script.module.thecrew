@@ -195,11 +195,59 @@ def markEpisodeDuringPlayback(imdb, tmdb, season, episode, watched):
         pass
 
 #TC 2/01/19 started
-def movies(imdb, watched):
+def movies(imdb, query):
+    """
+    Mark a movie watched/unwatched in Trakt (when available) and update local bookmarks.
+    Provides explicit logging and isolates failures so one subsystem failing doesn't stop the other.
+    """
+    import traceback
+
+    # validate/normalize input
+    try:
+        watched = int(query)
+        c.log(f"[CM Debug @ 208 in playcount.py] watched = {watched}|imdb={imdb}|query={query}")
+    except Exception as e:
+        c.log(f"[CM Debug @ movies] invalid 'query' value: {query} -> {e}")
+        return
+
+    # Update Trakt if indicators are available. Failures here should be logged but not prevent bookmarks update.
+    try:
+        if trakt.getTraktIndicatorsInfo():
+            c.log(f"[CM Debug @ 216 in playcount.py] imdb = {imdb}|watched={watched}")
+            if watched == 7:
+                trakt.markMovieAsWatched('imdb', imdb)
+            else:
+                trakt.markMovieAsNotWatched('imdb', imdb)
+
+            try:
+                trakt.cachesyncMovies()
+            except Exception as e:
+                c.log(f"[CM Debug @ movies] trakt.cachesyncMovies failed: {e}")
+        else:
+            c.log("[CM Debug @ movies] trakt indicators not available; skipping trakt update")
+    except Exception as e:
+        c.log(f"[CM Debug @ movies] trakt update failed: {e}\n{traceback.format_exc()}")
+
+    # Update local bookmarks independently of Trakt outcome.
+    try:
+        if watched == 7:
+            bookmarks.reset(1, 1, 'movie', imdb, '', '')
+        else:
+            bookmarks.delete_record('movie', imdb, '', '')
+    except Exception as e:
+        c.log(f"[CM Debug @ movies] bookmarks update failed: {e}\n{traceback.format_exc()}")
+
+    # Refresh UI (best-effort)
+    try:
+        control.refresh()
+    except Exception as e:
+        c.log(f"[CM Debug @ movies] control.refresh failed: {e}")
+# ...existing code...
+def movies2(imdb, query):
     try:
         if not trakt.getTraktIndicatorsInfo():
             raise Exception()
-        if int(watched) == 7:
+        if int(query) == 7:
             trakt.markMovieAsWatched('imdb', imdb)
         else:
             trakt.markMovieAsNotWatched('imdb', imdb)
@@ -209,7 +257,7 @@ def movies(imdb, watched):
         pass
 
     try:
-        if int(watched) == 7:
+        if int(query) == 7:
             bookmarks.reset(1, 1, 'movie', imdb, '', '')
         else:
             bookmarks.delete_record('movie', imdb, '', '')

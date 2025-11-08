@@ -19,23 +19,19 @@ import os
 import sys
 import time
 import json
+from urllib.parse import urlencode
+import sqlite3 as db
+import requests
+
 import xbmc
 import xbmcaddon
 import xbmcgui
 import xbmcplugin
 import xbmcvfs
-
-import requests
-
-import sqlite3 as db
-
-from .crewruntime import c
-from urllib.parse import urlencode
-
-from . import keys
-
 import six
 
+from . import keys
+from .crewruntime import c
 lang = xbmcaddon.Addon().getLocalizedString
 
 lang2 = xbmc.getLocalizedString
@@ -184,7 +180,7 @@ def encode(s, encoding='utf-8') -> bytes:
         return s
 
     # If it's neither a string nor bytes, raise an error
-    raise TypeError("Input must be a string or bytes, not '{}'".format(type(s).__name__))
+    raise TypeError(f"Input must be a string or bytes, not '{type(s).__name__}'")
 
 def decode(data, encoding='utf-8') -> str:
 
@@ -226,7 +222,8 @@ def decode(data, encoding='utf-8') -> str:
         # Try to decode the byte string
         return data.decode(encoding)
     except UnicodeDecodeError as e:
-        raise UnicodeDecodeError(f"Decoding failed: {e}") from e
+        # Re-raise a UnicodeDecodeError with the required constructor parameters
+        raise UnicodeDecodeError(e.encoding, e.object, e.start, e.end, f"Decoding failed: {e}") from e
 
 
 # Modified `sleep` command that honors a user exit request
@@ -243,11 +240,8 @@ def getKodiVersion(as_string = False, as_full = False):
     v_major = str(xbmc.getInfoLabel("System.BuildVersion").split(".")[0])
     v_minor = str(xbmc.getInfoLabel("System.BuildVersion").split(".")[1])
     v_debug = str(xbmc.getInfoLabel("System.BuildVersion").split(".")[2])
-    if(as_string == True):
-        if (as_full == False):
-            return version
-        else:
-            return (v_major + '.' + v_minor + '.' +  v_debug)
+    if as_string:
+        return f"{v_major}.{v_minor}.{v_debug}" if as_full else version
     return int(version)
 
 
@@ -424,6 +418,14 @@ def appearance():
 def artwork():
     execute('RunPlugin(plugin://script.thecrew.artwork)')
 
+# ...existing code...
+
+def okDialog(message, heading='Info'):
+    """
+    Display a simple OK dialog with the given message and optional heading.
+    """
+    xbmcgui.Dialog().ok(heading, message)
+# ...existing code...
 
 def infoDialog(message, heading=addonInfo('name'), icon='', time=3000, sound=False):
     if icon == '':

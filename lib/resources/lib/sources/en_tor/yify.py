@@ -72,7 +72,7 @@ class source:
             data = parse_qs(url)
             data = dict([(i, data[i][0]) if data[i] else (i, '') for i in data])
 
-            query = '%s %s' % (data['title'], data['year'])
+            query = f"{data['title']} {data['year']}"
 
             url = self.search_link % quote(query)
             url = urljoin(self.base_link, url)
@@ -81,10 +81,12 @@ class source:
 
             try:
                 results = client.parseDom(html, 'div', attrs={'class': 'row'})[2]
+                c.log(f"[CM Debug @ 84 in yify.py] results = {results}")
             except Exception:
                 return sources
 
-            items = re.findall('class="browse-movie-bottom">(.+?)</div>\s</div>', results, re.DOTALL)
+            items = re.findall(r'class="browse-movie-bottom">(.+?)</div>\s</div>', results, re.DOTALL)
+            c.log(f"[CM Debug @ 89 in yify.py] items = {items}")
             if items is None:
                 return sources
 
@@ -93,12 +95,12 @@ class source:
                     try:
                         link, name = re.findall('<a href="(.+?)" class="browse-movie-title">(.+?)</a>', entry, re.DOTALL)[0]
                         name = client.replaceHTMLCodes(name)
-                        if not cleantitle.get(name) == cleantitle.get(data['title']):
+                        if cleantitle.get(name) != cleantitle.get(data['title']):
                             continue
                     except Exception:
                         continue
                     y = entry[-4:]
-                    if not y == data['year']:
+                    if y != data['year']:
                         continue
 
                     response = client.request(link)
@@ -106,14 +108,14 @@ class source:
                         entries = client.parseDom(response, 'div', attrs={'class': 'modal-torrent'})
                         for torrent in entries:
                             link, name = re.findall('href="magnet:(.+?)" class="magnet-download download-torrent magnet" title="(.+?)"', torrent, re.DOTALL)[0]
-                            link = 'magnet:%s' % link
+                            link = f'magnet:{link}'
                             link = str(client.replaceHTMLCodes(link).split('&tr')[0])
                             quality, info = source_utils.get_release_quality(name, name)
                             try:
-                                size = re.findall('((?:\d+\.\d+|\d+\,\d+|\d+)\s*(?:GB|GiB|MB|MiB))', torrent)[-1]
+                                size = re.findall(r'((?:\d+\.\d+|\d+\,\d+|\d+)\s*(?:GB|GiB|MB|MiB))', torrent)[-1]
                                 div = 1 if size.endswith(('GB', 'GiB')) else 1024
                                 size = float(re.sub('[^0-9|/.|/,]', '', size)) / div
-                                size = '%.2f GB' % size
+                                size = f'{size:.2f} GB'
                                 info.append(size)
                             except Exception:
                                 pass

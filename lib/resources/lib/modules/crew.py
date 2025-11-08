@@ -53,6 +53,8 @@ def router(params):
         - method: call a method on the instance/attribute/module when provided
         """
         # Accept already-imported module objects
+
+        c.log(f"[CM Debug @ 57 in crew.py] call_module called with: module_path={module_path}, attr={attr}, inst={inst}, method={method}, args={a}, kwargs={kw}")
         if not isinstance(module_path, str):
             if inspect.ismodule(module_path):
                 mod = module_path
@@ -162,8 +164,8 @@ def router(params):
                 # lists.player().play(url, content)
                 call_module('resources.lib.indexers.lists', 'player', True, 'play', * (p('url'), content))
                 return
-            # sources.sources().play(...)
-            call_module('resources.lib.modules.sources', 'sources', inst=True, method='play', title=p('title'), year=p('year'), imdb=p('imdb'), tmdb=p('tmdb'), season=p('season'), episode=p('episode'), tvshowtitle=p('tvshowtitle'), premiered=p('premiered'), meta=p('meta'), select=p('select'))
+            # sources.Sources().play(...)
+            call_module('resources.lib.modules.sources', 'Sources', inst=True, method='play', title=p('title'), year=p('year'), imdb=p('imdb'), tmdb=p('tmdb'), season=p('season'), episode=p('episode'), tvshowtitle=p('tvshowtitle'), premiered=p('premiered'), meta=p('meta'), select=p('select'))
         except Exception as e:
             c.log(f'[CM @ router]Traceback:: {traceback.format_exc()}')
             c.log(f'[CM @ router]Error:: {e}')
@@ -173,7 +175,7 @@ def router(params):
         try:
             src = p('source')
             # use top-level downloader/local_sources imported above
-            downloader.download(p('name'), p('image'), local_sources.sources().sourcesResolve(json.loads(src)[0], True))
+            downloader.download(p('name'), p('image'), local_sources.Sources().sourcesResolve(json.loads(src)[0], True))
         except (ValueError, IndexError, TypeError, KeyError, json.JSONDecodeError) as e:
             c.log(f"[CM Debug @ 173 in crew.py] Download handler error: {e}")
             # ignore expected parsing/indexing/type errors but avoid catching all Exceptions
@@ -301,7 +303,10 @@ def router(params):
         'docuNavigator': lambda: call_module('resources.lib.indexers.docu', 'documentary', inst=True, method='root'),
         'docuHeaven': _docu_heaven,
         # movies
-        'movies': lambda: call_module('resources.lib.indexers.movies', 'movies', True, 'get', * (p('url'), p('tid')) ) if p('url') in ['tmdb_networks', 'tmdb_networks_no_unaired'] else call_module('resources.lib.indexers.movies', 'movies', True, 'get', * (p('url'),)),
+        'movies': lambda:
+            call_module('resources.lib.indexers.movies', 'movies', True, 'get', * (p('url'), p('tid')) )
+            if p('url') in ['tmdb_networks', 'tmdb_networks_no_unaired'] else
+            call_module('resources.lib.indexers.movies', 'movies', True, 'get', * (p('url'),)),
         'movieProgress': lambda: call_module('resources.lib.indexers.movies', 'movies', True, 'get', * (p('action'),)),
         'moviePage': lambda: call_module('resources.lib.indexers.movies', 'movies', True, 'get', * (p('url'),)),
         'movieWidget': lambda: call_module('resources.lib.indexers.movies', 'movies', inst=True, method='widget'),
@@ -341,47 +346,51 @@ def router(params):
         'calendars': lambda: call_module('resources.lib.indexers.episodes', 'episodes', inst=True, method='calendars'),
         'episodeUserlists': lambda: call_module('resources.lib.indexers.episodes', 'episodes', inst=True, method='userlists'),
         # settings / control
-        'setfanartquality': lambda: call_module('resources.lib.modules.control', 'control', method='setFanartQuality'),
-        'refresh': lambda: call_module('resources.lib.modules.control', 'control', method='refresh'),
-        'queueItem': lambda: call_module('resources.lib.modules.control', 'control', method='queueItem'),
-        'openSettings': lambda: call_module('resources.lib.modules.control', 'control', False, 'openSettings', * (p('query'),)),
+        'setfanartquality': lambda: call_module('resources.lib.modules.control', '', method='setFanartQuality'),
+        'refresh': lambda: call_module('resources.lib.modules.control', '', method='refresh'),
+        'queueItem': lambda: call_module('resources.lib.modules.control', '', method='queueItem'),
+        'openSettings': lambda: call_module('resources.lib.modules.control', '', False, 'openSettings', * (p('query'),)),
         # orion
         'userdetailsOrion': lambda: call_module('.orion_api', 'oa', method='authorize_orion'),
         'settingsOrion': lambda: call_module('.orion_api', 'oa', method='settings_orion'),
         'userlabelOrion': lambda: call_module('.orion_api', 'oa', method='info_orion'),
         'get_qrcode': lambda: call_module('.orion_api', 'orion_api', method='get_orion_qr'),
         # trakt / maintenance / misc
-        'traktSyncsetup': lambda: call_module('.trakt', 'trakt', method='traktSyncsetup'),
-        'traktchecksync': lambda: call_module('.trakt', 'trakt', method='check_sync_tables'),
-        'traktgetcollections': lambda: call_module('.trakt', 'trakt', False, 'get_trakt_collection', * ('all',)),
-        'startupMaintenance': lambda: call_module('.control', 'control', method='startupMaintenance'),
-        'setSizes': lambda: call_module('.control', 'control', method='setSizes'),
-        'updateSizes': lambda: call_module('.control', 'control', method='updateSizes'),
+        'traktSyncsetup': lambda: call_module('.trakt', None, False, method='traktSyncsetup'),
+        'traktchecksync': lambda: call_module('.trakt', None, False, method='check_sync_tables'),
+        'traktgetcollections': lambda: call_module('.trakt', None, False, 'get_trakt_collection', * ('all',)),
+        'startupMaintenance': lambda: call_module('.control', None, False, method='startupMaintenance'),
+        'setSizes': lambda: call_module('.control', None, False, method='setSizes'),
+        'updateSizes': lambda: call_module('.control', None, False, method='updateSizes'),
         'changelog': lambda: call_module('resources.lib.modules.changelog', method='get'),
-        'artwork': lambda: call_module('.control', 'control', method='artwork'),
-        'addView': lambda: call_module('.views', 'views', method='add_view', **{'content': p('content')}),
+        'artwork': lambda: call_module('.control', None, False, method='artwork'),
+        'addView': lambda: call_module('.views', None, False,  method='add_view', **{'content': p('content')}),
 
-        'moviePlaycount': lambda: call_module('.playcount', 'movies', * (p('imdb'), p('query'))),
-        'episodePlaycount': lambda: call_module('.playcount', 'episode', * (p('imdb'), p('tmdb'), p('season'), p('episode'), p('query'))),
-        'seasonPlaycount': lambda: call_module('.playcount', 'season', * (p('imdb'), p('tmdb'), p('season'), p('query'))),
-        'tvPlaycount': lambda: call_module('.playcount',  'tvshows', * (p('imdb'), p('tmdb'), p('query'))),
+        'moviePlaycount': lambda: call_module('.playcount', None, False, 'movies', * (p('imdb'), p('query'))),
+        'episodePlaycount': lambda: call_module('.playcount', None, False, 'episode', p('imdb'), p('tmdb'), p('season'), p('episode'), p('query')),
+        'seasonPlaycount': lambda: call_module('.playcount', None, False, 'season', * (p('imdb'), p('tmdb'), p('season'), p('query'))),
+        'tvPlaycount': lambda: call_module('.playcount', None, False, 'tvshows', * (p('imdb'), p('tmdb'), p('query'))),
 
         'trailer': lambda: call_module('.trailer', 'trailers', True, 'get', * (p('name'), p('url'), p('imdb'), p('tmdb'), int(p('windowedtrailer') or 0), p('mediatype'), p('meta'))),
 
         'traktManager': lambda: call_module('resources.lib.modules.trakt','', False, 'manager', * (p('name'), p('imdb'), p('tmdb'), p('content'))),
-        'authTrakt': lambda: call_module('resources.lib.modules.trakt', 'trakt', method='auth_trakt'),
-        'authRD': lambda: (call_module('resources.lib.modules.debridapis.realdbrid', 'realdbrid', method='__dict__') , call_module('.control', 'control', method='infoDialog'))[1],
-        'ResolveUrlTorrent': lambda: call_module('.control', 'control', False, 'openSettings', * (p('query'), "script.module.resolveurl")),
+        'authTrakt': lambda: call_module('resources.lib.modules.trakt', None, False, method='auth_trakt'),
+        'authRD': lambda: (
+            call_module('resources.lib.modules.debridapis.realdbrid', None, False, method='__dict__') ,
+            call_module('.control', None, False, method='infoDialog'))[1],
+        'ResolveUrlTorrent': lambda: call_module('.control', None, False, 'openSettings', * (p('query'), "script.module.resolveurl")),
         'download': _download_handler,
         'play': _play_handler,
         'play1': _play_handler,
-        'addItem': lambda: call_module('resources.lib.modules.sources', 'sources', True, 'addItem', * (p('title'),)),
-        'playItem': lambda: call_module('resources.lib.modules.sources', 'sources', True, 'playItem', * (p('title'), p('source'))),
-        'alterSources': lambda: call_module('resources.lib.modules.sources', 'sources', True, 'alterSources', * (p('url'), p('meta'))),
-        'clearSources': lambda: call_module('resources.lib.modules.sources', 'sources', inst=True, method='clearSources'),
+        'addItem': lambda: call_module('resources.lib.modules.sources', None, True, 'addItem', * (p('title'),)),
+        'playItem': lambda: call_module('resources.lib.modules.sources', None, True, 'playItem', * (p('title'), p('source'))),
+        'alterSources': lambda: call_module('resources.lib.modules.sources', None, True, 'alterSources', * (p('url'), p('meta'))),
+        'clearSources': lambda: call_module('resources.lib.modules.sources', None, True, 'clearSources'),
         'random': _random_handler,
         # library / sync / tools
-        'movieToLibrary': lambda: call_module('resources.lib.modules.libtools', '', inst=True, method='libmovies', **{}) or call_module('resources.lib.modules.libtools', 'libtools', True, 'add_movie', * (p('name'), p('title'), p('year'), p('imdb'), p('tmdb'))),
+        'movieToLibrary': lambda:
+            call_module('resources.lib.modules.libtools', '', inst=True, method='libmovies', **{}) or
+            call_module('resources.lib.modules.libtools', 'libtools', True, 'add_movie', * (p('name'), p('title'), p('year'), p('imdb'), p('tmdb'))),
         'moviesToLibrary': lambda:
             call_module('resources.lib.modules.libtools', attr='', inst=True,  method='libmovies', **{}) or\
             call_module('resources.lib.modules.libtools', 'libmovies', True, 'range', p('url')),
@@ -404,7 +413,8 @@ def router(params):
         'service': lambda:
             call_module('resources.lib.modules.libtools', method='libepisodes', **{}) or\
             call_module('resources.lib.modules.libtools', 'libtools', inst=True, method='service'),
-        'urlResolver': lambda: (importlib.import_module('resolveurl'), call_module('resolveurl', None, method='display_settings'))[1],
+        'urlResolver': lambda: (importlib.import_module('resolveurl'),
+                                call_module('resolveurl', None, method='display_settings'))[1],
         # more lists.indexer roots
         'debridkids': lambda: call_module('resources.lib.indexers.lists', 'indexer', inst=True, method='root_debridkids'),
         'waltdisney': lambda: call_module('resources.lib.indexers.lists', 'indexer', inst=True, method='root_waltdisney'),

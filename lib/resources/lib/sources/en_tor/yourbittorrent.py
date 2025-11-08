@@ -89,7 +89,7 @@ class source:
 
         try:
 
-            c.log(f"[CM Debug @ 91 in yourbittorrent.py] url = {url}")
+            # c.log(f"[CM Debug @ 91 in yourbittorrent.py] url = {url}")
             if url is None:
                 return self.sources_list
 
@@ -99,7 +99,7 @@ class source:
             data = parse_qs(url)
             data = dict([(i, data[i][0]) if data[i] else (i, '') for i in data])
 
-            self.title = data['tvshowtitle'] if 'tvshowtitle' in data else data['title']
+            self.title = data.get('tvshowtitle', data['title'])
             self.title = self.title.replace('&', 'and').replace('Special Victims Unit', 'SVU')
 
             self.hdlr = 'S%02dE%02d' % (int(data['season']), int(data['episode'])) if 'tvshowtitle' in data else data['year']
@@ -110,14 +110,14 @@ class source:
 
             url = self.search_link % quote_plus(query)
             url = urljoin(self.base_link, url).replace('+', '-')
-            c.log(f"[CM Debug @ 113 in yourbittorrent.py]\n\n\n url = {url} \n\n\n")
+            # c.log(f"[CM Debug @ 113 in yourbittorrent.py]\n\n\n url = {url} \n\n\n")
 
             try:
                 result = client.request(url)
-                c.log(f"[CM Debug @ 116 in yourbittorrent.py] r = {result}")
+                # c.log(f"[CM Debug @ 116 in yourbittorrent.py] r = {result}")
                 links = re.findall('<a href="(/torrent/.+?)"', result, re.DOTALL)
 
-                c.log(f"[CM Debug @ 118 in yourbittorrent.py] links = {repr(links)}")
+                # c.log(f"[CM Debug @ 118 in yourbittorrent.py] links = {repr(links)}")
 
                 threads = []
                 for link in links:
@@ -133,9 +133,9 @@ class source:
                 c.log(f'[CM Debug @ 133 in yourbittorrent.py]Traceback:: {failure}')
                 c.log(f'[CM Debug @ 134 in yourbittorrent.py]Exception raised. Error = {e}')
                 return self.sources_list
-            #except Exception as e:
-            #    c.log(f'YourBT3 - Exception: {e}', 1)
-            #    return self.sources_list
+                #except Exception as e:
+                #    c.log(f'YourBT3 - Exception: {e}', 1)
+                #    return self.sources_list
 
         except Exception as e:
             c.log(f'YourBT4 - Exception: {e}', 1)
@@ -145,7 +145,7 @@ class source:
     def get_sources(self, link):
         try:
             url = urljoin(self.base_link, link)
-            c.log(f"[CM Debug @ 128 in yourbittorrent.py] url = {url}")
+            # c.log(f"[CM Debug @ 128 in yourbittorrent.py] url = {url}")
             result = client.request(url)
 
             info_hash = re.findall('<kbd>(.+?)<', result, re.DOTALL)[0]

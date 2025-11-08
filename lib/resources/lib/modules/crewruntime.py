@@ -781,7 +781,12 @@ class CrewRuntime:
         _str = re.sub('\\\\\\\\u([\\da-f]{4})', lambda x: chr(int(x.group(1), 16)), _str)
         return json.dumps(_str)
 
-
+    @staticmethod
+    def okDialog(message, heading='Info'):
+        """
+        Display a simple OK dialog with the given message and optional heading.
+        """
+        xbmcgui.Dialog().ok(heading, message)
 
     def infoDialog(self, message, heading=addonInfo('name'), icon='', time=3000, sound=False) -> None:
         if icon == '':

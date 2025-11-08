@@ -1371,8 +1371,6 @@ class movies:
             if self.list[i]['metacache'] is True:
                 return
 
-
-
             lst = self.list[i]
             imdb = lst['imdb'] if 'imdb' in lst else '0'
             tmdb = lst['tmdb'] if 'tmdb' in lst else '0'
@@ -1401,13 +1399,13 @@ class movies:
                 except Exception:
                     pass
 
-            _id = tmdb if not tmdb == '0' else imdb
+            _id = tmdb if tmdb != '0' else imdb
             if _id in ['0', None]:
                 raise Exception()
 
 
             en_url = self.tmdb_api_link % _id
-            trans_url = en_url + ',translations'
+            trans_url = f'{en_url},translations'
             url = en_url if self.lang == 'en' else trans_url
 
             item = self.session.get(url, timeout=15).json()
@@ -1432,37 +1430,33 @@ class movies:
 
             name = item.get('title', '')
             original_title = item.get('original_title', '')
-            en_trans_name = en_trans_item.get('title', '') if en_trans_item is not None and not self.lang == 'en' else None
+            en_trans_name = (
+                en_trans_item.get('title', '')
+                if en_trans_item is not None and self.lang != 'en'
+                else None
+            )
 
             if self.lang == 'en':
                 title = label = name
             else:
                 title = en_trans_name or original_title
-                if original_language == self.lang:
-                    label = name
-                else:
-                    label = en_trans_name or name
+                label = name if original_language == self.lang else en_trans_name or name
             if not title:
                 title = list_title
             if not label:
                 label = list_title
 
-            plot = item.get('overview')
-
-            if not plot:
-                plot = lst['plot'] if 'plot' in lst else c.lang(32623)
+            plot = item.get('overview') or (lst['plot'] if 'plot' in lst else c.lang(32623))
 
             tagline = item.get('tagline') or '0'
 
-            if not self.lang == 'en':
+            if self.lang != 'en':
                 if plot == '0':
-                    en_plot = en_trans_item.get('overview', '')
-                    if en_plot:
+                    if en_plot := en_trans_item.get('overview', ''):
                         plot = en_plot
 
                 if tagline == '0':
-                    en_tagline = en_trans_item.get('tagline', '')
-                    if en_tagline:
+                    if en_tagline := en_trans_item.get('tagline', ''):
                         tagline = en_tagline
 
             premiered = item.get('release_date') or '0'
@@ -1473,7 +1467,7 @@ class movies:
                 _year = ''
             if not _year:
                 _year = '0'
-            year = lst['year'] if not lst['year'] == '0' else _year
+            year = lst['year'] if lst['year'] != '0' else _year
 
             status = item.get('status') or '0'
 
@@ -1504,8 +1498,6 @@ class movies:
 
 
             duration = str(item.get('runtime', "90"))
-
-
             rating = item.get('vote_average', '0')
             votes = item.get('vote_count', '0') #votes ?
 
@@ -1587,7 +1579,7 @@ class movies:
                 'plot': plot, 'tagline': tagline
                 }
 
-            item = dict((k, v) for k, v in item.items() if not v == '0')
+            item = {k: v for k, v in item.items() if v != '0'}
             lst.update(item)
 
             meta = {
@@ -1615,19 +1607,19 @@ class movies:
         addon_clearlogo, addon_clearart = c.addon_clearlogo(), c.addon_clearart()
         addon_discart = c.addon_discart()
 
-        traktCredentials = trakt.get_trakt_credentials_info()
+        trakt_credentials = trakt.get_trakt_credentials_info()
 
-        isPlayable = 'true' if 'plugin' not in control.infoLabel( 'Container.PluginName') else 'false'
+        isplayable = 'true' if 'plugin' not in control.infoLabel( 'Container.PluginName') else 'false'
         indicators = playcount.get_movie_indicators(refresh=True) if action == 'movies' else playcount.get_movie_indicators()
 
-        findSimilar = c.lang(32100)
+        find_similar = c.lang(32100)
         playtrailer = c.lang(32062)
-        playbackMenu = control.lang(32063) if control.setting('hosts.mode') == '2' else control.lang(32064)
-        watchedMenu = control.lang(32068) if traktCredentials else control.lang(32066)
-        unwatchedMenu = control.lang(32069) if traktCredentials else control.lang(32067)
-        queueMenu = control.lang(32065)
-        traktManagerMenu = control.lang(32515)
-        nextMenu = control.lang(32053)
+        playback_menu = control.lang(32063) if control.setting('hosts.mode') == '2' else control.lang(32064)
+        watched_menu = control.lang(32068) if trakt_credentials else control.lang(32066)
+        unwatched_menu = control.lang(32069) if trakt_credentials else control.lang(32067)
+        queue_menu = control.lang(32065)
+        trakt_manager_menu = control.lang(32515)
+        next_menu = control.lang(32053)
         addToLibrary = control.lang(32551)
         infoMenu = control.lang(32101)
 
@@ -1642,7 +1634,7 @@ class movies:
                 label = f"{label} ({year})"
                 status = i['status'] if 'status' in i else '0'
 
-                meta = dict((k, v) for k, v in i.items() if not v == '0')
+                meta = {k: v for k, v in i.items() if v != '0'}
 
                 # cm - resume_point -warning: percentage, float!
                 resume_point = float(meta['resume_point']) if 'resume_point' in meta else 0
@@ -1672,7 +1664,7 @@ class movies:
                 try:
                     premiered = i['premiered']
                     if (premiered == '0' and status in ['Upcoming', 'In Production', 'Planned']) or \
-                            (int(re.sub('[^0-9]', '', premiered)) > int(re.sub('[^0-9]', '', str(self.today_date)))):
+                                (int(re.sub('[^0-9]', '', premiered)) > int(re.sub('[^0-9]', '', str(self.today_date)))):
 
                         # changed by cm -  17-5-2023
                         # changed by cm -  27-12-2024
@@ -1731,30 +1723,30 @@ class movies:
 
                 cm = [
                     (
-                        findSimilar,
+                        find_similar,
                         f"Container.Update({sysaddon}?action=movies&url={quote_plus(self.related_link % tmdb)})",
                     )
                 ]
-                cm.append((queueMenu, f'RunPlugin({sysaddon}?action=queueItem)'))
+                cm.append((queue_menu, f'RunPlugin({sysaddon}?action=queueItem)'))
 
                 try:
                     overlay = int(playcount.get_movie_overlay(indicators, imdb))
                     #c.log(f"[CM Debug @ 1721 in movies.py] overlay = {overlay}")
                     if overlay == 7:
-                        cm.append((unwatchedMenu, 'RunPlugin(%s?action=moviePlaycount&imdb=%s&query=6)' % (sysaddon, imdb)))
+                        cm.append((unwatched_menu, f'RunPlugin({sysaddon}?action=moviePlaycount&imdb={imdb}&query=6)'))
                         meta.update({'playcount': 1, 'overlay': 7})
                     else:
-                        cm.append((watchedMenu, 'RunPlugin(%s?action=moviePlaycount&imdb=%s&query=7)' % (sysaddon, imdb)))
+                        cm.append((watched_menu, f'RunPlugin({sysaddon}?action=moviePlaycount&imdb={imdb}&query=7)'))
                         meta.update({'playcount': 0, 'overlay': 6})
                 except Exception:
                     pass
 
-                if traktCredentials is True:
+                if trakt_credentials is True:
                 #     cm.append((traktManagerMenu, 'RunPlugin(%s?action=traktManager&name=%s&imdb=%s&content=movie)' % (sysaddon, syslabel, imdb)))
                 # cm.append((playbackMenu, 'RunPlugin(%s?action=alterSources&url=%s&meta=%s)' % (sysaddon, sysurl, sysmeta)))
                 # cm.append((addToLibrary, 'RunPlugin(%s?action=movieToLibrary&name=%s&title=%s&year=%s&imdb=%s&tmdb=%s)' % (sysaddon, syslabel, systitle, year, imdb, tmdb)))
-                    cm.append((traktManagerMenu, f'RunPlugin({sysaddon}?action=traktManager&name={syslabel}&imdb={imdb}&content=movie)'))
-                cm.append((playbackMenu, f'RunPlugin({sysaddon}?action=alterSources&url={sysurl}&meta={sysmeta})'))
+                    cm.append((trakt_manager_menu, f'RunPlugin({sysaddon}?action=traktManager&name={syslabel}&imdb={imdb}&content=movie)'))
+                cm.append((playback_menu, f'RunPlugin({sysaddon}?action=alterSources&url={sysurl}&meta={sysmeta})'))
                 cm.append((addToLibrary, f'RunPlugin({sysaddon}?action=movieToLibrary&name={syslabel}&title={systitle}&year={year}&imdb={imdb}&tmdb={tmdb})'))
 
                 try:
@@ -1777,7 +1769,7 @@ class movies:
 
                 item.setArt(art)
                 #item.addContextMenuItems(cm)
-                item.setProperty('IsPlayable', isPlayable)
+                item.setProperty('IsPlayable', isplayable)
 
                 item.setProperty('imdb_id', imdb)
                 item.setProperty('tmdb_id', tmdb)
@@ -1824,9 +1816,9 @@ class movies:
             url = '%s?action=moviePage&url=%s' % (sysaddon, quote_plus(url))
 
             try:
-                item = control.item(label=nextMenu, offscreen=True)
+                item = control.item(label=next_menu, offscreen=True)
             except Exception:
-                item = control.item(label=nextMenu)
+                item = control.item(label=next_menu)
 
             item.setArt({
                 'icon': icon, 'thumb': icon, 'poster': icon, 'banner': icon, 'fanart': addon_fanart
@@ -1859,28 +1851,30 @@ class movies:
                 plot = i.get('plot') or '[CR]'
                 if i['image'].startswith('http'):
                     thumb = i['image']
-                elif not artPath is None:
+                elif artPath is not None:
                     thumb = os.path.join(artPath, i['image'])
                 else:
                     thumb = addonThumb
 
                 url = '%s?action=%s' % (sysaddon, i['action'])
-                try:
+
+                if 'url' in i and i['url']:
                     url += '&url=%s' % quote_plus(i['url'])
-                except Exception:
-                    pass
 
-                cm = []
 
-                cm.append((playRandom, 'RunPlugin(%s?action=random&rtype=movie&url=%s)' % (sysaddon, quote_plus(i['url']))))
+                cm = [
+                    (
+                        playRandom,
+                        f'RunPlugin({sysaddon}?action=random&rtype=movie&url={quote_plus(i["url"])}'
+                    )
+                ]
 
                 if queue is True:
-                    cm.append((queueMenu, 'RunPlugin(%s?action=queueItem)' % sysaddon))
+                    cm.append((queueMenu, f'RunPlugin({sysaddon}?action=queueItem)'))
 
-                try:
-                    cm.append((addToLibrary, 'RunPlugin(%s?action=moviesToLibrary&url=%s)' % (sysaddon, quote_plus(i['context']))))
-                except Exception:
-                    pass
+                if 'context' in i and i['context']:
+                    cm.append((addToLibrary, f'RunPlugin({sysaddon}?action=moviesToLibrary&url={quote_plus(i["context"])})'))
+
 
                 try:
                     item = control.item(label=name, offscreen=True)

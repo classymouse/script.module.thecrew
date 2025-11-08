@@ -119,13 +119,17 @@ def get_fanart_tv_art(tvdb, imdb = '0', lang='en', mediatype='tv'):
 
 
         response = get_cached_fanart(tvdb, imdb, url, headers, 15)
-        if response:
-            art = response
-
         if response is None:
+            c.log(f"[CM Debug @ 123 in fanart.py] no response, returning zero_str, {response}")
             return zero_str
 
-        if 'status' in art and art.get('status') == 'error':
+        if isinstance(response, str):
+            art = json.loads(response)
+        else:
+            art = response
+
+        if isinstance(art, dict) and 'status' in art and art.get('status') == 'error':
+            c.log(f"[CM Debug @ 123 in fanart.py] error in response(art), returning zero_str, {art}")
             return zero_str
 
     except ValueError as e:

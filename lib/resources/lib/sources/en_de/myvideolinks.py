@@ -1,38 +1,37 @@
 # -*- coding: utf-8 -*-
 
 '''
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+********************************************************cm*
+* The Crew Add-on
+*
+* @file myvideolinks.py
+* @package script.module.thecrew
+*
+* @copyright (c) 2025, The Crew
+* @license GNU General Public License, version 3 (GPL-3.0)
+*
+********************************************************cm*
 '''
 
 import re
 
-from resources.lib.modules import control
+
 from resources.lib.modules import cleantitle
 from resources.lib.modules import debrid
 from resources.lib.modules import client
 from resources.lib.modules import source_utils
 
-try: from urlparse import parse_qs, urljoin
-except ImportError: from urllib.parse import parse_qs, urljoin
-try: from urllib import urlencode, quote_plus, quote
-except ImportError: from urllib.parse import urlencode, quote_plus, quote
+
+from resources.lib.modules.crewruntime import c
+
+
+from urllib.parse import parse_qs, urljoin, urlencode
 
 class source:
     def __init__(self):
         self.priority = 1
         self.language = ['en']
-        self.domains = ['iwantmyshow.tk', 'myvideolinks.net', 'go.myvideolinks.net', 'to.myvideolinks.net/', 'see.home.kg', 'to.myvideolinks.net']
+        self.domains = ['iwantmyshow.tk', 'iwantmyshow.tk', 'go.myvideolinks.net', 'to.myvideolinks.net/', 'see.home.kg', 'to.myvideolinks.net']
         self.base_link = 'https://new.myvid.one/'
         self.search_link = '/?s=%s'
 
@@ -54,7 +53,8 @@ class source:
 
     def episode(self, url, imdb, tvdb, title, premiered, season, episode):
         try:
-            if url is None: return
+            if url is None:
+                return
             url = parse_qs(url)
             url = dict([(i, url[i][0]) if url[i] else (i, '') for i in url])
             url['title'], url['premiered'], url['season'], url['episode'] = title, premiered, season, episode
@@ -76,13 +76,13 @@ class source:
             data = parse_qs(url)
             data = dict([(i, data[i][0]) if data[i] else (i, '') for i in data])
 
-            title = data['tvshowtitle'] if 'tvshowtitle' in data else data['title']
+            title = data.get('tvshowtitle', data['title'])
 
             hdlr = 'S%02dE%02d' % (int(data['season']), int(data['episode'])) if 'tvshowtitle' in data else data['year']
 
             hostDict = hostprDict + hostDict
 
-            items = [] ; urls = [] ; posts = [] ; links = []
+            items, urls, posts, links = [], [], [], []
 
             url = urljoin(self.base_link, self.search_link % data['imdb'])
             r = client.request(url)
@@ -91,14 +91,13 @@ class source:
                 self.base_link = url = urljoin(url, self.search_link % data['imdb'])
                 r = client.request(url)
             posts = client.parseDom(r, 'article')
-            if not posts:
-                if 'tvshowtitle' in data:
-                    url = urljoin(self.base_link, self.search_link % (cleantitle.geturl(title).replace('-','+') + '+' + hdlr))
-                    r = client.request(url, headers={'User-Agent': client.agent()})
-                    posts += client.parseDom(r, 'article')
-                    url = urljoin(self.base_link, self.search_link % cleantitle.geturl(title).replace('-','+'))
-                    r = client.request(url, headers={'User-Agent': client.agent()})
-                    posts += client.parseDom(r, 'article')
+            if not posts and 'tvshowtitle' in data:
+                url = urljoin(self.base_link, self.search_link % (cleantitle.geturl(title).replace('-','+') + '+' + hdlr))
+                r = client.request(url, headers={'User-Agent': client.agent()})
+                posts += client.parseDom(r, 'article')
+                url = urljoin(self.base_link, self.search_link % cleantitle.geturl(title).replace('-','+'))
+                r = client.request(url, headers={'User-Agent': client.agent()})
+                posts += client.parseDom(r, 'article')
 
             if not posts: return sources
             for post in posts:

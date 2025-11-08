@@ -26,8 +26,11 @@
 [COLOR orange]Fixed[/COLOR]: a lot of regex strings to string literals (raw) to prevent deprecation warnings
 [COLOR orange]Fixed[/COLOR]: Manually setting watched/unwatched status in trakt via context menu
 [COLOR orange]Fixed[/COLOR]: sync Trakt with start/stop/resume in player
-[COLOR orange]Fixed[/COLOR]: size/filetypes/fileinfo and added the Dolby Vision (DV) tag as seperate 
-[COLOR orange]Fixed[/COLOR]:
+[COLOR orange]Fixed[/COLOR]: size/filetypes/fileinfo and added the Dolby Vision (DV) tag as seperate
+[COLOR orange]Fixed[/COLOR]: issue with trakt authentication on some systems
+[COLOR orange]Fixed[/COLOR]: issue with trakt syncing on some systems
+[COLOR orange]Fixed[/COLOR]: info screen missing data (e.g. genres, release date etc.)
+[COLOR orange]Fixed[/COLOR]: info contextual menu on tv-shows not working properly
 
 [COLOR cyan]Changed[/COLOR]: several (missing) language strings
 [COLOR cyan]Changed[/COLOR]: trailers: 1 result plays automatically, multiple results can be selected by the user from a dialog

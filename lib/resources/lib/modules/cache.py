@@ -137,77 +137,136 @@ def cache_insert(key, value):
     cursor.connection.commit()
 
 
-def cache_clear():
+
+def clear_caches(cache_types=None):
+    """
+    General function to clear specified cache types.
+    - cache_types: List of strings (e.g., ['main', 'meta', 'providers', 'debrid', 'search']) or None for all.
+    - Maintains ability to call individual functions separately.
+    - Uses improved exception handling for robustness.
+    """
+    if cache_types is None:
+        cache_types = ['main', 'meta', 'providers', 'debrid', 'search']
+
+    cache_functions = {
+        'main': _clear_main_cache,
+        'meta': _clear_meta_cache,
+        'providers': _clear_providers_cache,
+        'debrid': _clear_debrid_cache,
+        'search': _clear_search_cache
+    }
+
+    for cache_type in cache_types:
+        if cache_type in cache_functions:
+            try:
+                cache_functions[cache_type]()
+                c.log(f"[CM Debug @ clear_caches] Successfully cleared {cache_type} cache")
+            except Exception as e:
+                c.log(f"[CM Debug @ clear_caches] Failed to clear {cache_type} cache: {e}")
+        else:
+            c.log(f"[CM Debug @ clear_caches] Unknown cache type: {cache_type}")
+
+def _clear_main_cache():
+    """Clear main cache tables (cache_table, rel_list, rel_lib)."""
     try:
         cursor = _get_connection_cursor()
-
         for t in [cache_table, 'rel_list', 'rel_lib']:
             try:
-                cursor.execute("DROP TABLE IF EXISTS %s" % t)
+                cursor.execute(f"DROP TABLE IF EXISTS {t}")
                 cursor.execute("VACUUM")
-                cursor.commit()
-            except:
-                pass
-    except:
-        pass
+                cursor.connection.commit()
+            except OperationalError as e:
+                c.log(f"[CM Debug @ _clear_main_cache] SQLite error clearing table '{t}': {e}")
+            except Exception as e:
+                c.log(f"[CM Debug @ _clear_main_cache] Unexpected error clearing table '{t}': {e}")
+    except Exception as e:
+        c.log(f"[CM Debug @ _clear_main_cache] Failed to initialize cursor: {e}")
 
-def cache_clear_meta():
+def _clear_meta_cache():
+    """Clear meta cache tables (meta)."""
     try:
         cursor = _get_connection_cursor_meta()
-
         for t in ['meta']:
             try:
-                cursor.execute("DROP TABLE IF EXISTS %s" % t)
+                cursor.execute(f"DROP TABLE IF EXISTS {t}")
                 cursor.execute("VACUUM")
-                cursor.commit()
-            except:
-                pass
-    except:
-        pass
+                cursor.connection.commit()
+            except OperationalError as e:
+                c.log(f"[CM Debug @ _clear_meta_cache] SQLite error clearing table '{t}': {e}")
+            except Exception as e:
+                c.log(f"[CM Debug @ _clear_meta_cache] Unexpected error clearing table '{t}': {e}")
+    except Exception as e:
+        c.log(f"[CM Debug @ _clear_meta_cache] Failed to initialize cursor: {e}")
 
-def cache_clear_providers():
+def _clear_providers_cache():
+    """Clear providers cache tables (rel_src, rel_url)."""
     try:
         cursor = _get_connection_cursor_providers()
-
         for t in ['rel_src', 'rel_url']:
             try:
-                cursor.execute("DROP TABLE IF EXISTS %s" % t)
+                cursor.execute(f"DROP TABLE IF EXISTS {t}")
                 cursor.execute("VACUUM")
-                cursor.commit()
-            except:
-                pass
-    except:
-        pass
+                cursor.connection.commit()
+            except OperationalError as e:
+                c.log(f"[CM Debug @ _clear_providers_cache] SQLite error clearing table '{t}': {e}")
+            except Exception as e:
+                c.log(f"[CM Debug @ _clear_providers_cache] Unexpected error clearing table '{t}': {e}")
+    except Exception as e:
+        c.log(f"[CM Debug @ _clear_providers_cache] Failed to initialize cursor: {e}")
 
-def cache_clear_debrid():
+def _clear_debrid_cache():
+    """Clear debrid cache tables (debrid_data)."""
     try:
         cursor = _get_connection_cursor_debrid()
-
         for t in ['debrid_data']:
             try:
-                cursor.execute("DROP TABLE IF EXISTS %s" % t)
+                cursor.execute(f"DROP TABLE IF EXISTS {t}")
                 cursor.execute("VACUUM")
-                cursor.commit()
-            except:
-                pass
-    except:
-        pass
+                cursor.connection.commit()
+            except OperationalError as e:
+                c.log(f"[CM Debug @ _clear_debrid_cache] SQLite error clearing table '{t}': {e}")
+            except Exception as e:
+                c.log(f"[CM Debug @ _clear_debrid_cache] Unexpected error clearing table '{t}': {e}")
+    except Exception as e:
+        c.log(f"[CM Debug @ _clear_debrid_cache] Failed to initialize cursor: {e}")
 
-def cache_clear_search():
+def _clear_search_cache():
+    """Clear search cache tables (tvshow, movies)."""
     try:
         cursor = _get_connection_cursor_search()
-
         for t in ['tvshow', 'movies']:
             try:
-                cursor.execute("DROP TABLE IF EXISTS %s" % t)
+                cursor.execute(f"DROP TABLE IF EXISTS {t}")
                 cursor.execute("VACUUM")
-                cursor.commit()
-            except:
-                pass
-    except:
-        pass
+                cursor.connection.commit()
+            except OperationalError as e:
+                c.log(f"[CM Debug @ _clear_search_cache] SQLite error clearing table '{t}': {e}")
+            except Exception as e:
+                c.log(f"[CM Debug @ _clear_search_cache] Unexpected error clearing table '{t}': {e}")
+    except Exception as e:
+        c.log(f"[CM Debug @ _clear_search_cache] Failed to initialize cursor: {e}")
 
+# Keep individual functions for backward compatibility and separate calls
+def cache_clear():
+    _clear_main_cache()
+
+def cache_clear_meta():
+    _clear_meta_cache()
+
+def cache_clear_providers():
+    _clear_providers_cache()
+
+def cache_clear_debrid():
+    _clear_debrid_cache()
+
+def cache_clear_search():
+    _clear_search_cache()
+
+# Update cache_clear_all to use the new general function
 def cache_clear_all():
+    clear_caches()  # Clears all by default
+
+def cache_clear_all_old():
     cache_clear()
     cache_clear_meta()
     cache_clear_providers()
@@ -275,7 +334,7 @@ def _hash_function(function_instance, *args):
 
 
 def _get_function_name(function_instance):
-    return re.sub('.+\smethod\s|.+function\s|\sat\s.+|\sof\s.+', '', repr(function_instance))
+    return re.sub(r'.+\smethod\s|.+function\s|\sat\s.+|\sof\s.+', '', repr(function_instance))
 
 
 def _generate_md5(*args):

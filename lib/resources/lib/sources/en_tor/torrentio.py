@@ -112,14 +112,16 @@ class source:
                 season = data['season'][0]
                 episode = data['episode'][0]
                 #hdlr = 'S%02dE%02d' % (int(season), int(episode))
-                #url = '%s%s' % (self.base_link, self.tvSearch_link % (imdb, season, episode))
-                url = f"{self.base_link}{self.tvSearch_link.format(imdb, season, episode)}"
+                url = '%s%s' % (self.base_link, self.tvSearch_link % (imdb, season, episode))
+                #url = f"{self.base_link}{self.tvSearch_link.format(imdb, season, episode)}"
             else:
-                #url = '%s%s' % (self.base_link, self.movieSearch_link % imdb)
-                url = f"{self.base_link}{self.movieSearch_link.format(imdb)}"
+                url = '%s%s' % (self.base_link, self.movieSearch_link % imdb)
+                #url = f"{self.base_link}{self.movieSearch_link.format(imdb)}"
                 hdlr = year
             try:
-                results = requests.get(url, headers=self.headers, timeout=5)
+                c.log(f"[CM Debug @ 117 in torrentio.py] url = {url}")
+                results = requests.get(url, headers=self.headers, timeout=15)
+                c.log(f"[CM Debug @ 124 in torrentio.py] results = {results}")
                 files = results.json()['streams']
             except (requests.RequestException, json.JSONDecodeError):
                 files = []
@@ -133,13 +135,12 @@ class source:
 
         for file in files:
             try:
-                c.log(f"[CM Debug @ 146 in torrentio.py] file = {repr(file)}")
                 infohash = file['infoHash']
                 file_title = file['title'].split('\n')
                 file_info = [x for x in file_title if ITEMINFO.match(x)][0]
-                behaviourHints = file['behaviorHints']
-                b_filename = behaviourHints['filename']
-                b_bingegroup = behaviourHints['bingegroup']
+                #behaviourHints = file['behaviorHints']
+                #b_filename = behaviourHints['filename']
+                #b_bingegroup = behaviourHints['bingegroup']
 
                 # cm - 2025/06/12
                 # we can get a lot of info from the Bingegroup, things like HDR or DV, 10BIT etc,

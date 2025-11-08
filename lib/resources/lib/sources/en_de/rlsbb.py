@@ -24,13 +24,13 @@ class source:
     def __init__(self):
         self.priority = 1
         self.language = ['en']
-        self.domains = ['rlsbb.com', 'rlsbb.ru', 'rlsbb.to', 'rlsbb.cc']
+        self.domains = ['rlsbb.in', 'rlsbb.com', 'rlsbb.ru', 'rlsbb.to', 'rlsbb.cc']
         self.base_link = 'https://rlsbb.in/'
         self.old_base_link = 'http://old3.rlsbb.in/'
         self.search_base_link = 'http://search.rlsbb.in/'
         self.search_cookie = 'serach_mode=rlsbb'
         self.search_link = 'lib/search526049.php?phrase=%s&pindex=1&content=true'
-        self.search_link = 'lib/search526049.php?phrase=%s&pindex=1&content=true'
+
 
     def movie(self, imdb, title, localtitle, aliases, year):
         try:
@@ -77,7 +77,7 @@ class source:
 
             data = parse_qs(url)
             data = dict([(i, data[i][0]) if data[i] else (i, '') for i in data])
-            title = data['tvshowtitle'] if 'tvshowtitle' in data else data['title']
+            title = data.get('tvshowtitle', data['title'])
             year = data['year']
             _year = re.findall('(\d{4})', data['premiered'])[0] if 'tvshowtitle' in data else year
             title = cleantitle.get_query(title)
@@ -85,7 +85,7 @@ class source:
             #premDate = ''
 
             query = '%s S%02dE%02d' % (title, int(data['season']), int(data['episode'])) if 'tvshowtitle' in data else '%s %s' % (title, year)
-            query = re.sub(r'(\\\|/| -|:|;|\*|\?|"|\'|<|>|\|)', '', query)
+            query = re.sub(r'(\\\|/| -|:|;|\*|\?|"|\'|<|>|\|)', '', query or '')
             query = query.replace(" ", "-")
 
             _base_link = self.base_link if int(year) >= 2021 else self.old_base_link
@@ -93,15 +93,15 @@ class source:
             url = _base_link + query
 
             r = scraper.get(url).content
-            #c.log(f"[RLSBB Debug @ 83 in rlsbb.py] r: {r}")
+            c.log(f"[RLSBB Debug @ 83 in rlsbb.py] r: {r}")
             r = c.ensure_text(r, errors='replace')
 
             if r is None and 'tvshowtitle' in data:
-                season = re.search('S(.*?)E', hdlr)
-                season = season.group(1)
+                m = re.search(r'S(\d+)E', hdlr)
+                season = m[1] if m else ''
                 query = title
-                query = re.sub(r'(\\\|/| -|:|;|\*|\?|"|\'|<|>|\|)', '', query)
-                query = query + "-S" + season
+                query = re.sub(r'(\\\|/| -|:|;|\*|\?|"|\'|<|>|\|)', '', query or '')
+                query = f"{query}-S{season}"
                 query = query.replace("&", "and")
                 query = query.replace("  ", " ")
                 query = query.replace(" ", "-")
@@ -109,10 +109,10 @@ class source:
                 r = scraper.get(url).content
                 r = c.ensure_text(r, errors='replace')
 
-            for loopCount in range(0, 2):
+            for loopCount in range(2):
                 if loopCount == 1 or (r is None and 'tvshowtitle' in data):
 
-                    query = re.sub(r'[\\\\:;*?"<>|/\-\']', '', title)
+                    query = re.sub(r'[\\\\:;*?"<>|/\-\']', '', title or '')
                     query = query.replace(
                         "&", " and ").replace(
                         "  ", " ").replace(
@@ -142,9 +142,9 @@ class source:
                                 pass
                     except Exception as e:
                         c.log(f"[CM Debug @ 143 in rlsbb.py] Exception raised. Error = {e}")
-                        pass
 
-                if len(items) > 0:
+
+                if items:
                     break
 
             seen_urls = set()
@@ -163,7 +163,7 @@ class source:
 
                     host = url.replace("\\", "")
                     host2 = host.strip('"')
-                    host = re.findall('([\w]+[.][\w]+)$', urlparse(host2.strip().lower()).netloc)[0]
+                    host = re.findall(r'([\w]+[.][\w]+)$', urlparse(host2.strip().lower()).netloc)[0]
 
                     if host not in hostDict:
                         continue
@@ -189,9 +189,8 @@ class source:
                                     'url': host2, 'info': info, 'direct': False, 'debridonly': True})
                 except Exception as e:
                     c.log(f"[CM Debug @ 190 in rlsbb.py] Exception raised. Error = {e}")
-                    pass
-            check = [i for i in sources if not i['quality'] == 'CAM']
-            if check:
+
+            if check := [i for i in sources if i['quality'] != 'CAM']:
                 sources = check
             return sources
         except Exception as e:

@@ -87,7 +87,7 @@ class lib_tools:
     @staticmethod
     def check_sources(title, year, imdb, tmdb=None, season=None, episode=None, tvshowtitle=None, premiered=None):
         try:
-            src = sources.sources().getSources(title, year, imdb, tmdb, season, episode, tvshowtitle, premiered)
+            src = sources.Sources().getSources(title, year, imdb, tmdb, season, episode, tvshowtitle, premiered)
             return src and len(src) > 5
         except Exception:
             return False

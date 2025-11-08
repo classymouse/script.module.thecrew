@@ -14,9 +14,11 @@
  ********************************************************cm*
 '''
 
+
 from argparse import Action
 import base64
 import codecs
+import contextlib
 import gzip
 import json
 import os
@@ -162,7 +164,7 @@ class player(xbmc.Player):
             discart = meta.get('discart', '')
 
             return poster, thumb, fanart, clearlogo, clearart, discart, meta
-        except:
+        except Exception:
             pass
 
 
@@ -177,14 +179,16 @@ class player(xbmc.Player):
             discart = meta.get('discart', '')
 
             #return poster, thumb, fanart, clearlogo, clearart, discart, meta
-        except:
+        except Exception:
             pass
 
         try:
             if not self.content == 'movie':
                 raise Exception()
 
-            meta = control.jsonrpc('{"jsonrpc": "2.0", "method": "VideoLibrary.GetMovies", "params": {"filter":{"or": [{"field": "year", "operator": "is", "value": "%s"}, {"field": "year", "operator": "is", "value": "%s"}, {"field": "year", "operator": "is", "value": "%s"}]}, "properties" : ["title", "originaltitle", "year", "genre", "studio", "country", "runtime", "rating", "votes", "mpaa", "director", "writer", "plot", "plotoutline", "tagline", "thumbnail", "file"]}, "id": 1}' % (self.year, str(int(self.year)+1), str(int(self.year)-1)))
+            meta = control.jsonrpc(
+                '{"jsonrpc": "2.0", "method": "VideoLibrary.GetMovies", "params": {"filter":{"or": [{"field": "year", "operator": "is", "value": "%s"}, {"field": "year", "operator": "is", "value": "%s"}, {"field": "year", "operator": "is", "value": "%s"}]}, "properties" : ["title", "originaltitle", "year", "genre", "studio", "country", "runtime", "rating", "votes", "mpaa", "director", "writer", "plot", "plotoutline", "tagline", "thumbnail", "file"]}, "id": 1}' % (self.year, str(int(self.year)+1), str(int(self.year)-1))
+                )
             meta = c.ensure_text(meta, errors='ignore')
             meta = json.loads(meta)['result']['movies']
 
@@ -196,12 +200,12 @@ class player(xbmc.Player):
                 if isinstance(v, list):
                     try:
                         meta[k] = str(' / '.join([c.ensure_text(i) for i in v]))
-                    except:
+                    except Exception:
                         meta[k] = ''
                 else:
                     try:
                         meta[k] = str(c.ensure_text(v))
-                    except:
+                    except Exception:
                         meta[k] = str(v)
 
             if 'plugin' not in control.infoLabel('Container.PluginName'):
@@ -210,11 +214,18 @@ class player(xbmc.Player):
             poster = thumb = meta['thumbnail']
 
             return poster, thumb, '', '', '', '', meta
-        except:
+        except Exception as e:
+            import traceback
+            failure = traceback.format_exc()
+            c.log(f'[CM Debug @ 217 in player.py]Traceback:: {failure}')
+            c.log(f'[CM Debug @ 217 in player.py]Exception raised. Error = {e}')
             pass
+        # except Exception as e:
+        #     c.log(f"[CM Debug @ 218 in player.py] exception in getMeta for movie: {e}", 1)
+
 
         try:
-            if not self.content == 'episode':
+            if self.content != 'episode':
                 raise Exception()
 
             meta = control.jsonrpc('{"jsonrpc": "2.0", "method": "VideoLibrary.GetTVShows", "params": {"filter":{"or": [{"field": "year", "operator": "is", "value": "%s"}, {"field": "year", "operator": "is", "value": "%s"}, {"field": "year", "operator": "is", "value": "%s"}]}, "properties" : ["title", "year", "thumbnail", "file"]}, "id": 1}' % (self.year, str(int(self.year)+1), str(int(self.year)-1)))
@@ -232,24 +243,24 @@ class player(xbmc.Player):
             meta = json.loads(meta)['result']['episodes'][0]
 
             for k, v in six.iteritems(meta):
-                if type(v) == list:
+                if isinstance(v, list):
                     try:
                         meta[k] = str(' / '.join([c.ensure_text(i) for i in v]))
-                    except:
+                    except Exception:
                         meta[k] = ''
                 else:
                     try:
                         meta[k] = str(c.ensure_text(v))
-                    except:
+                    except Exception:
                         meta[k] = str(v)
 
-            if not 'plugin' in control.infoLabel('Container.PluginName'):
+            if 'plugin' not in control.infoLabel('Container.PluginName'):
                 self.DBID = meta['episodeid']
 
             thumb = meta['thumbnail']
 
             return poster, thumb, '', '', '', '', meta
-        except:
+        except Exception:
             pass
 
         poster, thumb, fanart, clearlogo, clearart, discart, meta = '', '', '', '', '', '', {'title': self.name}
@@ -284,7 +295,7 @@ class player(xbmc.Player):
                 try:
                     self.totalTime = self.getTotalTime()
                     self.currentTime = self.getTime()
-                except:
+                except Exception:
                     pass
                 xbmc.sleep(2000)
 
@@ -297,14 +308,14 @@ class player(xbmc.Player):
                     watcher = self.currentTime / self.totalTime >= .92
                     _property = control.window.getProperty(pname)
 
-                    if watcher is True and not _property == '7':
+                    if watcher and _property != '7':
                         control.window.setProperty(pname, '7')
                         playcount.markMovieDuringPlayback(self.imdb, '7')
 
-                    elif watcher is False and not _property == '6':
+                    elif not watcher and not _property == '6':
                         control.window.setProperty(pname, '6')
                         playcount.markMovieDuringPlayback(self.imdb, '6')
-                except:
+                except Exception:
                     pass
                 xbmc.sleep(2000)
 
@@ -317,14 +328,14 @@ class player(xbmc.Player):
                     watcher = self.currentTime / self.totalTime >= .92
                     _property = control.window.getProperty(pname)
 
-                    if watcher is True and not _property == '7':
+                    if watcher and not _property == '7':
                         control.window.setProperty(pname, '7')
                         playcount.markEpisodeDuringPlayback(self.imdb, self.tmdb, self.season, self.episode, '7')
 
-                    elif watcher is False and not _property == '6':
+                    elif not watcher and not _property == '6':
                         control.window.setProperty(pname, '6')
                         playcount.markEpisodeDuringPlayback(self.imdb, self.tmdb, self.season, self.episode, '6')
-                except:
+                except Exception:
                     pass
                 xbmc.sleep(2000)
 
@@ -333,14 +344,7 @@ class player(xbmc.Player):
 
 #cm 19-02-2025
 #overlay isn't used anymore and is calculated by kodi based on percentage of video watched
-#so i need to completely rewrite the keepPlaybackAlive function
-#i will keep the same logic as before but without the overlay
-#i will also remove the playcount.py file and move the functions to the player.py file
-#i will also remove the playcount module from the imports
-#i will also remove the playcount.markMovieDuringPlayback and playcount.markEpisodeDuringPlayback functions
-#i will also remove the playcount.getMovieOverlay and playcount.getEpisodeOverlay functions
-#i will also remove the playcount.getMovieIndicators and playcount.getTVShowIndicators functions
-#i will also remove the playcount.getMovieOverlay and playcount.getEpisodeOverlay functions
+
     def keepPlaybackAlive(self):
         pname = f"{control.addonInfo('id')}.player.overlay"
         control.window.clearProperty(pname)
@@ -367,7 +371,7 @@ class player(xbmc.Player):
                 try:
                     self.totalTime = self.getTotalTime()
                     self.currentTime = self.getTime()
-                except:
+                except Exception:
                     pass
                 xbmc.sleep(2000)
 
@@ -388,7 +392,7 @@ class player(xbmc.Player):
                     elif not watcher and _property != '6':
                         control.window.setProperty(pname, '6')
                         playcount.markMovieDuringPlayback(self.imdb, '6')
-                except:
+                except Exception:
                     pass
                 xbmc.sleep(2000)
 
@@ -406,39 +410,53 @@ class player(xbmc.Player):
                         control.window.setProperty(pname, '7')
                         playcount.markEpisodeDuringPlayback(self.imdb, self.tmdb, self.season, self.episode, '7')
 
-                    elif not watcher and not _property == '6':
+                    elif not watcher and _property != '6':
                         control.window.setProperty(pname, '6')
                         playcount.markEpisodeDuringPlayback(self.imdb, self.tmdb, self.season, self.episode, '6')
-                except:
+                except Exception:
                     pass
                 xbmc.sleep(2000)
 
         control.window.clearProperty(pname)
 
 
-
+    def do_rpc(self, method, params):
+        """
+        Construct a JSON-RPC request string.
+        - method: String, e.g., "VideoLibrary.SetMovieDetails"
+        - params: Dict, e.g., {"movieid": 123, "playcount": 1}
+        Returns the formatted JSON string or None on error.
+        """
+        try:
+            # Serialize params to JSON string
+            params_json = json.dumps(params)
+            return '{"jsonrpc": "2.0", "method": "%s", "params": %s, "id": 1}' % (
+                method,
+                params_json,
+            )
+        except Exception as e:
+            c.log(f"[CM Debug @ do_rpc] Failed to construct RPC: {e}")
+            return None
 
 
 
 
     #! f-string on rpc impossible for now on py < 3.11 because of nesting-level
     def libForPlayback(self):
-        try:
-            if self.DBID is None:
-                raise Exception()
+        with contextlib.suppress(Exception):
+            if not self.DBID:
+                return
 
             if self.content == 'movie':
-                rpc = '{"jsonrpc": "2.0", "method": "VideoLibrary.SetMovieDetails", "params": {"movieid" : %s, "playcount" : 1 }, "id": 1 }' % str(self.DBID)
+                self.do_rpc('VideoLibrary.SetMovieDetails', {"movieid" : int(self.DBID), "playcount" : 1})
             elif self.content == 'episode':
-                rpc = '{"jsonrpc": "2.0", "method": "VideoLibrary.SetEpisodeDetails", "params": {"episodeid" : %s, "playcount" : 1 }, "id": 1 }' % str(self.DBID)
+                self.do_rpc('VideoLibrary.SetEpisodeDetails', {"episodeid" : int(self.DBID), "playcount" : 1})
             else:
                 rpc = ''
 
             if rpc:
                 control.jsonrpc(rpc)
                 control.refresh()
-        except:
-            pass
 
     def idleForPlayback(self):
         for _ in range(400):
@@ -609,22 +627,22 @@ class subtitles:
             try:
                 try:
                     langs = langDict[control.setting('subtitles.lang.1')].split(',')
-                except:
+                except Exception:
                     langs.append(langDict[control.setting('subtitles.lang.1')])
-            except:
+            except Exception:
                 pass
             try:
                 try:
                     langs = langs + langDict[control.setting('subtitles.lang.2')].split(',')
-                except:
+                except Exception:
                     langs.append(langDict[control.setting('subtitles.lang.2')])
-            except:
+            except Exception:
                 pass
 
 
             try:
                 subLang = xbmc.Player().getSubtitles()
-            except:
+            except Exception:
                 subLang = ''
             if subLang == langs[0]:
                 raise Exception()
@@ -642,7 +660,7 @@ class subtitles:
                 result = server.SearchSubtitles(token, [{'sublanguageid': sublanguageid, 'imdbid': imdbid}])['data']
                 try:
                     vidPath = xbmc.Player().getPlayingFile()
-                except:
+                except Exception:
                     vidPath = ''
                 fmt = re.split(r'\.|\(|\)|\[|\]|\s|\-', vidPath)
                 fmt = [i.lower() for i in fmt]
@@ -658,7 +676,7 @@ class subtitles:
 
             try:
                 lang = xbmc.convertLanguage(filter[0]['SubLanguageID'], xbmc.ISO_639_1)
-            except:
+            except Exception:
                 lang = filter[0]['SubLanguageID']
 
             content = [filter[0]['IDSubtitleFile'], ]
@@ -675,7 +693,7 @@ class subtitles:
                     try:
                         content_encoded = codecs.decode(content, codepage)
                         content = codecs.encode(content_encoded, 'utf-8')
-                    except:
+                    except Exception:
                         pass
 
             file = control.openFile(subtitle, 'w')
@@ -684,5 +702,5 @@ class subtitles:
 
             control.sleep(1000)
             xbmc.Player().setSubtitles(subtitle)
-        except:
+        except Exception:
             pass
