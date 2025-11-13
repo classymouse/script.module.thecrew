@@ -409,7 +409,7 @@ class libtvshows:
             seasons = [i['season'] for i in seasons]
             c.log(f'[CM Debug @ 293 in libtools.py] seasons ={repr(seasons)}')
             for s in seasons:
-                items = episodes.episodes().get(tvshowtitle, year, imdb, tmdb, meta=None, season=s, idx=False)
+                items = episodes.Episodes().get(tvshowtitle, year, imdb, tmdb, meta=None, season=s, idx=False)
 
                 try:
                     items = [{
@@ -500,7 +500,7 @@ class libtvshows:
             self.silentDialog = True
 
 
-        items = tvshows.tvshows().get(url, idx=False)
+        items = tvshows.TVshows().get(url, idx=False)
 
         if items is None:
             items = []
@@ -529,7 +529,7 @@ class libtvshows:
             self.infoDialog = True
 
 
-        items = tvshows.tvshows().get(url, idx=False)
+        items = tvshows.TVshows().get(url, idx=False)
         if items is None:
             items = []
 
@@ -711,7 +711,7 @@ class libepisodes:
                 season = [i['season'] for i in seasons]
                 for s in season:
                     #c.log('lib_seasons: ' + str(s))
-                    it = episodes.episodes().get(item['tvshowtitle'], item['year'], item['imdb'], item['tmdb'], meta=None, season=s, idx=False)
+                    it = episodes.Episodes().get(item['tvshowtitle'], item['year'], item['imdb'], item['tmdb'], meta=None, season=s, idx=False)
                     #c.log('lib_it: ' + str(it))
 
                     status = seasons[0]['status'].lower()

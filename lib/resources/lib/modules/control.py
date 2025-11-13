@@ -418,14 +418,14 @@ def appearance():
 def artwork():
     execute('RunPlugin(plugin://script.thecrew.artwork)')
 
-# ...existing code...
+
 
 def okDialog(message, heading='Info'):
     """
     Display a simple OK dialog with the given message and optional heading.
     """
     xbmcgui.Dialog().ok(heading, message)
-# ...existing code...
+
 
 def infoDialog(message, heading=addonInfo('name'), icon='', time=3000, sound=False):
     if icon == '':

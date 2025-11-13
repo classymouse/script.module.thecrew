@@ -14,19 +14,22 @@
  ********************************************************cm*
 '''
 
+
 #cm - 2024/11/12 - new file
 import json
 import time
 import traceback
+
+import sqlite3 as database
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+
 
 from . import keys
 from . import control
 from .crewruntime import c
 
-import sqlite3 as database
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
 
 
 
@@ -34,8 +37,7 @@ from urllib3.util.retry import Retry
 # housekeeping
 #
 fanart_tv_user = c.get_setting('fanart.tv.user') or ''
-fanart_tv_headers = {}
-fanart_tv_headers['api-key'] = keys.fanart_key
+fanart_tv_headers = {'api-key': keys.fanart_key}
 if fanart_tv_user != '':
     fanart_tv_headers['client-key'] = fanart_tv_user
 
@@ -123,11 +125,7 @@ def get_fanart_tv_art(tvdb, imdb = '0', lang='en', mediatype='tv'):
             c.log(f"[CM Debug @ 123 in fanart.py] no response, returning zero_str, {response}")
             return zero_str
 
-        if isinstance(response, str):
-            art = json.loads(response)
-        else:
-            art = response
-
+        art = json.loads(response) if isinstance(response, str) else response
         if isinstance(art, dict) and 'status' in art and art.get('status') == 'error':
             c.log(f"[CM Debug @ 123 in fanart.py] error in response(art), returning zero_str, {art}")
             return zero_str
@@ -155,7 +153,6 @@ def get_fanart_tv_art(tvdb, imdb = '0', lang='en', mediatype='tv'):
         clearlogo = _extract_artwork(art, 'hdmovielogo', lang)
         clearart = _extract_artwork(art, 'hdmovieclearart', lang)
         landscape = _extract_artwork(art, 'moviethumb' if 'moviethumb' in art else 'moviebackground', lang)
-        #discart = _extract_artwork(art, 'moviediscart', lang)
         discart = _extract_artwork(art, 'moviedisc', lang)
     else:
         return zero_str
@@ -180,30 +177,27 @@ def get_cached_fanart(tvdb, imdb, url, headers, timeout=30):
 
             sql = f"SELECT * FROM fanart_cache WHERE url = '{url}' and added < {time.time() - TWOWEEKS}"
             dbcur.execute(sql)
-            result = dbcur.fetchone()
-
-            if result:
+            if result := dbcur.fetchone():
                 #data in cache
                 return json.loads(result[3])
+            #no data in cache
+            response = session.get(url, headers=headers, timeout=timeout)
+            response.encoding = 'utf-8'
+            txt = json.loads(response.text)
+
+            if response.status_code == 200:
+                sql = "INSERT or REPLACE INTO fanart_cache (tvdb, imdb, url, data, added) Values (?,?,?,?,?)"
+
+                if isinstance(txt, dict):
+                    txt = json.dumps(txt, indent=4, sort_keys=True)
+                dbcur.execute(sql, (tvdb, imdb, url, txt, int(time.time())))
+                dbcon.commit()
+                dbcon.close()
+                #return response
+                return txt
             else:
-                #no data in cache
-                response = session.get(url, headers=headers, timeout=timeout)
-                response.encoding = 'utf-8'
-                txt = json.loads(response.text)
-
-                if response.status_code == 200:
-                    sql = "INSERT or REPLACE INTO fanart_cache (tvdb, imdb, url, data, added) Values (?,?,?,?,?)"
-
-                    if isinstance(txt, dict):
-                        txt = json.dumps(txt, indent=4, sort_keys=True)
-                    dbcur.execute(sql, (tvdb, imdb, url, txt, int(time.time())))
-                    dbcon.commit()
-                    dbcon.close()
-                    #return response
-                    return txt
-                else:
-                    dbcon.close()
-                    return None
+                dbcon.close()
+                return None
     except Exception as e:
         c.log(f'[CM Debug @ 200 in fanart.py]Exception raised. Error = {e}')
         dbcon.close()

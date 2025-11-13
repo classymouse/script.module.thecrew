@@ -14,7 +14,6 @@
  ********************************************************cm*
 '''
 
-
 import os
 import sys
 import re
@@ -26,32 +25,34 @@ import sqlite3 as database
 from sqlite3 import OperationalError
 from urllib.parse import quote, quote_plus, parse_qsl, urlparse, urlsplit, urlencode
 
-
 import requests
-#import xbmc
+
+from ..modules import trakt
+from ..modules import keys
+from ..modules import cleantitle
+from ..modules import cleangenre
+from ..modules import control
+from ..modules import client
+from ..modules import cache
+from ..modules import metacache
+from ..modules import playcount
+from ..modules import workers
+from ..modules import utils
+from ..modules import fanart as fanart_tv
+from ..indexers import navigator
+from ..modules.listitem import ListItemInfoTag
+from ..modules.crewruntime import c
 
 
-from resources.lib.modules import trakt
-from resources.lib.modules import keys
-from resources.lib.modules import cleantitle
-from resources.lib.modules import cleangenre
-from resources.lib.modules import control
-from resources.lib.modules import client
-from resources.lib.modules import cache
-from resources.lib.modules import metacache
-from resources.lib.modules import playcount
-from resources.lib.modules import workers
-from resources.lib.modules import utils
-from resources.lib.modules import fanart as fanart_tv
-from resources.lib.indexers import navigator
-from resources.lib.modules.listitem import ListItemInfoTag
-from resources.lib.modules.crewruntime import c
 
-
-params = dict(parse_qsl(sys.argv[2].replace('?',''))) if len(sys.argv) > 1 else {}
+# safely parse query params from sys.argv[2] (ensure index exists)
+# params = dict(parse_qsl(sys.argv[2].replace('?',''))) if len(sys.argv) > 1 else {}
+query = sys.argv[2] if len(sys.argv) > 2 else ''
+params = dict(parse_qsl(query.lstrip('?')))
 action = params.get('action')
 
-class tvshows:
+
+class TVshows:
     '''
     tvshows class
     '''
@@ -314,6 +315,17 @@ class tvshows:
 
         navigator.navigator.endDirectory()
 
+    def create_db_connection(self):
+        """Creates and returns a database connection to the search database."""
+        db_connection = database.connect(control.searchFile)
+        db_cursor = db_connection.cursor()
+        return db_connection, db_cursor
+
+    def close_db_connection(self, db_connection, db_cursor):
+        """Closes the given database connection and cursor."""
+        db_cursor.close()
+        db_connection.close()
+
     def search_new(self):
         """Search for a TV show."""
         control.idle()
@@ -329,12 +341,11 @@ class tvshows:
         search_query = search_query.lower()
         clean_search_query = utils.title_key(search_query)
 
-        db_connection = database.connect(control.searchFile)
-        db_cursor = db_connection.cursor()
+        db_connection, db_cursor = self.create_db_connection()
         db_cursor.execute("DELETE FROM tvshow WHERE term = ?", (search_query,))
         db_cursor.execute("INSERT INTO tvshow VALUES (?,?)", (None, search_query))
         db_connection.commit()
-        db_cursor.close()
+        self.close_db_connection(db_connection, db_cursor)
 
         url = self.search_link % quote_plus(clean_search_query)
         self.get(url)
@@ -344,12 +355,11 @@ class tvshows:
         query = query.lower()
         cleaned_query = utils.title_key(query)
 
-        db_connection = database.connect(control.searchFile)
-        db_cursor = db_connection.cursor()
+        db_connection, db_cursor = self.create_db_connection()
         db_cursor.execute("DELETE FROM tvshow WHERE term = ?", (query,))
         db_cursor.execute("INSERT INTO tvshow VALUES (?, ?)", (None, query))
         db_connection.commit()
-        db_cursor.close()
+        self.close_db_connection(db_connection, db_cursor)
 
         search_url = self.search_link % quote_plus(cleaned_query)
         self.get(search_url)
@@ -365,11 +375,10 @@ class tvshows:
         :type search_term_id: int
         """
         try:
-            db_connection = database.connect(control.searchFile)
-            db_cursor = db_connection.cursor()
+            db_connection, db_cursor = self.create_db_connection()
             db_cursor.execute("DELETE FROM tvshow WHERE ID = ?", (search_term_id,))
             db_connection.commit()
-            db_cursor.close()
+            self.close_db_connection(db_connection, db_cursor)
             control.refresh()
         except Exception as e:
             import traceback
@@ -911,25 +920,25 @@ class tvshows:
 
 
     def collection_list(self):
-        # collection = trakt.get_collection('movies')
+        # collection = trakt.get_collection('tvshows')
         if not self.list:
             self.list = []
 
 
-        collection = trakt.get_collection('movies') or []
-        c.log(f"[CM Debug @ 1048 in movies.py] collection = {collection}")
+        collection = trakt.get_collection('tvshows') or []
+        c.log(f"[CM Debug @ 1048 in tvshows.py] collection = {collection}")
         if len(collection) == 0:
             trakt.get_trakt_collection('movies')
             collection = trakt.get_collection('movies') or []
         if len(collection) == 0:
             return
-        c.log(f"[CM Debug @ 1046 in movies.py] collection = {collection}")
+        c.log(f"[CM Debug @ 927 in tvshows.py] collection = {collection}")
 
 
         for item in collection:
             try:
 
-                c.log(f"[CM Debug @ 1059 in movies.py] item = {item}")
+                c.log(f"[CM Debug @ 1059 in tvshows.py] item = {item}")
                 tmdb = str(item['tmdb'])
 
                 imdb = item['imdb']
@@ -1918,7 +1927,9 @@ class tvshows:
     def tvshowDirectory(self, items):
         if items is None or len(items) == 0:
             control.idle()
-            # ; sys.exit()
+            control.infoDialog(c.lang(32500), sound=False, icon='INFO')
+            return
+
 
         sysaddon = sys.argv[0]
         syshandle = int(sys.argv[1])
@@ -1931,8 +1942,6 @@ class tvshows:
 
         traktCredentials = trakt.get_trakt_credentials_info()
         indicators = playcount.get_tvshow_indicators(refresh=True) if action == 'tvshows' else playcount.get_tvshow_indicators()
-        c.log(f"[CM Debug @ 1726 in tvshows.py] action = {action}")
-        #c.log(f"[CM Debug @ 1681 in tvshows.py] indicators = {indicators}")
         flatten = control.setting('flatten.tvshows') or 'false'
 
         #cm - menus
@@ -1949,7 +1958,11 @@ class tvshows:
 
         for i in items:
             try:
-                label = i['label'] if 'label' in i and not i['label'] == '0' else i['title']
+                #cm - for some reason trakt returns movies too sometimes so check for seasons key
+                if 'seasons' not in i:
+                    continue
+
+                label = i['label'] if 'label' in i and i['label'] != '0' else i['title']
                 status = i.get('status', '')
                 try:
                     premiered = i['premiered']
@@ -1966,14 +1979,14 @@ class tvshows:
                 except Exception:
                     pass
 
-                poster = i['poster'] if 'poster' in i and not i['poster'] == '0' else addon_poster
-                fanart = i['fanart'] if 'fanart' in i and not i['fanart'] == '0' else addon_fanart
-                clearlogo = i['clearlogo'] if 'clearlogo' in i and not i['clearlogo'] == '0' else addon_clearlogo
-                clearart = i['clearart'] if 'clearart' in i and not i['clearart'] == '0' else addon_clearart
-                discart = i['discart'] if 'discart' in i and not i['discart'] == '0' else addon_discart
+                poster = i['poster'] if 'poster' in i and i['poster'] != '0' else addon_poster
+                fanart = i['fanart'] if 'fanart' in i and i['fanart'] != '0' else addon_fanart
+                clearlogo = i['clearlogo'] if 'clearlogo' in i and i['clearlogo'] != '0' else addon_clearlogo
+                clearart = i['clearart'] if 'clearart' in i and i['clearart'] != '0' else addon_clearart
+                discart = i['discart'] if 'discart' in i and i['discart'] != '0' else addon_discart
                 banner1 = i.get('banner', '')
                 banner = banner1 or fanart or addon_banner
-                if 'landscape' in i and not i['landscape'] == '0':
+                if 'landscape' in i and i['landscape'] != '0':
                     landscape = i['landscape']
                 else:
                     landscape = fanart
@@ -1990,35 +2003,28 @@ class tvshows:
                     'landscape': landscape
                     }
 
-                #c.log(f"\n=======================================\n\n[CM Debug @ 1807 in tvshows.py]season = {i['seasons']}\n\n=======================================\n\n")
-
                 sysmeta = quote_plus(json.dumps(meta))
 
                 imdb = i.get('imdb')
                 tmdb = i.get('tmdb')
                 year = i.get('year')
 
-                meta = dict((k,v) for k, v in i.items() if not v == '0')
-                meta['code'] = tmdb
-                meta['imdbnumber'] = imdb
-                meta['mediatype'] = 'tvshow'
-                meta['tvshowtitle'] = i['title']
-                meta['tmdb_id'] = str(tmdb)
-                meta['imdb_id'] = imdb
-                meta['dev'] = 'Classy'
+                # meta = dict((k,v) for k, v in i.items() if not v == '0')
+                # build meta by filtering out '0' values and merging extra keys in one step
+                meta = {
+                    **{k: v for k, v in i.items() if v != '0'},
+                    'code': tmdb,
+                    'imdbnumber': imdb,
+                    'mediatype': 'tvshow',
+                    'tvshowtitle': i.get('title'),
+                    'tmdb_id': str(tmdb),
+                    'imdb_id': imdb,
+                    'dev': 'Classy'
+                }
 
-                if 'trailer' not in i or i['trailer'] is None:
-                    #c.log(f"[CM Debug @ 1585 in tvshows.py] trailer not in i: {i}")
-                    pass
+                trailer = c.ensure_str(i['trailer']) if 'trailer' in i and i['trailer'] != '' else '0'
 
-                trailer = c.ensure_str(i['trailer']) if 'trailer' in i and not i['trailer'] == '' else '0'
-
-                if trailer != '0':
-                    #c.log(f"[CM Debug @ 1591 in tvshows.py] trailer = {trailer}")
-                    trailer_url = quote(trailer)
-                else:
-                    trailer_url = '0'
-
+                trailer_url = quote(trailer) if trailer != '0' else '0'
                 search_name = systitle
 
                 if trailer_url == '0':
@@ -2042,7 +2048,7 @@ class tvshows:
                 except Exception:
                     pass
 
-                if 'castwiththumb' in i and not i['castwiththumb'] == '0':
+                if 'castwiththumb' in i and i['castwiththumb'] != '0':
                     meta.pop('cast', '0')
 
                 try:
@@ -2054,13 +2060,25 @@ class tvshows:
                 except Exception:
                     pass
 
-                cm = []
                 related_url = quote_plus(self.related_link % tmdb)
-                cm.append((playtrailermenu, f'RunPlugin({sysaddon}?action=trailer&name={systitle}&imdb={imdb}&tmdb={tmdb}&mediatype=tvshow&meta={sysmeta})'))
-                cm.append((findSimilar, f'Container.Update({sysaddon}?action=tvshows&url={related_url})'))
-                cm.append((playRandom, f'RunPlugin({sysaddon}?action=random&rtype=season&tvshowtitle={systitle}&imdb={imdb}&tmdb={tmdb})'))
-                cm.append((queueMenu, f'RunPlugin({sysaddon}?action=queueItem)'))
-
+                cm = [
+                    (
+                        playtrailermenu,
+                        f'RunPlugin({sysaddon}?action=trailer&name={systitle}&imdb={imdb}&tmdb={tmdb}&mediatype=tvshow&meta={sysmeta})',
+                    ),
+                    (
+                        findSimilar,
+                        f'Container.Update({sysaddon}?action=tvshows&url={related_url})',
+                    ),
+                    (
+                        playRandom,
+                        f'RunPlugin({sysaddon}?action=random&rtype=season&tvshowtitle={systitle}&imdb={imdb}&tmdb={tmdb})',
+                    ),
+                    (
+                        queueMenu,
+                        f'RunPlugin({sysaddon}?action=queueItem)',
+                    ),
+                ]
                 # TODO: fix watched/unwatched
                 if overlay == 6:
                     cm.append((watchedMenu, f'RunPlugin({sysaddon}?action=tvPlaycount&name={systitle}&imdb{imdb}&tmdb={tmdb}&query=7)'))
@@ -2081,9 +2099,9 @@ class tvshows:
                     }
 
                 art['fanart'] = fanart if setting_fanart == 'true' else c.addon_fanart()
-                if 'clearlogo' in i and not i['clearlogo'] == '0':
+                if 'clearlogo' in i and i['clearlogo'] != '0':
                     art['clearlogo'] = i['clearlogo']
-                if 'clearart' in i and not i['clearart'] == '0':
+                if 'clearart' in i and i['clearart'] != '0':
                     art['clearart'] = i['clearart']
 
                 meta['art'] = art
@@ -2110,42 +2128,39 @@ class tvshows:
                 if index in [None, 0, -1]:
                     watched_episodes = 0
                 else:
-                    watched_episodes = c.count_wachted_items_in_indicators(index, indicators)
+                    watched_episodes = c.count_wachted_items_in_indicators(index, indicators) or 0
 
-                #total_episodes = c.count_total_items_in_indicators(index, indicators)
-                total_episodes = i['episodes']
-
-                if total_episodes < 0:
-                    total_episodes = 0
-
-
-                if watched_episodes == 0:
-                    unwatched_episodes = total_episodes
+                if 'episodes' not in i or i['episodes'] is None:
+                    total_episodes = c.count_total_items_in_indicators(index, indicators) or 0
                 else:
-                    unwatched_episodes = total_episodes - watched_episodes
-                if unwatched_episodes < 0:
-                    unwatched_episodes = 0
+                    total_episodes = i['episodes'] or 0
 
+                # Ensure numeric ints to avoid type errors from None or unexpected types
+                try:
+                    total_episodes = int(total_episodes)
+                except Exception:
+                    total_episodes = 0
+                try:
+                    watched_episodes = int(watched_episodes)
+                except Exception:
+                    watched_episodes = 0
+
+                total_episodes = max(total_episodes, 0)
+                # Compute unwatched safely and clamp to non-negative
+                unwatched_episodes = total_episodes - watched_episodes
+                unwatched_episodes = max(unwatched_episodes, 0)
                 if unwatched_episodes == 0:
                     watched_episodes = total_episodes
 
                 item.setProperties({'WatchedEpisodes': watched_episodes, 'UnWatchedEpisodes': unwatched_episodes})
-                item.setProperties({'TotalSeasons': i['seasons'], 'TotalEpisodes': i['episodes']})
+                item.setProperties({'TotalSeasons': i['seasons'], 'TotalEpisodes': total_episodes})
 
                 genre = i.get('genre') or '0'
 
-                if genre != '0':
-                    genres = c.string_split_to_list(genre)
-                else:
-                    genres = []
-
+                genres = c.string_split_to_list(genre) if genre != '0' else []
                 studio = i.get('studio') or '0'
 
-                if studio != '0':
-                    studios = c.string_split_to_list(studio)
-                else:
-                    studios = []
-
+                studios = c.string_split_to_list(studio) if studio != '0' else []
                 country = i.get('country') or '0'
 
                 if country != '0':
@@ -2189,37 +2204,33 @@ class tvshows:
                 failure = traceback.format_exc()
                 c.log(f'[CM Debug @ 1709 in tvshows.py]Traceback:: {failure}')
                 c.log(f'[CM Debug @ 1709 in tvshows.py]Exception raised. Error = {e}')
-                pass
+
 
 
 
         try:
             url = items[0]['next']
-            if url == '':
-                raise Exception()
+            if url not in ['0', '', None, 'None']:
+                icon = control.addonNext()
+                q_url = quote_plus(url)
+                url = f'{sysaddon}?action=tvshowPage&url={q_url}'
 
-            icon = control.addonNext()
-            #url = f"{sysaddon}?action=tvshowPage&url={quote_plus(url)}"
-            q_url = quote_plus(url)
-            #url = '%s?action=tvshowPage&url=%s' % (sysaddon, quote_plus(url))
-            url = f'{sysaddon}?action=tvshowPage&url={q_url}'
+                try:
+                    item = control.item(label=nextMenu, offscreen=True)
+                except Exception:
+                    item = control.item(label=nextMenu)
 
-            try:
-                item = control.item(label=nextMenu, offscreen=True)
-            except Exception:
-                item = control.item(label=nextMenu)
+                item.setArt({
+                    'icon': icon,
+                    'thumb': icon,
+                    'poster': icon,
+                    'banner': icon,
+                    'fanart': addon_fanart
+                    })
 
-            item.setArt({
-                'icon': icon,
-                'thumb': icon,
-                'poster': icon,
-                'banner': icon,
-                'fanart': addon_fanart
-                })
-
-            control.addItem(handle=syshandle, url=url, listitem=item, isFolder=True)
+                control.addItem(handle=syshandle, url=url, listitem=item, isFolder=True)
         except Exception as e:
-            c.log(f"Exception in tvshows.adddirectory() - 2: error = {e}")
+            c.log(f"Exception in tvshows.adddirectory() #2: error = {e}")
 
 
         control.content(syshandle, 'tvshows')

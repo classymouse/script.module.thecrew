@@ -8,14 +8,14 @@ disable=
     C0115, # missing-class-docstring
     C0116, # missing-function-docstring
     R0903, # too-few-public-methods
-    R0201, # method could be a function
     W0611, # unused-import
     W0612, # unused-variable
     W0702, # bare-except
     W0621, # redefined-outer-name
+    W0718, # broad-except
 
 [FORMAT]
-max-line-length=120
+max-line-length=280
 indent-string='    '
 
 [REPORTS]
@@ -23,14 +23,18 @@ output-format=colorized
 reports=no
 
 [TYPECHECK]
-generated-members=xbmc.*,xbmcvfs.*,xbmcaddon.*,xbmcgui.*,xbmcplugin.*
+# runtime-provided modules / attributes to avoid "unable to import" / "no-member" false positives
+generated-members=xbmc.*,xbmcvfs.*,xbmcaddon.*,xbmcgui.*,orion,fanart_tv,trakt,cache,control,client,c,crew_errors
 
 [DESIGN]
-max-args=10
-max-locals=30
-max-branches=20
-max-statements=100
+# raise limits to fit legacy large single-file modules used by the addon
+max-args=12
+max-locals=60
+max-branches=40
+max-statements=300
 max-parents=7
-max-attributes=20
+max-attributes=50
 min-public-methods=0
 max-public-methods=50
+# allow larger modules (this project has very large modules)
+max-module-lines=6000

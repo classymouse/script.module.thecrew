@@ -14,7 +14,6 @@
 # pylint: disable=C0301  # disable "line too long" (file-wide)
 
 import sys
-from .crewruntime import c
 
 # moved imports to module top-level for clarity and performance
 import importlib
@@ -25,12 +24,13 @@ import types
 from random import randint
 from urllib.parse import quote_plus
 
-# moved previously-local imports to top-level as requested
+
 from . import cache
 from . import control
 from . import downloader
 from . import sources as local_sources
 from . import views
+from .crewruntime import c
 
 def router(params):
     """
@@ -39,11 +39,11 @@ def router(params):
     - Handles instantiation heuristics
     - Maps every action from the original file to a handler
     """
-    # local helper to read params
+    # cm - internal local helper to read params
     def p(k, default=None):
         return params.get(k, default)
 
-    # robust call_module: import module, resolve attribute, optionally instantiate or call method
+    # cm - robust call_module: import module, resolve attribute, optionally instantiate or call method
     def call_module(module_path, attr=None, inst=False, method=None, *a, **kw):
         """
         Lazily import module or accept a module object.
@@ -53,8 +53,8 @@ def router(params):
         - method: call a method on the instance/attribute/module when provided
         """
         # Accept already-imported module objects
-
-        c.log(f"[CM Debug @ 57 in crew.py] call_module called with: module_path={module_path}, attr={attr}, inst={inst}, method={method}, args={a}, kwargs={kw}")
+        if c.devmode:
+            c.log(f"[CM Debug @ 57 in crew.py]\n\ncall_module called with: module_path={module_path}, attr={attr}, inst={inst}, method={method}, args={a}, kwargs={kw}\n=======================================================\n")
         if not isinstance(module_path, str):
             if inspect.ismodule(module_path):
                 mod = module_path
@@ -83,7 +83,7 @@ def router(params):
                     return obj
             return None
 
-        # instantiate requested
+        # cm - try to instantiate requested
         if inst:
             instance = None
             if inspect.isclass(target):
@@ -98,7 +98,7 @@ def router(params):
                 raise TypeError(f"'inst' requested but target is not callable: {module_path}{f'.{attr}' if attr else ''}")
             return getattr(instance, method)(*a, **kw) if method else instance
 
-        # call a method in module/attribute or call the callable
+        # cm - try to call a method in module/attribute or call the callable
         if method:
             if inspect.ismodule(target):
                 func = getattr(target, method, None)
@@ -115,24 +115,24 @@ def router(params):
 
         return target
 
-    # actionlist from original file
+    # cm - a helper to handle big actionlist with lists.indexer().root_<action>()
     actionlist = {
         '247movies','247tvshows','iptv','yss','weak','daddylive',
         'sportsbay','sports24','gratis','base','waste','whitehat','arconai','iptv_lodge','stratus','distro',
         'xumo','bumble','pluto','tubi','spanish','spanish2','bp','arabic','arabic2','india','chile','colombia','argentina',
-        'spain','iptv_git','cctv','titan','porn','faith','lust','greyhat','absolution','eyecandy','purplehat','classy','retribution','kiddo',
+        'spain','iptv_git','cctv','titan','porn','faith','lust','greyhat','absolution','eyecandy','purplehat','classy','orangehat','retribution','kiddo',
         'redhat','yellowhat','blackhat','food','ncaa','ncaab','lfl','xfl','boxing','tennis','mlb','nfl','nhl','nba',
         'ufc','fifa','wwe','motogp','f1','pga','nascar','cricket','sports_channels','sreplays','greenhat'
     }
 
     action = p('action')
     if action is None:
-        # default behaviour
+        # default action
         call_module('resources.lib.indexers.navigator', 'Navigator', inst=True, method='root')
         cache.cache_version_check()
         return
 
-    # handle big actionlist with lists.indexer().root_<action>()
+    # cm - a helper to handle big actionlist with lists.indexer().root_<action>()
     if action in actionlist:
         idx = call_module('resources.lib.indexers.lists', 'indexer', inst=True)
         func_name = f'root_{action}'
@@ -147,16 +147,15 @@ def router(params):
                 c.log(f"[router] indexer 'root' not callable for action: {action}")
         return
 
-    # helper for docuHeaven fallback
+    # cm - a helper for docuHeaven fallback
     def _docu_heaven():
         if p('docuCat') is not None:
-            call_module('resources.lib.indexers.docu', 'documentary', True, 'docu_list', * (p('docuCat'),))
+            call_module('resources.lib.indexers.docu', 'Documentary', True, 'docu_list', * (p('docuCat'),))
         elif p('docuPlay') is not None:
-            call_module('resources.lib.indexers.docu', 'documentary', True, 'docu_play', * (p('docuPlay'),))
+            call_module('resources.lib.indexers.docu', 'Documentary', True, 'docu_play', * (p('docuPlay'),))
         else:
-            call_module('resources.lib.indexers.docu', 'documentary', inst=True, method='root')
-
-    # complex 'play' handler reused by play/play1
+            call_module('resources.lib.indexers.docu', 'Documentary', inst=True, method='root')
+    # cm - the complex 'play' handler reused by play/play1 where play1 needs to be discontinued
     def _play_handler(use_player=False):
         try:
             content = p('content')
@@ -170,7 +169,7 @@ def router(params):
             c.log(f'[CM @ router]Traceback:: {traceback.format_exc()}')
             c.log(f'[CM @ router]Error:: {e}')
 
-    # download handler (keeps original silent failure behaviour)
+    # cm - the download handler (keeps original silent failure behaviour)
     def _download_handler():
         try:
             src = p('source')
@@ -181,7 +180,7 @@ def router(params):
             # ignore expected parsing/indexing/type errors but avoid catching all Exceptions
 
 
-    # random handler preserves original branching
+    # cm - the random handler preserves original branching
     def _random_handler():
         try:
             rtype = p('rtype')
@@ -192,12 +191,12 @@ def router(params):
                 rlist = call_module('resources.lib.indexers.movies', 'movies', inst=True, method='get', create_directory=False, url=p('url'))
             elif rtype == 'episode':
                 # use the correct attribute/class name 'episodes' (not 'episode')
-                rlist = call_module('resources.lib.indexers.episodes', 'episodes', inst=True, method='get', create_directory=False, tvshowtitle=p('tvshowtitle'), year=p('year'), imdb=p('imdb'), tmdb=p('tmdb'), meta=p('meta'), season=p('season'))
+                rlist = call_module('resources.lib.indexers.episodes', 'Episodes', inst=True, method='get', create_directory=False, tvshowtitle=p('tvshowtitle'), year=p('year'), imdb=p('imdb'), tmdb=p('tmdb'), meta=p('meta'), season=p('season'))
             elif rtype == 'season':
                 rlist = call_module('resources.lib.indexers.episodes', 'Seasons', inst=True, method='get', create_directory=False, tvshowtitle=p('tvshowtitle'), year=p('year'), imdb=p('imdb'), tmdb=p('tmdb'), meta=p('meta'))
                 r = f"{sys.argv[0]}?action=random&rtype=episode"
             elif rtype == 'show':
-                rlist = call_module('resources.lib.indexers.tvshows', 'tvshows', inst=True, method='get', create_directory=False, url=p('url'))
+                rlist = call_module('resources.lib.indexers.tvshows', 'TVshows', inst=True, method='get', create_directory=False, url=p('url'))
                 r = f"{sys.argv[0]}?action=random&rtype=season"
 
             # Defensive normalization: ensure we have a sequence
@@ -290,6 +289,7 @@ def router(params):
         'holidaysNavigator': lambda: call_module('resources.lib.indexers.navigator', 'Navigator', inst=True, method='holidays'),
         'halloweenNavigator': lambda: call_module('resources.lib.indexers.navigator', 'Navigator', inst=True, method='halloween'),
         'kidsgreyNavigator': lambda: call_module('resources.lib.indexers.navigator', 'Navigator', inst=True, method='kidsgrey'),
+
         # lists indexer shortcuts
         'gitNavigator': lambda: call_module('resources.lib.indexers.lists', 'indexer', inst=True, method='root_git'),
         'plist': lambda: call_module('resources.lib.indexers.lists', 'indexer', inst=True, method='root_personal'),
@@ -300,8 +300,9 @@ def router(params):
         'tvtuner': lambda: call_module('resources.lib.indexers.lists', 'indexer', True, 'tvtuner', * (p('url'),)),
         'youtube': lambda: call_module('resources.lib.indexers.lists', 'indexer', True, 'youtube', * (p('url'), p('action'))),
         'browser': lambda: call_module('resources.lib.indexers.lists', 'indexer', True, 'browser', * (p('url'),)),
-        'docuNavigator': lambda: call_module('resources.lib.indexers.docu', 'documentary', inst=True, method='root'),
+        'docuNavigator': lambda: call_module('resources.lib.indexers.docu', 'Documentary', inst=True, method='root'),
         'docuHeaven': _docu_heaven,
+
         # movies
         'movies': lambda:
             call_module('resources.lib.indexers.movies', 'movies', True, 'get', * (p('url'), p('tid')) )
@@ -324,27 +325,27 @@ def router(params):
         # channels
         'channels': lambda: call_module('resources.lib.indexers.channels', 'channels', inst=True, method='get'),
         # tvshows
-        'tvshows': lambda: call_module('resources.lib.indexers.tvshows', 'tvshows', True, 'get', * (p('url'), p('tid')) ) if p('url') == 'tmdb_networks' else call_module('resources.lib.indexers.tvshows', 'tvshows', True, 'get', * (p('url'),)),
-        'tvshowPage': lambda: call_module('resources.lib.indexers.tvshows', 'tvshows', True, 'get', * (p('url'),)),
-        'tvSearch': lambda: call_module('resources.lib.indexers.tvshows', 'tvshows', inst=True, method='search'),
-        'tvSearchnew': lambda: call_module('resources.lib.indexers.tvshows', 'tvshows', inst=True, method='search_new'),
-        'tvSearchterm': lambda: call_module('resources.lib.indexers.tvshows', 'tvshows', True, 'search_term', * (p('name'),)),
-        'tvDeleteTerm': lambda: call_module('resources.lib.indexers.tvshows', 'tvshows', True, 'delete_search_term', * (p('id'),)),
-        'tvPerson': lambda: call_module('resources.lib.indexers.tvshows', 'tvshows', inst=True, method='person'),
-        'tvGenres': lambda: call_module('resources.lib.indexers.tvshows', 'tvshows', inst=True, method='genres'),
-        'tvNetworks': lambda: call_module('resources.lib.indexers.tvshows', 'tvshows', inst=True, method='networks'),
-        'tvLanguages': lambda: call_module('resources.lib.indexers.tvshows', 'tvshows', inst=True, method='languages'),
-        'tvCertificates': lambda: call_module('resources.lib.indexers.tvshows', 'tvshows', inst=True, method='certifications'),
-        'tvPersons': lambda: call_module('resources.lib.indexers.tvshows', 'tvshows', True, 'persons', * (p('url'),)),
-        'tvUserlists': lambda: call_module('resources.lib.indexers.tvshows', 'tvshows', inst=True, method='userlists'),
+        'tvshows': lambda: call_module('resources.lib.indexers.tvshows', 'TVshows', True, 'get', * (p('url'), p('tid')) ) if p('url') == 'tmdb_networks' else call_module('resources.lib.indexers.tvshows', 'TVshows', True, 'get', * (p('url'),)),
+        'tvshowPage': lambda: call_module('resources.lib.indexers.tvshows', 'TVshows', True, 'get', * (p('url'),)),
+        'tvSearch': lambda: call_module('resources.lib.indexers.tvshows', 'TVshows', inst=True, method='search'),
+        'tvSearchnew': lambda: call_module('resources.lib.indexers.tvshows', 'TVshows', inst=True, method='search_new'),
+        'tvSearchterm': lambda: call_module('resources.lib.indexers.tvshows', 'TVshows', True, 'search_term', * (p('name'),)),
+        'tvDeleteTerm': lambda: call_module('resources.lib.indexers.tvshows', 'TVshows', True, 'delete_search_term', * (p('id'),)),
+        'tvPerson': lambda: call_module('resources.lib.indexers.tvshows', 'TVshows', inst=True, method='person'),
+        'tvGenres': lambda: call_module('resources.lib.indexers.tvshows', 'TVshows', inst=True, method='genres'),
+        'tvNetworks': lambda: call_module('resources.lib.indexers.tvshows', 'TVshows', inst=True, method='networks'),
+        'tvLanguages': lambda: call_module('resources.lib.indexers.tvshows', 'TVshows', inst=True, method='languages'),
+        'tvCertificates': lambda: call_module('resources.lib.indexers.tvshows', 'TVshows', inst=True, method='certifications'),
+        'tvPersons': lambda: call_module('resources.lib.indexers.tvshows', 'TVshows', True, 'persons', * (p('url'),)),
+        'tvUserlists': lambda: call_module('resources.lib.indexers.tvshows', 'TVshows', inst=True, method='userlists'),
         # seasons / episodes
         'seasons': lambda: call_module('resources.lib.indexers.episodes', 'Seasons', True, 'get', * (p('tvshowtitle'), p('year'), p('imdb'), p('tmdb'), p('meta'))),
-        'episodes': lambda: call_module('resources.lib.indexers.episodes', 'episodes', True, 'get',
+        'episodes': lambda: call_module('resources.lib.indexers.episodes', 'Episodes', True, 'get',
                                        * (p('tvshowtitle'), p('year'), p('imdb'), p('tmdb'), p('meta'), p('season'), p('episode'))),
-        'calendar': lambda: call_module('resources.lib.indexers.episodes', 'episodes', True, 'calendar', * (p('url'),)),
-        'tvWidget': lambda: call_module('resources.lib.indexers.episodes', 'episodes', inst=True, method='widget'),
-        'calendars': lambda: call_module('resources.lib.indexers.episodes', 'episodes', inst=True, method='calendars'),
-        'episodeUserlists': lambda: call_module('resources.lib.indexers.episodes', 'episodes', inst=True, method='userlists'),
+        'calendar': lambda: call_module('resources.lib.indexers.episodes', 'Episodes', True, 'calendar', * (p('url'),)),
+        'tvWidget': lambda: call_module('resources.lib.indexers.episodes', 'Episodes', inst=True, method='widget'),
+        'calendars': lambda: call_module('resources.lib.indexers.episodes', 'Episodes', inst=True, method='calendars'),
+        'episodeUserlists': lambda: call_module('resources.lib.indexers.episodes', 'Episodes', inst=True, method='userlists'),
         # settings / control
         'setfanartquality': lambda: call_module('resources.lib.modules.control', '', method='setFanartQuality'),
         'refresh': lambda: call_module('resources.lib.modules.control', '', method='refresh'),
@@ -371,7 +372,7 @@ def router(params):
         'seasonPlaycount': lambda: call_module('.playcount', None, False, 'season', * (p('imdb'), p('tmdb'), p('season'), p('query'))),
         'tvPlaycount': lambda: call_module('.playcount', None, False, 'tvshows', * (p('imdb'), p('tmdb'), p('query'))),
 
-        'trailer': lambda: call_module('.trailer', 'trailers', True, 'get', * (p('name'), p('url'), p('imdb'), p('tmdb'), int(p('windowedtrailer') or 0), p('mediatype'), p('meta'))),
+        'trailer': lambda: call_module('.trailer', 'Trailers', True, 'get', * (p('name'), p('url'), p('imdb'), p('tmdb'), int(p('windowedtrailer') or 0), p('mediatype'), p('meta'))),
 
         'traktManager': lambda: call_module('resources.lib.modules.trakt','', False, 'manager', * (p('name'), p('imdb'), p('tmdb'), p('content'))),
         'authTrakt': lambda: call_module('resources.lib.modules.trakt', None, False, method='auth_trakt'),

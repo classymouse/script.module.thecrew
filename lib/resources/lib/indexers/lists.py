@@ -220,12 +220,12 @@ class indexer:
 #OH added 1-5-2021
     def create_list(self, url):
         try:
-            c.log(f"[CM Debug @ 341 in lists.py]url = {url}")
+            c.log(f"[CM Debug @ 223 in lists.py]url = {url}")
             regex.clear()
-            c.log(f"[CM Debug @ 343 in lists.py]url = {url}")
+            c.log(f"[CM Debug @ 225 in lists.py]url = {url}")
 
             self.list = self.the_crew_list(url)
-            c.log(f"[CM Debug @ 343 in lists.py]self.list = {self.list}")
+            c.log(f"[CM Debug @ 228 in lists.py]self.list = {self.list}")
             for i in self.list:
                 i.update({'content': 'addons'})
             self.addDirectory(self.list)
@@ -276,6 +276,8 @@ class indexer:
             r += unquote_plus(x)
             c.log(f"[CM Debug @ 405 in lists.py] r = {repr(r)} and x = {repr(x)}")
             url = regex.resolve(r)
+            c.log(f"[CM Debug @ 407 in lists.py] resolved url = {repr(url)}")
+
             self.list = self.the_crew_list('', result=url)
             self.addDirectory(self.list)
             return self.list
@@ -327,7 +329,7 @@ class indexer:
     #TODO getting key from trailers is just plain wrong. Needs a key from yt or settings
     def youtube(self, url, action):
         try:
-            key = trailer.trailers().key_link.split('=', 1)[-1]
+            key = trailer.Trailers().key_link.split('=', 1)[-1]
             if 'PlaylistTuner' in action:
                 self.list = cache.get(youtube.youtube(key=key).playlist, 1, url)
             elif 'Playlist' in action:
@@ -357,11 +359,198 @@ class indexer:
             pass
 
 
-#OH - checked
     def the_crew_list(self, url, result=None):
+        """
+        Parse a remote/local "the_crew" list format into a normalized list of dicts.
+        - result: optional pre-fetched payload (string). If None, will fetch via cache.get(client.request, 0, url).
+        Returns: list of items (each a dict)
+        """
+        try:
+            # fetch if needed
+            if result is None:
+                result = cache.get(client.request, 0, url)
+
+            if not result:
+                c.infoDialog(control.lang(32085), sound=False, icon='INFO')
+                return []
+
+            # handle EXT M3U -> convert to simple XML-like <item> blocks
+            if result.strip().startswith('#EXTM3U') and '#EXTINF' in result:
+                try:
+                    matches = re.findall(r'#EXTINF:.+?,(.+?)\n(.+?)\n', result, flags=re.MULTILINE | re.DOTALL)
+                    result = ''.join(f'<item><title>{m[0]}</title><link>{m[1]}</link></item>' for m in matches)
+                except Exception:
+                    # fall back to original result if conversion fails
+                    c.log(f"[CM Debug @ 382 in lists.py] fall back to original result if conversion fails::result = {result}")
+
+
+            # try base64 decode if payload looks encoded
+            decoded = None
+            try:
+                c.log("[CM Debug @ 398 in lists.py] attempting base64 decode of result")
+                decoded_bytes = base64.b64decode(result)
+                decoded = six_decode(decoded_bytes)
+                # accept decoded if it looks like XML/html/link content
+                if decoded and ('</link>' in decoded or '<item>' in decoded or '<dir>' in decoded):
+                    result = decoded
+            except Exception:
+                # ignore decode failures
+                pass
+
+            # top info block (before first <item> or <dir>)
+            info = re.split(r'<item>|<dir>', result, maxsplit=1)[0]
+
+            def first_match(text, tag, default='0'):
+                try:
+                    return re.findall(f'<{tag}>(.+?)</{tag}>', text)[0]
+                except Exception:
+                    return default
+
+            vip = first_match(info, 'poster')
+            image = first_match(info, 'thumbnail')
+            fanart = first_match(info, 'fanart')
+
+            # item pattern - catch <item>, <dir>, <plugin>, <info> and simple name/link blocks
+            item_pattern = re.compile(
+                r'((?:<item>.+?</item>|<dir>.+?</dir>|<plugin>.+?</plugin>|<info>.+?</info>|'
+                r'<name>[^<]+</name><link>[^<]+</link><thumbnail>[^<]+</thumbnail><mode>[^<]+</mode>|'
+                r'<name>[^<]+</name><link>[^<]+</link><thumbnail>[^<]+</thumbnail><date>[^<]+</date>))',
+                flags=re.MULTILINE | re.DOTALL
+            )
+            raw_items = item_pattern.findall(result)
+
+            out = []
+            for raw in raw_items:
+                try:
+                    block = raw.replace('\r', '').replace('\n', '').replace('\t', '').replace('&nbsp;', '')
+
+                    # capture embedded <regex> block (kept separately)
+                    regdata_list = re.findall(r'(<regex>.+?</regex>)', block, flags=re.MULTILINE | re.DOTALL)
+                    regdata = ''.join(regdata_list)
+                    reglist = re.findall(r'(<listrepeat>.+?</listrepeat>)', regdata, flags=re.MULTILINE | re.DOTALL)
+                    regdata_q = quote_plus(regdata) if regdata else ''
+
+                    if regdata_q:
+                        # lightweight stable hash for regex payload
+                        h = hashlib.md5(regdata_q.encode('utf-8')).hexdigest()
+                        self.hash.append({'regex': h, 'response': regdata_q})
+                        # append regex reference to url later if needed
+                    # remove regex block for normal parsing
+                    block = re.sub(r'<regex>.+?</regex>', '', block, flags=re.MULTILINE | re.DOTALL)
+                    block = re.sub(r'<sublink></sublink>|<sublink\s+name=(?:\'|\").*?(?:\'|\")></sublink>', '', block)
+                    block = re.sub(r'<link></link>', '', block)
+
+                    # extract visible name/title
+                    name = re.sub(r'<meta>.+?</meta>', '', block)
+                    name = first_match(name, 'title', default=None) or first_match(name, 'name', default='Unknown')
+
+                    # date suffix
+                    date = first_match(block, 'date', default='')
+                    if re.search(r'\d+', date or ''):
+                        name = f"{name} [COLOR red] Updated {date}[/COLOR]"
+
+                    image2 = first_match(block, 'thumbnail', default=image)
+                    fanart2 = first_match(block, 'fanart', default=fanart)
+                    meta_block = first_match(block, 'meta', default='0')
+                    url_field = first_match(block, 'link', default='0')
+
+                    # defaults and normalization
+                    url_field = url_field.replace('>search<', f'><preset>search</preset>{meta_block}<')
+                    url_field = f'<preset>search</preset>{meta_block}' if url_field == 'search' else url_field
+                    url_field = url_field.replace('>searchsd<', f'><preset>searchsd</preset>{meta_block}<')
+                    url_field = f'<preset>searchsd</preset>{meta_block}' if url_field == 'searchsd' else url_field
+                    url_field = re.sub(r'<sublink></sublink>|<sublink\s+name=(?:\'|\").*?(?:\'|\")></sublink>', '', url_field)
+
+                    # determine action
+                    if block.startswith('<item>'):
+                        action = 'play'
+                    elif block.startswith('<plugin>'):
+                        action = 'plugin'
+                    elif block.startswith('<info>') or url_field == '0':
+                        action = '0'
+                    else:
+                        action = 'directory'
+
+                    # xdirectory if play + listrepeat present
+                    if action == 'play' and reglist:
+                        action = 'xdirectory'
+
+                    # attach regex fingerprint if we created one
+                    if regdata_q:
+                        url_field = f"{url_field}|regex={h}"
+
+                    folder = action in ('directory', 'xdirectory', 'plugin')
+
+                    # content field
+                    content_tag = first_match(meta_block, 'content', default='0')
+                    if content_tag == '0':
+                        content_tag = first_match(block, 'content', default='0')
+                    content = f"{content_tag}s" if content_tag != '0' else '0'
+
+                    # tv/tv tuner conversions
+                    if 'tvshow' in content and not url_field.strip().endswith('.xml'):
+                        url_field = f'<preset>tvindexer</preset><url>{url_field}</url><thumbnail>{image2}</thumbnail><fanart>{fanart2}</fanart>{meta_block}'
+                        action = 'tvtuner'
+                    if 'tvtuner' in content and not url_field.strip().endswith('.xml'):
+                        url_field = f'<preset>tvtuner</preset><url>{url_field}</url><thumbnail>{image2}</thumbnail><fanart>{fanart2}</fanart>{meta_block}'
+                        action = 'tvtuner'
+
+                    # extract common meta tags or defaults
+                    imdb = first_match(meta_block, 'imdb', default='0')
+                    tvdb = first_match(meta_block, 'tvdb', default='0')
+                    tvshowtitle = first_match(meta_block, 'tvshowtitle', default='0')
+                    title = first_match(meta_block, 'title', default='0') or tvshowtitle
+                    year = first_match(meta_block, 'year', default='0')
+                    premiered = first_match(meta_block, 'premiered', default='0')
+                    season = first_match(meta_block, 'season', default='0')
+                    episode = first_match(meta_block, 'episode', default='0')
+
+                    out.append({
+                        'name': name, 'vip': vip, 'url': url_field, 'action': action, 'folder': folder,
+                        'poster': image2 or '0', 'banner': '0', 'fanart': fanart2 or '0',
+                        'content': content, 'imdb': imdb, 'tvdb': tvdb, 'tmdb': '0', 'title': title,
+                        'originaltitle': title, 'tvshowtitle': tvshowtitle, 'year': year,
+                        'premiered': premiered, 'season': season, 'episode': episode
+                    })
+                except Exception as e:
+                    import traceback
+                    failure = traceback.format_exc()
+                    c.log(f'[CM Debug @ 515 in lists.py]Traceback:: {failure}')
+                    c.log(f'[CM Debug @ 515 in lists.py]Exception raised. Error = {e}')
+
+
+                # except Exception:
+                #     # skip malformed item but continue parsing others
+                    continue
+
+            # persist regex index if any
+            try:
+                if self.hash:
+                    regex.insert(self.hash)
+            except Exception:
+                pass
+
+            # update internal list and return (do not mutate caller-provided list)
+            self.list = out
+            return out
+
+        except Exception as e:
+            import traceback
+            failure = traceback.format_exc()
+            c.log(f'[CM Debug @ the_crew_list]Traceback:: {failure}')
+            c.log(f'[CM Debug @ the_crew_list]Exception raised. Error = {e}')
+            return []
+
+
+
+#OH - checked
+    def the_crew_list_orig(self, url, result=None):
         try:
             if result is None:
                 result = cache.get(client.request, 0, url)
+
+            if result is None or result == '':
+                c.infoDialog(control.lang(32085), sound=False, icon='INFO')
 
             if result.strip().startswith('#EXTM3U') and '#EXTINF' in result:
                 try:
@@ -588,8 +777,90 @@ class indexer:
             c.log(f'[CM Debug @ 650 in lists.py]Exception raised. Error = {e}')
             pass
 
-
+# ...existing code...
     def worker(self):
+        """
+        Fetch and cache metadata for items in self.list using threading.
+        Processes movies and TV shows, with special handling for single unique IMDB.
+        """
+        from concurrent.futures import ThreadPoolExecutor, as_completed  # Import here for clarity
+
+        try:
+            total = len(self.list)
+            if total == 0:
+                return
+
+            # Initial metacache fetch (mark all as not cached)
+            for item in self.list:
+                item['metacache'] = False
+            self.list = metacache.fetch(self.list, self.lang)
+
+            # Deduplicate IMDB IDs and handle single unique IMDB case
+            imdb_ids = [item.get('imdb', '0') for item in self.list if item.get('imdb', '0') != '0']
+            unique_imdb = list(dict.fromkeys(imdb_ids))  # Preserve order, dedupe
+            if len(unique_imdb) == 1:
+                # Process all items with this IMDB (not just the first)
+                single_imdb = unique_imdb[0]
+                for idx, item in enumerate(self.list):
+                    if item.get('imdb') == single_imdb:
+                        if item.get('content') == 'movies':
+                            self.movie_info(idx)
+                        elif item.get('content') in ['tvshows', 'seasons', 'episodes']:
+                            self.tv_info(idx)
+                if self.meta:
+                    metacache.insert(self.meta)
+                    self.meta = []  # Reset after insert
+
+            # Refetch from metacache after single-IMDB processing
+            for item in self.list:
+                item['metacache'] = False
+            self.list = metacache.fetch(self.list, self.lang)
+
+            # Batch processing with ThreadPoolExecutor (limit to 20 workers per batch)
+            batch_size = 50
+            max_workers_per_batch = 20
+            for r in range(0, total, batch_size):
+                batch_end = min(r + batch_size, total)
+                batch_items = [(i, self.list[i]) for i in range(r, batch_end)]
+
+                with ThreadPoolExecutor(max_workers=max_workers_per_batch) as executor:
+                    # Submit tasks for movie_info and tv_info based on content
+                    futures = []
+                    for idx, item in batch_items:
+                        content = item.get('content', '')
+                        if content == 'movies':
+                            futures.append(executor.submit(self.movie_info, idx))
+                        elif content in ['tvshows', 'seasons', 'episodes']:
+                            futures.append(executor.submit(self.tv_info, idx))
+
+                    # Wait for all futures to complete and handle exceptions
+                    for future in as_completed(futures):
+                        try:
+                            future.result()  # Raises exception if task failed
+                        except Exception as e:
+                            c.log(f"[CM Debug @ worker] Task failed: {e}")
+
+                # Insert meta after each batch
+                if self.meta:
+                    try:
+                        metacache.insert(self.meta)
+                        self.meta = []  # Reset
+                    except Exception as e:
+                        c.log(f"[CM Debug @ worker] Failed to insert meta for batch starting at {r}: {e}")
+
+            # Final meta insert if any remaining
+            if self.meta:
+                try:
+                    metacache.insert(self.meta)
+                except Exception as e:
+                    c.log(f"[CM Debug @ worker] Failed final meta insert: {e}")
+
+        except Exception as e:
+            c.log(f"[CM Debug @ worker] Unexpected error: {e}")
+# ...existing code...
+
+
+    def worker_orig(self):
         try:
             total = len(self.list)
 
@@ -897,9 +1168,7 @@ class indexer:
         if items is None or len(items) == 0:
             return
 
-        c.log(f"[CM Debug @ 1027 in lists.py] items = {repr(items)}")
-
-
+        c.log(f"[CM Debug @ 1171 in lists.py] items = {repr(items)}")
 
         sysaddon = sys.argv[0]
         addon_poster = addon_banner = control.addonInfo('icon')
@@ -910,7 +1179,7 @@ class indexer:
             playlist.clear()
 
         try:
-            devmode = True if 'testings.xml' in control.listDir(control.dataPath)[1] else False
+            devmode = 'testings.xml' in control.listDir(control.dataPath)[1]
         except FileNotFoundError:
             devmode = False
 
@@ -925,6 +1194,7 @@ class indexer:
         }.get(key, 'addons')
 
         for i in items:
+            c.log(f"[CM Debug @ 1197 in lists.py] i = {repr(i)}")
             try:
                 name = control.lang(int(i['name']))
             except (ValueError, TypeError):
@@ -961,12 +1231,12 @@ class indexer:
                 banner = addon_banner if poster == '0' else poster
             content = i['content'] if 'content' in i else '0'
             folder = i['folder'] if 'folder' in i else True
-            meta = dict((k,v) for k, v in i.items() if not v == '0')
+            meta = {k: v for k, v in i.items() if v != '0'}
 
             cm = []
 
             if content in ['movies', 'tvshows']:
-                meta.update({'trailer': f'{sysaddon}?action=trailer&name={quote_plus(name)}'})
+                meta['trailer'] = f'{sysaddon}?action=trailer&name={quote_plus(name)}'
                 cm.append((control.lang(30707), f'RunPlugin({sysaddon}?action=trailer&name={quote_plus(name)})'))
 
             if content in ['movies', 'tvshows', 'seasons', 'episodes']:
@@ -996,7 +1266,7 @@ class indexer:
             elif mode == 'episodes':
                 cm.append((control.lang(30714), f"RunPlugin({sysaddon}?action=addView&content=episodes)"))
 
-            if devmode is True:
+            if devmode:
                 cm.append(('Open in browser',f"RunPlugin({sysaddon}?action=browser&url={quote_plus(i['url'])}"))
 
             item = control.item(label=name)
@@ -1015,7 +1285,7 @@ class indexer:
             elif addon_fanart is not None:
                 item.setProperty('Fanart_Image', addon_fanart)
 
-            if queue is False:
+            if not queue:
                 item.setInfo(type='Video', infoLabels = meta)
                 item.addContextMenuItems(cm)
                 control.addItem(handle=int(sys.argv[1]), url=url, listitem=item, isFolder=folder)
@@ -1028,22 +1298,31 @@ class indexer:
             return control.player.play(playlist)
 
         try:
-            i = items[0]
-            if i['next'] == '':
-                raise Exception()
+            # Only add "next page" item if items exist and the first item has valid 'next' and 'nextaction'
+            if items and len(items) > 0:
+                i = items[0]
+                if 'next' in i and i['next'] and 'nextaction' in i:
+                    url = f"{sysaddon}?action={i['nextaction']}&url={quote_plus(i['next'])}"
 
-            url = f"{sysaddon}?action={i['nextaction']}&url={quote_plus(i['next'])}"
-            item = control.item(label=control.lang(30500).encode('utf-8'))
-            item.setArt({
-                'addonPoster': addon_poster, 'thumb': addon_poster, 'poster': addon_poster,
-                'tvshow.poster': addon_poster, 'season.poster': addon_poster, 'banner': addon_poster,
-                'tvshow.banner': addon_poster, 'season.banner': addon_poster
-                })
-            item.setProperty('addonFanart_Image', addon_fanart)
+                    item = control.item(label=control.lang(30500))
+                    item.setArt({
+                        'addonPoster': addon_poster, 'thumb': addon_poster, 'poster': addon_poster,
+                        'tvshow.poster': addon_poster, 'season.poster': addon_poster, 'banner': addon_poster,
+                        'tvshow.banner': addon_poster, 'season.banner': addon_poster
+                        })
+                    item.setProperty('addonFanart_Image', addon_fanart)
 
-            control.addItem(handle=int(sys.argv[1]), url=url, listitem=item, isFolder=True)
-        except Exception:
-            pass
+                    control.addItem(handle=int(sys.argv[1]), url=url, listitem=item, isFolder=True)
+                else:
+                    c.log("[CM Debug @ addDirectory] No valid 'next' page found in first item")
+        except Exception as e:
+            import traceback
+            failure = traceback.format_exc()
+            c.log(f'[CM Debug @ addDirectory] Failed to add next page item: {failure}')
+            c.log(f'[CM Debug @ addDirectory] Exception: {e}')
+        #     pass
+        # except Exception:
+        #     pass
 
         if mode is not None:
             control.content(int(sys.argv[1]), mode)

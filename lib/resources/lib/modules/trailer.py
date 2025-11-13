@@ -14,10 +14,11 @@
  ********************************************************cm*
 '''
 
+import re
 import sys
 import json
 #import re
-import requests # type: ignore
+import requests
 
 from . import client
 from . import control
@@ -28,7 +29,7 @@ from .crewruntime import c
 from .listitem import ListItemInfoTag
 
 
-class trailers:
+class Trailers:
     '''
     Represents a trailer with associated metadata.
     '''
@@ -48,9 +49,9 @@ class trailers:
                 self.tmdb_user = keys.tmdb_key
             self.tmdb_baselink = ''
             self.tmdb_url = f'{self.tmdb_base}/%s/%s/videos?api_key={self.tmdb_user}' \
-                                        f'&language=en-US'
+                                            f'&language=en-US'
             self.show_url = f'{self.tmdb_base}/tv/%s/videos?api_key={self.tmdb_user}' \
-                                        f'&include_video_language={self.tmdb_lang}'
+                                            f'&include_video_language={self.tmdb_lang}'
             self.base_link = 'https://www.youtube.com'
             self.base_link2 = 'https://youtube.com'
             self.base_link3 = 'https://youtu.be'
@@ -71,7 +72,7 @@ class trailers:
             self.clearlogo = ''
             self.clearart = ''
 
-            self.is_youtube_link = True if 'youtu' in self.url else False
+            self.is_youtube_link = 'youtu' in self.url
             #self.key = control.addon('plugin.video.youtube').getSetting('youtube.api.key') or keys.yt_key
             self.key = control.addon('plugin.video.youtube').getSetting('youtube.api.key') or ""
 
@@ -101,36 +102,14 @@ class trailers:
             self.tmdb = tmdb
             self.mediatype = mediatype
             self.windowedtrailer = windowedtrailer
-            #self.meta = json.dumps(meta) if not meta == None else meta
-            #self.meta = meta if meta is None else json.dumps(meta)
             self.meta = meta if meta is None else json.loads(meta)
-
             self.poster = self.meta.get('poster', '') or control.addonPoster()
             self.fanart = self.meta.get('fanart', '') or control.addonFanart()
             self.banner = self.meta.get('banner') or control.addonBanner()
             self.clearlogo = self.meta.get('clearlogo') or control.addonClearlogo()
             self.clearart = self.meta.get('clearart') or control.addonClearart()
 
-            #1. do we have an url?
-            # play url
-            #3if self.is_youtube_link is True:
-            #    result = {}
-            #    result['video'] = self.url
-            #    result['title'] = self.name
-            #    result['plot'] = ''
-            #    result['icon'] = self.poster
-            #    c.log(f"[CM Debug @ 117 in trailer.py] result = {result}")
-            #    self.play(result)
-            #    return
-
-            #2. start with tmdb
-            #First try tmdb
-            result = self.getSources(mode='tmdb')
-
-
-            if not result:
-                #2. next, continue with imdb
-                result = self.getSources(mode='imdb')
+            result = self.get_sources(mode='tmdb') or self.get_sources(mode='imdb')
 
             #if not result in ['canceled', 'empty'] and result != '':
             if result not in ['canceled', 'empty', '']:
@@ -157,12 +136,20 @@ class trailers:
             c.log(f"[CM Debug @ 140 in trailer.py] result = {repr(result)}")
 
             url = result['video']
-
             c.log(f"[CM Debug @ 160 in trailer.py] url = {url}")
+
+            if 'youtube' in url and 'video_id' in url:
+                #split the url on 'video_id=' and take the last part
+                video_id = url.split('video_id=')[-1]
+                c.log(f"[CM Debug @ 163 in trailer.py]found the culprit! splitting on video_id: {video_id}")
+                url = self.yt_plugin_url % video_id
+                c.log(f"[CM Debug @ 167 in trailer.py] new url = {url}")
+
+
+            c.log(f"[CM Debug @ 168 in trailer.py] url = {url}")
             #if 'youtube' in url:
                 #url = self.get_youtube_link(url)
             title = result['title']
-            c.log(f"[CM Debug @ 164 in trailer.py] title = {title}")
             plot = result['plot']
             #icon = result['video']
             poster = self.poster
@@ -176,6 +163,7 @@ class trailers:
             info_tag = ListItemInfoTag(item, 'video')
             imdb = self.imdb
             tmdb = self.tmdb
+            c.log(f"[CM Debug @ 182 in trailer.py] tmdb = {tmdb}")
 
             info_tag.set_info(infolabels)
             unique_ids = {'imdb': imdb, 'tmdb': str(tmdb)}
@@ -201,7 +189,7 @@ class trailers:
 
 
 
-    def getSources(self, mode):
+    def get_sources(self, mode):
         """
         Retrieves trailer sources from IMDB or TMDb.
 
@@ -220,17 +208,43 @@ class trailers:
                     return
                 items = utils.json_loads_as_str(result)
 
-                list_items = items['playlists'][self.imdb]['listItems']
-                video_metadata = items['videoMetadata']
+                # Safely access 'playlists' and the imdb entry to avoid indexing non-mappings
+                playlists = items.get('playlists') if isinstance(items, dict) else None
+                if not isinstance(playlists, dict):
+                    c.log(f"[CM Debug @ 165 in trailer.py] Invalid or missing 'playlists' in response: {repr(playlists)}")
+                    return
+
+                # Try both direct and stringified imdb keys
+                imdb_entry = playlists.get(self.imdb) or playlists.get(str(self.imdb))
+                if not isinstance(imdb_entry, dict):
+                    c.log(f"[CM Debug @ 165 in trailer.py] Missing playlist for imdb id {self.imdb}")
+                    return
+
+                # Some payloads may use 'listItems' or 'items'
+                list_items = imdb_entry.get('listItems') or imdb_entry.get('items') or []
+                video_metadata = items.get('videoMetadata', {})
                 trailer_list = []
+
                 for item in list_items:
                     try:
-                        metadata = video_metadata[item['videoId']]
+                        # Safely retrieve metadata and ensure it's a mapping before using string keys
+                        if isinstance(video_metadata, dict):
+                            metadata = video_metadata.get(item.get('videoId')) if isinstance(item, dict) else None
+                        else:
+                            metadata = None
                         c.log(f"[CM Debug @ 193 in trailer.py] metadata = {repr(metadata)}")
-                        title = metadata['title']
-                        icon = metadata['smallSlate']['url2x']
-                        #canoniculUrl = metadata['canonicalUrl']
-                        plot = item.get('description') or title
+                        if not isinstance(metadata, dict):
+                            continue
+
+                        title = metadata.get('title', '')
+                        # smallSlate may be missing or not a dict, guard accordingly
+                        small_slate = metadata.get('smallSlate') or {}
+                        icon = ''
+                        if isinstance(small_slate, dict):
+                            icon = small_slate.get('url2x') or small_slate.get('url') or ''
+
+                        #canoniculUrl = metadata.get('canonicalUrl')
+                        plot = item.get('description') or title if isinstance(item, dict) else title
                         related_to = metadata.get('primaryConst') or self.imdb
 
                         #if (not related_to == self.imdb) and (not self.name.lower() in ' '.join((title, plot)).lower()):
@@ -241,19 +255,18 @@ class trailers:
                         ):
                             continue
 
-                        #trailer_url = [i['videoUrl'] for i in metadata['encodings'] if i['definition'] in ['1080', '720', '480p', '360p', 'SD']]
-                        if trailer_url := [
-                            i['videoUrl']
-                            for i in metadata['encodings']
-                            if i['definition']
-                            in ['1080', '720', '480p', '360p', 'SD']
-                        ]:
-                            trailer_list.append({
-                                'title': title,
-                                'icon': icon,
-                                'plot': plot,
-                                'video': trailer_url[0]
-                            })
+                        # Build trailer_url safely from encodings (ensure enc is a dict before using string keys)
+                        trailer_url = []
+                        for enc in metadata.get('encodings', []) or []:
+                            try:
+                                if isinstance(enc, dict) and enc.get('definition') in ['1080', '720', '480p', '360p', 'SD']:
+                                    video = enc.get('videoUrl') or enc.get('videoURL') or enc.get('video') or ''
+                                    if video:
+                                        trailer_url.append(video)
+                            except Exception:
+                                # skip malformed encoding entries
+                                continue
+
                         if not trailer_url:
                             continue
 
@@ -267,25 +280,19 @@ class trailers:
                     except Exception:
                         pass
             elif mode == 'tmdb':
-                #if self.mediatype == 'tv':
-                #url = self.tmdb_url % ('tv', self.tmdb)
                 if self.mediatype in ['tvshow','episode']:
                     self.mediatype = 'tv'
                 url = self.tmdb_url % (self.mediatype, self.tmdb)
-                c.log(f"[CM Debug @ 216 in trailer.py] ---> url = {url}")
                 result = self.session.get(url, timeout=15).json()
 
-                listItems = result['results']
-                c.log(f"[CM Debug @ 251 in trailer.py] url = {url}")
+                list_items = result['results']
                 trailer_list = []
 
-                for item in listItems:
+                for item in list_items:
                     try:
                         title = item['name']
-                        if item['site'] == 'YouTube':
-                            #trailer_url = self.yt_plugin_url2 % str(item['key'])
+                        if item['site'].lower() == 'youtube':
                             trailer_url = self.yt_plugin_url % str(item['key'])
-                            #trailer_url = self.get_youtube_link(trailer_url)
                         else:
                             trailer_url = ''
                         icon = control.addonThumb()
@@ -306,46 +313,23 @@ class trailers:
 
             if not trailer_list:
                 return 'empty'
-            # else:
-            #     trailer_list.sort(reverse=True)
+
 
             try:
-                trailers = []
-                for t in trailer_list:
-                    li = control.item(label=t['title'])
-                    # li.setProperty('IsPlayable', 'true')
-                    li.setArt({'icon': t['icon'], 'thumb': t['icon'], 'poster': self.poster})
-                    trailers.append(li)
-
-
-                if len(trailers) == 1:
-                    return trailer_list[0]
-
-                if not trailers:
-                    return 'empty'
-
-                select = control.selectDialog(trailers, control.lang(90220) % str(mode), useDetails=True)
-
-                return 'canceled' if select < 0 else trailer_list[select]
-
-
-
-
-                # return self.select_item(trailer_list, mode)
+                return self.select_item(trailer_list, mode)
+                        # return self.select_item(trailer_list, mode)
             except Exception as e:
                 import traceback
                 failure = traceback.format_exc()
                 c.log(f'[CM Debug @ 324 in trailer.py]Traceback:: {failure}')
                 c.log(f'[CM Debug @ 324 in trailer.py]Exception raised. Error = {e}')
-                pass
-            # except Exception as e:
-            #     c.log(f"[CM Debug @ 302 in trailer.py] exception: {e}")
-            #     pass
+
         except Exception as e:
             c.log(f"[CM Debug @ 305 in trailer.py] exception: {e}")
-            pass
 
-    # TODO Rename this here and in `getSources`
+
+
+
     def select_item(self, trailer_list, mode):
         trailers = []
         for t in trailer_list:
@@ -353,7 +337,7 @@ class trailers:
             # li.setProperty('IsPlayable', 'true')
             li.setArt({'icon': t['icon'], 'thumb': t['icon'], 'poster': self.poster})
             trailers.append(li)
-            trailers.sort(reverse=True)
+            # trailers.sort(reverse=True)
 
         if len(trailers) == 1:
             return trailer_list[0]
@@ -364,83 +348,3 @@ class trailers:
         select = control.selectDialog(trailers, control.lang(90220) % str(mode), useDetails=True)
 
         return 'canceled' if select < 0 else trailer_list[select]
-
-
-    def get_youtube_link2(self, url):
-        import re
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:82.0) Gecko/20100101 Firefox/82.0',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.5',
-            'Connection': 'keep-alive',
-            'Referer': 'https://qdownloader.io/',
-            'Upgrade-Insecure-Requests': '1',
-            'Pragma': 'no-cache',
-            'Cache-Control': 'no-cache',
-            'TE': 'Trailers',
-        }
-
-
-        params = (('url', url),)
-
-
-
-        response = client.request('https://qdownloader.io/download', headers=headers, post=params)
-        c.log(f"[CM Debug @ 327 in trailer.py] response = {response}")
-
-
-        regex=' download="(.+?)" href="(.+?)"'
-        match=re.compile(regex).findall(response)
-        all_results=[]
-        for name,link in match:
-
-            return link.replace('&amp;','&')
-            all_results.append((name,link.replace('&amp;','&')))
-
-    def creat_youtube_link(self, url) -> None:
-        """
-        Create the YouTube download link.
-        """
-        key = url.rsplit('=', 1)[1]
-        url = f'https://www.youtube.com/watch?v={key}'
-        c.log(f"[CM Debug @ 347 in trailer.py] url = {url}")
-        return url
-
-    def get_youtube_link(self, url: str) -> str:
-        """
-        Get the YouTube download link.
-        """
-        import re
-
-        c.log(f"[CM Debug @ 349 in trailer.py] url = {url}")
-
-        headers = {
-            "User-Agent": client.randomagent(),
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-            "Accept-Language": "en-US,en;q=0.5",
-            "Connection": "keep-alive",
-            "Referer": "https://qdownloader.io/",
-            "Upgrade-Insecure-Requests": "1",
-            "Pragma": "no-cache",
-            "Cache-Control": "no-cache",
-        }
-
-        url = self.creat_youtube_link(url)
-
-        params = (("v", url),)
-
-        response = client.request("https://qdownloader.io/download", headers=headers, post=params)
-
-        #response = self.session.post("https://qdownloader.io/download", headers=headers, data=params)
-
-        c.log(f"[CM Debug @ 377 in trailer.py] response = {response}")
-
-        regex = r" download=\"(.+?)\" href=\"(.+?)\""
-        #match = re.compile(regex).findall(response.text)
-
-        match = re.findall(regex, response)
-
-        c.log(f"[CM Debug @ 373 in trailer.py] match = {match}")
-
-        for name, link in match:
-            return link.replace("&amp;", "&")

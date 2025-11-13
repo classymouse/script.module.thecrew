@@ -100,42 +100,6 @@ class Navigator:
 
         self.endDirectory()
 
-
-    def root(self) -> None:
-        c.log(f"[CM Debug @ 64 in navigator.py] devmode = {DEVMODE}")
-        if DEVMODE:
-            self.addDirectoryItem('[COLOR orchid]¤[/COLOR] [B][COLOR white]Dev menu[/COLOR][/B]', 'developers','dev.png', 'main_orangehat.png')
-        if self.get_menu_enabled('navi.holidays'):
-            self.addDirectoryItem(90157, 'holidaysNavigator', 'holidays.png', 'holidays.png')
-        if self.get_menu_enabled('navi.halloween'):
-            self.addDirectoryItem(30201, 'halloweenNavigator', 'halloween.png', 'halloween.png')
-        if c.get_setting('navi.movies') != 'false':
-            self.addDirectoryItem(32001, 'movieNavigator','main_movies.png', 'DefaultMovies.png')
-        if c.get_setting('navi.tvshows') != 'false':
-            self.addDirectoryItem(32002, 'tvNavigator','main_tvshows.png', 'DefaultTVShows.png')
-        if c.get_setting('navi.sports') != 'false':
-            self.addDirectoryItem(90006, 'bluehat', 'main_bluehat.png', 'DefaultMovies.png')
-        if c.get_setting('navi.iptv') != 'false':
-            self.addDirectoryItem(90007, 'whitehat', 'main_whitehat.png', 'DefaultMovies.png')
-        if c.get_setting('navi.kidsgrey') != 'false':
-            self.addDirectoryItem(90009, 'kidsgreyNavigator', 'main_greyhat.png', 'DefaultTVShows.png')
-        if c.get_setting('navi.1clicks') != 'false':
-            self.addDirectoryItem(90011, 'greenhat', 'main_greenhat.png', 'DefaultMovies.png')
-        if c.get_setting('navi.purplehat') != 'false':
-            self.addDirectoryItem(90189, 'purplehat', 'main_purplehat.png', 'DefaultMovies.png')
-        if DEVMODE:
-            self.addDirectoryItem('[COLOR orchid]¤[/COLOR] [B][COLOR orange]Classy Collections[/COLOR][/B]', 'classy', 'main_classy.png', 'DefaultMovies.png')
-        if ADULT:
-            self.addDirectoryItem(90008, 'porn', 'main_pinkhat.png', 'DefaultMovies.png')
-        if c.get_setting('navi.personal.list') != 'false':
-            self.addDirectoryItem(90167, 'plist', 'userlists.png', 'userlists.png')
-        self.addDirectoryItem(32008, 'toolNavigator','main_tools.png', 'DefaultAddonProgram.png')
-        if DOWNLOADS is True:
-            self.addDirectoryItem(32009, 'downloadNavigator','downloads.png', 'DefaultFolder.png')
-        self.addDirectoryItem(32010, 'searchNavigator','main_search.png', 'DefaultFolder.png')
-
-        self.endDirectory()
-
     def movies(self, lite=False):
         self.addDirectoryItem(32003, 'mymovieliteNavigator','mymovies.png', 'DefaultVideoPlaylists.png')
         if(c.get_setting('dev_pw') == c.ensure_text(base64.b64decode(b'dGhlY3Jldw=='))) or (month == 12):
@@ -250,7 +214,7 @@ class Navigator:
             self.account_check()
 
             if traktCredentials is True:
-                self.addDirectoryItem(90050, 'calendar&url=onDeck', 'trakt.png', 'DefaultTVShows.png')
+                self.addDirectoryItem(90050, 'calendar&url=ondeck', 'trakt.png', 'DefaultTVShows.png')
                 self.addDirectoryItem(32624, 'calendar&url=tvProgress','main_classy.png', 'main_classy.png')
                 self.addDirectoryItem(32032, 'tvshows&url=traktcollection', 'trakt.png', 'DefaultTVShows.png', context=(32551, 'tvshowsToLibrary&url=traktcollection'))
                 self.addDirectoryItem(32033, 'tvshows&url=traktwatchlist', 'trakt.png', 'DefaultTVShows.png', context=(32551, 'tvshowsToLibrary&url=traktwatchlist'))
@@ -386,9 +350,7 @@ class Navigator:
             return True
         if menu_item == 'navi.holidays'and datetime.now().month == 12:
             return True
-        if menu_item == 'navi.halloween' and datetime.now().month == 10:
-            return True
-        return False
+        return menu_item == 'navi.halloween' and datetime.now().month == 10
 
 
     def account_check(self) -> None:
@@ -541,6 +503,7 @@ class Navigator:
     #######
     def developers(self):
 
+        self.addDirectoryItem('Documentaries', 'docuNavigator','main_purplehat.png', 'main_purplehat.png')
         self.addDirectoryItem('Trending Sci-Fi', 'movies&url=https://trakt.tv/movies/trending?genres=science-fiction/','main_purplehat.png', 'main_purplehat.png')
         self.addDirectoryItem('Best of Sci-Fi', 'movies&url=https://trakt.tv/lists/31916837/items','main_purplehat.png', 'main_purplehat.png')
         self.addDirectoryItem('Alien Invasion', 'movies&url=https://trakt.tv/lists/10178267/items','main_purplehat.png', 'main_purplehat.png')

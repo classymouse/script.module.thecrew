@@ -52,7 +52,8 @@ def fetch(items, lang='en', user=''):
             # item_data = eval(c.ensure_str(match[5]))
 
             item_data = json.loads(c.ensure_str(match[5]))
-            item_data = dict((k,v) for k, v in item_data.items() if not v == '0')
+            # item_data = dict((k,v) for k, v in item_data.items() if not v == '0')
+            item_data = {k:v for k, v in item_data.items() if v != '0'}
 
             item.update(item_data)
             item.update({'metacache': True})
@@ -133,7 +134,7 @@ def local(items, link, poster, fanart):
             match = [x for x in data if x[1] == item['imdb']][0]
 
             try:
-                if poster in item and not item[poster] == '0':
+                if poster in item and item[poster] != '0':
                     raise Exception()
                 if match[2] == '0':
                     raise Exception()
@@ -142,7 +143,7 @@ def local(items, link, poster, fanart):
             except:
                 pass
             try:
-                if fanart in item and not item[fanart] == '0':
+                if fanart in item and item[fanart] != '0':
                     raise Exception()
                 if match[3] == '0':
                     raise Exception()

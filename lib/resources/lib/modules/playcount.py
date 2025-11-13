@@ -242,7 +242,7 @@ def movies(imdb, query):
         control.refresh()
     except Exception as e:
         c.log(f"[CM Debug @ movies] control.refresh failed: {e}")
-# ...existing code...
+
 def movies2(imdb, query):
     try:
         if not trakt.getTraktIndicatorsInfo():

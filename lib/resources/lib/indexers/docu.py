@@ -15,24 +15,29 @@
 
 import os
 import re
+import sys
 import time
 # import trace
+import traceback
+
+from urllib.parse import quote_plus, urlparse
 import requests
-import sys
+
+
+
 import xbmc
 import xbmcgui
 import xbmcaddon
 import xbmcplugin
+
+
 # import urllib
 # import six
 
 import resolveurl
 # from xbmcplugin import setResolvedUrl
 
-
-from urllib.parse import quote_plus, urlparse
-
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup as bs
 
 from ..modules.listitem import ListItemInfoTag
 
@@ -49,7 +54,7 @@ artPath = control.artPath()
 addonFanart = control.addonFanart()
 
 
-class documentary:
+class Documentary:
     def __init__(self):
         self.list = []
         self.docu_link = 'https://topdocumentaryfilms.com/'
@@ -71,9 +76,10 @@ class documentary:
         self.DAILYMOTION_PLUGIN = "plugin://plugin.video.dailymotion_com/"
 
     def get_html(self, url):
-        page_response = self.session.get(url)
-        html = BeautifulSoup(page_response.text, "html.parser")
-        return html
+        # page_response = self.session.get(url)
+        page_response = client.request(url)
+        c.log(f"[CM Debug @ 77 in docu.py] url = {page_response}")
+        return bs(page_response, "html.parser")
 
     def get_json(self, url):
         page_response = self.session.get(url)
@@ -96,6 +102,7 @@ class documentary:
             # html = client.request(self.docu_cat_list) #cm - use client request because cf
 
             soup = self.get_html(self.docu_cat_list)
+            c.log(f"[CM Debug @ 99 in docu.py] url = {soup}")
             # soup = BeautifulSoup(html, 'html.parser')
             # c.log(f"[CM Debug @ 87 in docu.py] soup = {soup}")
 
@@ -105,7 +112,7 @@ class documentary:
                 links.append(child.find('h2').find_all('a'))
 
             for link in links:
-                link = BeautifulSoup(str(link[0]), 'html.parser')
+                link = bs(str(link[0]), 'html.parser')
                 c.log(f"[CM Debug @ 107 in docu.py] link = {link}")
                 cat_url = link.find("a").attrs.get("href")
                 c.log(f"[CM Debug @ 109 in docu.py] url = {cat_url}")
@@ -114,7 +121,13 @@ class documentary:
                 cat_action = f'docuHeaven&docuCat={cat_url}'
                 self.list.append({'name': cat_title, 'url': cat_url, 'image': cat_icon, 'action': cat_action})
         except Exception as e:
-            c.log(f'root() Exception: {e}')
+
+            failure = traceback.format_exc()
+            c.log(f'[CM Debug @ 119 in docu.py]Traceback:: {failure}')
+            c.log(f'[CM Debug @ 119 in docu.py]Exception raised. Error = {e}')
+        #     pass
+        # except Exception as e:
+        #     c.log(f'root() Exception: {e}')
 
         self.addDirectory(self.list)
         return self.list
@@ -137,6 +150,7 @@ class documentary:
                 c.log(f'[CM DEBUG in docu.py @ 101] item = {item}')
                 docu_img = item.find('img')
                 docu_icon = docu_img.get("src")
+                temp = item.find('source', attrs={'srcset': ''})
                 link = item.find('a')
                 docu_url = link.get('href')
                 docu_title = link.get('title')
@@ -144,10 +158,13 @@ class documentary:
 
                 self.list.append({'name': docu_title, 'url': docu_url, 'image': docu_icon, 'action': docu_action})
             try:
-                soup = BeautifulSoup(html, 'html.parser')
-                soup = soup.find('div', attrs={'class':'pagination module'})
-                if soup:
+                soup = bs(html, 'html.parser')
+                if soup := soup.find('div', attrs={'class': 'pagination module'}):
+                    is_ytube = False
+                    soup.find()
                     links = soup.find_all("a")
+
+                    links =
                     link = links[(len(links)-1)]
                     docu_action = f'docuHeaven&docuCat={link}'
                     self.list.append({
